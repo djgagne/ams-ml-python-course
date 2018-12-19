@@ -12,6 +12,7 @@ import netCDF4
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
+POOP_FORMAT = 'poop'
 DATE_FORMAT = '%Y%m%d'
 DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
 
