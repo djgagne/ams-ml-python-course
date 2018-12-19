@@ -2,9 +2,10 @@
 
 import copy
 import glob
+import random
+import os.path
 import time
 import calendar
-import os.path
 import numpy
 import pandas
 import netCDF4
@@ -34,6 +35,7 @@ CSV_EXTRANEOUS_COLUMNS = [
 
 CSV_TARGET_NAME = 'RVORT1_MAX-future_max'
 TARGET_NAME = 'max_future_vorticity_s01'
+BINARIZATION_THRESHOLD_S01 = 0.005
 
 NETCDF_REFL_NAME = 'REFL_COM_curr'
 NETCDF_TEMP_NAME = 'T2_curr'
@@ -358,6 +360,189 @@ def read_many_image_files(netcdf_file_names):
     return image_dict
 
 
+def normalize_images(
+        predictor_matrix, predictor_names, normalization_dict=None):
+    """Normalizes images to z-scores.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :param predictor_names: length-C list of predictor names.
+    :param normalization_dict: Dictionary.  Each key is the name of a predictor
+        value, and the corresponding value is a length-2 numpy array with
+        [mean, standard deviation].  If `normalization_dict is None`, mean and
+        standard deviation will be computed for each predictor.
+    :return: predictor_matrix: Normalized version of input.
+    :return: normalization_dict: See doc for input variable.  If input was None,
+        this will be a newly created dictionary.  Otherwise, this will be the
+        same dictionary passed as input.
+    """
+
+    num_predictors = len(predictor_names)
+
+    if normalization_dict is None:
+        normalization_dict = {}
+
+        for m in range(num_predictors):
+            this_mean = numpy.mean(predictor_matrix[..., m])
+            this_stdev = numpy.std(predictor_matrix[..., m], ddof=1)
+
+            normalization_dict[predictor_names[m]] = numpy.array(
+                [this_mean, this_stdev])
+
+    for m in range(num_predictors):
+        this_mean = normalization_dict[predictor_names[m]][0]
+        this_stdev = normalization_dict[predictor_names[m]][1]
+
+        predictor_matrix[..., m] = (
+            (predictor_matrix[..., m] - this_mean) / this_stdev
+        )
+
+    return predictor_matrix, normalization_dict
+
+
+def denormalize_images(predictor_matrix, predictor_names, normalization_dict):
+    """Denormalizes images from z-scores back to original scales.
+
+    :param predictor_matrix: See doc for `normalize_images`.
+    :param predictor_names: Same.
+    :param normalization_dict: Same.
+    :return: predictor_matrix: Denormalized version of input.
+    """
+
+    num_predictors = len(predictor_names)
+    for m in range(num_predictors):
+        this_mean = normalization_dict[predictor_names[m]][0]
+        this_stdev = normalization_dict[predictor_names[m]][1]
+
+        predictor_matrix[..., m] = (
+            this_mean + this_stdev * predictor_matrix[..., m]
+        )
+
+    return predictor_matrix
+
+
+def binarize_target_images(target_matrix, binarization_threshold):
+    """Binarizes target images.
+
+    Specifically, this method turns each target image into a binary label,
+    depending on whether or not (max value in image) >= binarization_threshold.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+
+    :param target_matrix: E-by-M-by-N numpy array of floats.
+    :param binarization_threshold: Binarization threshold.
+    :return: target_values: length-E numpy array of target values (integers in
+        0...1).
+    """
+
+    num_examples = target_matrix.shape[0]
+    target_values = numpy.full(num_examples, -1, dtype=int)
+
+    for i in range(num_examples):
+        target_values[i] = (
+            numpy.max(target_matrix[i, ...]) >= binarization_threshold
+        )
+
+    return target_values
+
+
+def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
+                            normalization_dict, binarization_threshold_s01):
+    """Generates training examples for deep-learning model on the fly.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param netcdf_file_names: 1-D list of paths to input (NetCDF) files.
+    :param num_examples_per_batch: Number of examples per training batch.
+    :param normalization_dict: See doc for `normalize_images`.  You cannot leave
+        this as None.
+    :param binarization_threshold_s01: Binarization threshold (inverse seconds)
+        for target variable.  See `binarize_target_images` for details on what
+        this does.
+    :return: predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :return: target_values: length-E numpy array of target values (integers in
+        0...1).
+    :raises: TypeError: if `normalization_dict is None`.
+    """
+
+    if normalization_dict is None:
+        error_string = 'normalization_dict cannot be None.  Must be specified.'
+        raise TypeError(error_string)
+
+    random.shuffle(netcdf_file_names)
+    num_files = len(netcdf_file_names)
+    file_index = 0
+
+    num_examples_in_memory = 0
+    full_predictor_matrix = None
+    full_target_matrix = None
+    predictor_names = None
+
+    while True:
+        while num_examples_in_memory < num_examples_per_batch:
+            print 'Reading data from: "{0:s}"...'.format(
+                netcdf_file_names[file_index])
+
+            this_image_dict = read_image_file(netcdf_file_names[file_index])
+            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
+
+            file_index += 1
+            if file_index >= num_files:
+                file_index = 0
+
+            if full_target_matrix is None or full_target_matrix.size == 0:
+                full_predictor_matrix = (
+                    this_image_dict[PREDICTOR_MATRIX_KEY] + 0.
+                )
+                full_target_matrix = this_image_dict[TARGET_MATRIX_KEY] + 0.
+
+            else:
+                full_predictor_matrix = numpy.concatenate(
+                    (full_predictor_matrix,
+                     this_image_dict[PREDICTOR_MATRIX_KEY]),
+                    axis=0)
+
+                full_target_matrix = numpy.concatenate(
+                    (full_target_matrix, this_image_dict[TARGET_MATRIX_KEY]),
+                    axis=0)
+
+            num_examples_in_memory = full_target_matrix.shape[0]
+
+        batch_indices = numpy.linspace(
+            0, num_examples_in_memory - 1, num=num_examples_in_memory,
+            dtype=int)
+        batch_indices = numpy.random.choice(
+            batch_indices, size=num_examples_per_batch, replace=False)
+
+        predictor_matrix, _ = normalize_images(
+            predictor_matrix=full_predictor_matrix[batch_indices, ...],
+            predictor_names=predictor_names,
+            normalization_dict=normalization_dict)
+        predictor_matrix = predictor_matrix.astype('float32')
+
+        target_values = binarize_target_images(
+            target_matrix=full_target_matrix[batch_indices, ...],
+            binarization_threshold=binarization_threshold_s01)
+
+        print 'Fraction of examples in positive class: {0:.4f}'.format(
+            numpy.mean(target_values))
+
+        num_examples_in_memory = 0
+        full_predictor_matrix = None
+        full_target_matrix = None
+
+        yield (predictor_matrix, target_values)
+
+
 def _run():
     """This is effectively the main method for now."""
 
@@ -379,6 +564,14 @@ def _run():
     print 'Shape of predictor matrix: {0:s}'.format(
         str(image_dict[PREDICTOR_MATRIX_KEY].shape)
     )
+
+    image_dict[PREDICTOR_MATRIX_KEY] = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=image_dict[PREDICTOR_NAMES_KEY])
+
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=BINARIZATION_THRESHOLD_S01)
 
 
 if __name__ == '__main__':
