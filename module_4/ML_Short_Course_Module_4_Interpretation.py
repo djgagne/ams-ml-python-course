@@ -1314,7 +1314,7 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         model_object=model_object, training_file_names=training_file_names,
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold,
-        num_examples_per_batch=512, num_epochs=10,
+        num_examples_per_batch=100, num_epochs=10,
         num_training_batches_per_epoch=10,
         validation_file_names=validation_file_names,
         num_validation_batches_per_epoch=10,
