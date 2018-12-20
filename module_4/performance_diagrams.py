@@ -253,6 +253,9 @@ def plot_performance_diagram(
     :param line_width: Line width (real positive number).
     :param bias_line_colour: Colour of contour lines for frequency bias.
     :param bias_line_width: Width of contour lines for frequency bias.
+    :return: pod_by_threshold: See doc for `_get_points_in_perf_diagram`.
+        detection) values.
+    :return: success_ratio_by_threshold: Same.
     """
 
     pod_by_threshold, success_ratio_by_threshold = _get_points_in_perf_diagram(
@@ -310,3 +313,5 @@ def plot_performance_diagram(
     axes_object.set_ylabel('POD (probability of detection)')
     axes_object.set_xlim(0., 1.)
     axes_object.set_ylim(0., 1.)
+
+    return pod_by_threshold, success_ratio_by_threshold

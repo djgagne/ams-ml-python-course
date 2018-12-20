@@ -2,7 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/attributes_diagrams.py" afterPath="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/performance_diagrams.py" afterPath="$PROJECT_DIR$/module_4/performance_diagrams.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/roc_curves.py" afterPath="$PROJECT_DIR$/module_4/roc_curves.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -13,11 +16,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf>
-      <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="468">
-              <caret line="26" column="40" lean-forward="true" selection-start-line="26" selection-start-column="40" selection-end-line="26" selection-end-column="40" />
+            <state relative-caret-position="402">
+              <caret line="1187" column="0" lean-forward="true" selection-start-line="1187" selection-start-column="0" selection-end-line="1187" selection-end-column="0" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -25,11 +28,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="attributes_diagrams.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="attributes_diagrams.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/module_4/attributes_diagrams.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="101">
-              <caret line="294" column="44" lean-forward="true" selection-start-line="294" selection-start-column="44" selection-end-line="294" selection-end-column="44" />
+            <state relative-caret-position="834">
+              <caret line="345" column="77" lean-forward="true" selection-start-line="345" selection-start-column="11" selection-end-line="345" selection-end-column="77" />
               <folding>
                 <element signature="e#48#60#0" expanded="true" />
               </folding>
@@ -53,16 +56,23 @@
       <find>HISTOGRAM_EDGE_COLOUR</find>
       <find>input_to_bin_indices</find>
       <find>def _plot</find>
-      <find>axes_object:</find>
       <find>def deep</find>
+      <find>axes_object:</find>
+      <find>E =</find>
+      <find>MAX_PROBABILITY</find>
+      <find>_get_binary_xentropy</find>
+      <find>TRAINING_FILES_KEY</find>
+      <find>:return: pofd_by_threshold:</find>
+      <find>def _csi_from_sr_and_pod</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
       <replace>intermediate_normalization_dict</replace>
       <replace>right</replace>
       <replace>inputs_to_bins</replace>
-      <replace>real_indices</replace>
       <replace>binarization_threshold</replace>
+      <replace>real_indices</replace>
+      <replace>Same</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -78,10 +88,10 @@
       <list>
         <option value="$PROJECT_DIR$/module_4/performance_diagram_stuff.py" />
         <option value="$PROJECT_DIR$/setup.py" />
-        <option value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
         <option value="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
         <option value="$PROJECT_DIR$/module_4/performance_diagrams.py" />
         <option value="$PROJECT_DIR$/module_4/roc_curves.py" />
+        <option value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
       </list>
     </option>
   </component>
@@ -151,7 +161,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.roc_curves">
+  <component name="RunManager" selected="Python.ML_Short_Course_Module_4_Interpretation">
     <configuration name="ML_Short_Course_Module_4_Interpretation" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -309,10 +319,10 @@
     </list>
     <recent_temporary>
       <list size="4">
-        <item index="0" class="java.lang.String" itemvalue="Python.roc_curves" />
-        <item index="1" class="java.lang.String" itemvalue="Python.performance_diagrams" />
-        <item index="2" class="java.lang.String" itemvalue="Python.attributes_diagrams" />
-        <item index="3" class="java.lang.String" itemvalue="Python.ML_Short_Course_Module_4_Interpretation" />
+        <item index="0" class="java.lang.String" itemvalue="Python.ML_Short_Course_Module_4_Interpretation" />
+        <item index="1" class="java.lang.String" itemvalue="Python.roc_curves" />
+        <item index="2" class="java.lang.String" itemvalue="Python.performance_diagrams" />
+        <item index="3" class="java.lang.String" itemvalue="Python.attributes_diagrams" />
       </list>
     </recent_temporary>
   </component>
@@ -341,7 +351,7 @@
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.437684" sideWeight="0.50208336" order="0" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.48184493" sideWeight="0.49791667" order="5" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.5109261" sideWeight="0.49791667" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Tool" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
@@ -385,42 +395,38 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
+    <entry file="file://$PROJECT_DIR$/module_4/roc_curves.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="468">
-          <caret line="26" column="40" lean-forward="true" selection-start-line="26" selection-start-column="40" selection-end-line="26" selection-end-column="40" />
-          <folding>
-            <element signature="e#39#50#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="353">
+          <caret line="103" column="26" lean-forward="false" selection-start-line="103" selection-start-column="26" selection-end-line="103" selection-end-column="26" />
+          <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/performance_diagrams.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="379">
-          <caret line="312" column="0" lean-forward="true" selection-start-line="312" selection-start-column="0" selection-end-line="312" selection-end-column="0" />
-          <folding>
-            <element signature="e#49#61#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/module_4/roc_curves.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="870">
-          <caret line="145" column="0" lean-forward="true" selection-start-line="145" selection-start-column="0" selection-end-line="145" selection-end-column="0" />
-          <folding>
-            <element signature="e#75#87#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="263">
+          <caret line="245" column="26" lean-forward="false" selection-start-line="245" selection-start-column="26" selection-end-line="245" selection-end-column="26" />
+          <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/attributes_diagrams.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="101">
-          <caret line="294" column="44" lean-forward="true" selection-start-line="294" selection-start-column="44" selection-end-line="294" selection-end-column="44" />
+        <state relative-caret-position="834">
+          <caret line="345" column="77" lean-forward="true" selection-start-line="345" selection-start-column="11" selection-end-line="345" selection-end-column="77" />
           <folding>
             <element signature="e#48#60#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="402">
+          <caret line="1187" column="0" lean-forward="true" selection-start-line="1187" selection-start-column="0" selection-end-line="1187" selection-end-column="0" />
+          <folding>
+            <element signature="e#39#50#0" expanded="true" />
           </folding>
         </state>
       </provider>

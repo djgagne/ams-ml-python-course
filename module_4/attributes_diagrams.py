@@ -272,12 +272,16 @@ def plot_reliability_curve(
     :param num_bins: Number of bins for forecast probability.
     :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
         Will plot on these axes.
+    :return: mean_observation_by_bin: See doc for `_get_points_in_relia_curve`.
+    :return: mean_forecast_by_bin: Same.
+    :return: num_examples_by_bin: Same.
     """
 
-    mean_observation_by_bin, mean_forecast_by_bin = _get_points_in_relia_curve(
-        observed_labels=observed_labels,
-        forecast_probabilities=forecast_probabilities, num_bins=num_bins
-    )[:2]
+    mean_observation_by_bin, mean_forecast_by_bin, num_examples_by_bin = (
+        _get_points_in_relia_curve(
+            observed_labels=observed_labels,
+            forecast_probabilities=forecast_probabilities, num_bins=num_bins)
+    )
 
     if axes_object is None:
         _, axes_object = pyplot.subplots(
@@ -305,6 +309,8 @@ def plot_reliability_curve(
     axes_object.set_xlim(0., 1.)
     axes_object.set_ylim(0., 1.)
 
+    return mean_observation_by_bin, mean_forecast_by_bin, num_examples_by_bin
+
 
 def plot_attributes_diagram(
         observed_labels, forecast_probabilities, num_bins=DEFAULT_NUM_BINS):
@@ -313,13 +319,16 @@ def plot_attributes_diagram(
     :param observed_labels: See doc for `plot_reliability_curve`.
     :param forecast_probabilities: Same.
     :param num_bins: Same.
-    :param num_bins: Same.
+    :return: mean_observation_by_bin: See doc for `_get_points_in_relia_curve`.
+    :return: mean_forecast_by_bin: Same.
+    :return: num_examples_by_bin: Same.
     """
 
-    num_examples_by_bin = _get_points_in_relia_curve(
-        observed_labels=observed_labels,
-        forecast_probabilities=forecast_probabilities, num_bins=num_bins
-    )[-1]
+    mean_observation_by_bin, mean_forecast_by_bin, num_examples_by_bin = (
+        _get_points_in_relia_curve(
+            observed_labels=observed_labels,
+            forecast_probabilities=forecast_probabilities, num_bins=num_bins)
+    )
 
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
@@ -333,3 +342,5 @@ def plot_attributes_diagram(
         observed_labels=observed_labels,
         forecast_probabilities=forecast_probabilities, num_bins=num_bins,
         axes_object=axes_object)
+
+    return mean_observation_by_bin, mean_forecast_by_bin, num_examples_by_bin

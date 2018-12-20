@@ -11,9 +11,16 @@ import numpy
 import pandas
 import netCDF4
 import keras
+from sklearn.metrics import auc as scikit_learn_auc
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as pyplot
 from gewittergefahr.deep_learning import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
+from module_4 import attributes_diagrams
+
+FIGURE_RESOLUTION_DPI = 300
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 DATE_FORMAT = '%Y%m%d'
@@ -98,6 +105,23 @@ LIST_OF_METRIC_FUNCTIONS = [
     keras_metrics.binary_peirce_score, keras_metrics.binary_success_ratio,
     keras_metrics.binary_focn
 ]
+
+TRAINING_FILES_KEY = 'training_file_names'
+NORMALIZATION_DICT_KEY = 'normalization_dict'
+BINARIZATION_THRESHOLD_KEY = 'binarization_threshold'
+NUM_EXAMPLES_PER_BATCH_KEY = 'num_examples_per_batch'
+NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
+VALIDATION_FILES_KEY = 'validation_file_names'
+NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
+
+MIN_PROBABILITY = 1e-15
+MAX_PROBABILITY = 1. - MIN_PROBABILITY
+
+PERMUTED_PREDICTORS_KEY = 'permuted_predictor_name_by_step'
+HIGHEST_COSTS_KEY = 'highest_cost_by_step'
+ORIGINAL_COST_KEY = 'original_cost'
+STEP1_PREDICTORS_KEY = 'predictor_names_step1'
+STEP1_COSTS_KEY = 'costs_step1'
 
 
 def _remove_future_data(predictor_table):
@@ -246,6 +270,32 @@ def _get_standard_deviation(intermediate_normalization_dict):
         intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] -
         intermediate_normalization_dict[MEAN_VALUE_KEY] ** 2
     ))
+
+
+def _get_binary_xentropy(target_values, forecast_probabilities):
+    """Computes binary cross-entropy.
+
+    This function satisfies the requirements for `cost_function` in the input to
+    `run_permutation_test`.
+
+    E = number of examples
+
+    :param: target_values: length-E numpy array of target values (integer class
+        labels).
+    :param: forecast_probabilities: length-E numpy array with predicted
+        probabilities of positive class (target value = 1).
+    :return: cross_entropy: Cross-entropy.
+    """
+
+    forecast_probabilities[
+        forecast_probabilities < MIN_PROBABILITY] = MIN_PROBABILITY
+    forecast_probabilities[
+        forecast_probabilities > MAX_PROBABILITY] = MAX_PROBABILITY
+
+    return -1 * numpy.mean(
+        target_values * numpy.log2(forecast_probabilities) +
+        (1 - target_values) * numpy.log2(1 - forecast_probabilities)
+    )
 
 
 def _create_directory(directory_name=None, file_name=None):
@@ -924,6 +974,14 @@ def train_cnn(
     :param num_validation_batches_per_epoch:
         [used only if `validation_file_names is not None`]
         Number of validation batches furnished to model in each epoch.
+    :return: model_metadata_dict: Dictionary with the following keys.
+    model_metadata_dict['training_file_names']: See input doc.
+    model_metadata_dict['normalization_dict']: Same.
+    model_metadata_dict['binarization_threshold']: Same.
+    model_metadata_dict['num_examples_per_batch']: Same.
+    model_metadata_dict['num_training_batches_per_epoch']: Same.
+    model_metadata_dict['validation_file_names']: Same.
+    model_metadata_dict['num_validation_batches_per_epoch']: Same.
     """
 
     _create_directory(file_name=output_model_file_name)
@@ -947,13 +1005,23 @@ def train_cnn(
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold)
 
+    model_metadata_dict = {
+        TRAINING_FILES_KEY: training_file_names,
+        NORMALIZATION_DICT_KEY: normalization_dict,
+        BINARIZATION_THRESHOLD_KEY: binarization_threshold,
+        NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
+        NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
+        VALIDATION_FILES_KEY: validation_file_names,
+        NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch
+    }
+
     if validation_file_names is None:
         model_object.fit_generator(
             generator=training_generator,
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
             verbose=1, callbacks=list_of_callback_objects)
 
-        return
+        return model_metadata_dict
 
     early_stopping_object = keras.callbacks.EarlyStopping(
         monitor='val_loss', min_delta=MIN_LOSS_DECR_FOR_EARLY_STOPPING,
@@ -973,6 +1041,204 @@ def train_cnn(
         verbose=1, callbacks=list_of_callback_objects,
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
+
+    return model_metadata_dict
+
+
+def evaluate_cnn(
+        model_object, image_dict, model_metadata_dict, output_dir_name):
+    """Evaluates trained CNN (convolutional neural net).
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param image_dict: Dictionary created by `read_image_file` or
+        `read_many_image_files`.  Should contain validation or testing data (not
+        training data), but this is not enforced.
+    :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
+        ensure that data in `image_dict` are processed the exact same way as the
+        training data for `model_object`.
+    :param output_dir_name: Path to output directory.  Figures will be saved
+        here.
+    """
+
+    predictor_matrix, _ = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=image_dict[PREDICTOR_NAMES_KEY],
+        normalization_dict=model_metadata_dict[NORMALIZATION_DICT_KEY])
+    predictor_matrix = predictor_matrix.astype('float32')
+
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
+
+    forecast_probabilities = model_object.predict(
+        predictor_matrix, batch_size=predictor_matrix.shape[0])
+
+    pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
+        observed_labels=target_values,
+        forecast_probabilities=forecast_probabilities)
+
+    area_under_roc_curve = scikit_learn_auc(pofd_by_threshold, pod_by_threshold)
+    print 'Area under ROC curve: {0:.4f}'.format(area_under_roc_curve)
+
+    _create_directory(directory_name=output_dir_name)
+    roc_curve_file_name = '{0:s}/roc_curve.jpg'.format(output_dir_name)
+
+    print 'Saving figure to: "{0:s}"...'.format(roc_curve_file_name)
+    pyplot.savefig(roc_curve_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+    performance_diagrams.plot_performance_diagram(
+        observed_labels=target_values,
+        forecast_probabilities=forecast_probabilities)
+
+    perf_diagram_file_name = '{0:s}/performance_diagram.jpg'.format(
+        output_dir_name)
+
+    print 'Saving figure to: "{0:s}"...'.format(perf_diagram_file_name)
+    pyplot.savefig(perf_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+    attributes_diagrams.plot_attributes_diagram(
+        observed_labels=target_values,
+        forecast_probabilities=forecast_probabilities, num_bins=20)
+
+    attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
+        output_dir_name)
+
+    print 'Saving figure to: "{0:s}"...'.format(attr_diagram_file_name)
+    pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+
+def permutation_test_for_cnn(
+        model_object, image_dict, model_metadata_dict,
+        cost_function=_get_binary_xentropy):
+    """Runs permutation test on CNN (convolutional neural net).
+
+    E = number of examples (storm objects)
+    C = number of channels (predictor variables)
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param image_dict: Dictionary created by `read_image_file` or
+        `read_many_image_files`.  Should contain validation data (rather than
+        training data), but this is not enforced.
+    :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
+        ensure that data in `image_dict` are processed the exact same way as the
+        training data for `model_object`.
+
+    :param cost_function: Cost function (used to evaluate model predictions).
+        Must be negatively oriented (lower values are better).  Must have the
+        following inputs and outputs.
+    Input: target_values: length-E numpy array of target values (integer class
+        labels).
+    Input: forecast_probabilities: length-E numpy array with predicted
+        probabilities of positive class (target value = 1).
+    Output: cost: Scalar value.
+
+    :return: result_dict: Dictionary with the following keys.
+    result_dict['permuted_predictor_name_by_step']: length-C list with name of
+        predictor permuted at each step.
+    result_dict['highest_cost_by_step']: length-C numpy array with corresponding
+        cost at each step.  highest_cost_by_step[m] = cost after permuting
+        permuted_predictor_name_by_step[m].
+    result_dict['original_cost']: Original cost (before any permutation).
+    result_dict['predictor_names_step1']: length-C list of predictor names.
+    result_dict['costs_step1']: length-C numpy array of corresponding costs.
+        costs_step1[m] = cost after permuting only predictor_names_step1[m].
+        This key and "predictor_names_step1" correspond to the Breiman version
+        of the permutation test, while "permuted_predictor_name_by_step" and
+        "highest_cost_by_step" correspond to the Lakshmanan version.
+    """
+
+    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix, _ = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=image_dict[PREDICTOR_NAMES_KEY],
+        normalization_dict=model_metadata_dict[NORMALIZATION_DICT_KEY])
+    predictor_matrix = predictor_matrix.astype('float32')
+
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
+    
+    # Get original cost (before permutation).
+    num_examples = predictor_matrix.shape[0]
+    these_probabilities = model_object.predict(
+        predictor_matrix, batch_size=num_examples)
+
+    original_cost = cost_function(target_values, these_probabilities)
+    print 'Original cost (no permutation): {0:.4e}'.format(original_cost)
+
+    remaining_predictor_names = predictor_names + []
+    current_step_num = 0
+
+    permuted_predictor_name_by_step = []
+    highest_cost_by_step = []
+    predictor_names_step1 = []
+    costs_step1 = []
+
+    while len(remaining_predictor_names) > 0:
+        print '\n'
+        current_step_num += 1
+
+        highest_cost = -numpy.inf
+        best_predictor_name = None
+        best_predictor_permuted_values = None
+
+        for this_predictor_name in remaining_predictor_names:
+            print (
+                'Trying predictor "{0:s}" at step {1:d} of permutation '
+                'test...'
+            ).format(this_predictor_name, current_step_num)
+
+            this_predictor_index = predictor_names.index(this_predictor_name)
+            this_predictor_matrix = predictor_matrix + 0.
+
+            for i in range(num_examples):
+                this_predictor_matrix[i, ..., this_predictor_index] = (
+                    numpy.random.permutation(
+                        this_predictor_matrix[i, ..., this_predictor_index])
+                )
+
+            these_probabilities = model_object.predict(
+                this_predictor_matrix, batch_size=num_examples)
+            this_cost = cost_function(target_values, these_probabilities)
+            print 'Resulting cost = {0:.4e}'.format(this_cost)
+
+            if current_step_num == 1:
+                predictor_names_step1.append(this_predictor_name)
+                costs_step1.append(this_cost)
+
+            if this_cost < highest_cost:
+                continue
+
+            highest_cost = this_cost + 0.
+            best_predictor_name = this_predictor_name + ''
+            best_predictor_permuted_values = this_predictor_matrix[
+                ..., this_predictor_index]
+
+        permuted_predictor_name_by_step.append(best_predictor_name)
+        highest_cost_by_step.append(highest_cost)
+
+        # Remove best predictor from list.
+        remaining_predictor_names.remove(best_predictor_name)
+
+        # Leave values of best predictor permuted.
+        this_predictor_index = predictor_names.index(best_predictor_name)
+        predictor_matrix[
+            ..., this_predictor_index] = best_predictor_permuted_values
+
+        print '\nBest predictor = "{0:s}" ... new cost = {1:.4e}\n'.format(
+            best_predictor_name, highest_cost)
+
+    return {
+        PERMUTED_PREDICTORS_KEY: permuted_predictor_name_by_step,
+        HIGHEST_COSTS_KEY: numpy.array(highest_cost_by_step),
+        ORIGINAL_COST_KEY: original_cost,
+        STEP1_PREDICTORS_KEY: predictor_names_step1,
+        STEP1_COSTS_KEY: numpy.array(costs_step1)
+    }
 
 
 def _run():
@@ -997,22 +1263,40 @@ def _run():
         netcdf_file_names=training_file_names, percentile_level=90.)
     print SEPARATOR_STRING
 
-    image_dict = read_image_file(training_file_names[0])
+    this_image_dict = read_image_file(training_file_names[0])
     model_object = setup_cnn(
-        num_grid_rows=image_dict[PREDICTOR_MATRIX_KEY].shape[1],
-        num_grid_columns=image_dict[PREDICTOR_MATRIX_KEY].shape[2])
+        num_grid_rows=this_image_dict[PREDICTOR_MATRIX_KEY].shape[1],
+        num_grid_columns=this_image_dict[PREDICTOR_MATRIX_KEY].shape[2])
 
     validation_file_names = find_many_image_files(
         first_date_string='20150101', last_date_string='20151231')
 
-    train_cnn(
+    model_metadata_dict = train_cnn(
         model_object=model_object, training_file_names=training_file_names,
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold,
-        num_examples_per_batch=32, num_epochs=10,
+        num_examples_per_batch=100, num_epochs=10,
         num_training_batches_per_epoch=10,
         validation_file_names=validation_file_names,
         num_validation_batches_per_epoch=10)
+    print SEPARATOR_STRING
+
+    validation_image_dict = read_many_image_files(validation_file_names)
+    print SEPARATOR_STRING
+
+    validation_dir_name = '{0:s}/validation'.format(
+        os.path.split(DEFAULT_CNN_FILE_NAME)[0]
+    )
+
+    evaluate_cnn(
+        model_object=model_object, image_dict=validation_image_dict,
+        model_metadata_dict=model_metadata_dict,
+        output_dir_name=validation_dir_name)
+    print SEPARATOR_STRING
+
+    permutation_dict = permutation_test_for_cnn(
+        model_object=model_object, image_dict=validation_image_dict,
+        model_metadata_dict=model_metadata_dict)
 
 
 if __name__ == '__main__':

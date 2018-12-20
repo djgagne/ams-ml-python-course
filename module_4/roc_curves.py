@@ -113,6 +113,8 @@ def plot_roc_curve(
         predictor).
     :param random_line_width: Width of reference line (ROC curve for random
         predictor).
+    :return: pofd_by_threshold: See doc for `_get_points_in_roc_curve`.
+    :return: pod_by_threshold: Same.
     """
 
     pofd_by_threshold, pod_by_threshold = _get_points_in_roc_curve(
@@ -143,3 +145,5 @@ def plot_roc_curve(
     axes_object.set_ylabel('POD (probability of detection)')
     axes_object.set_xlim(0., 1.)
     axes_object.set_ylim(0., 1.)
+
+    return pofd_by_threshold, pod_by_threshold
