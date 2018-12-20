@@ -17,7 +17,6 @@ from sklearn.metrics import auc as scikit_learn_auc
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as pyplot
-from gewittergefahr.deep_learning import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
@@ -60,6 +59,15 @@ FIGURE_RESOLUTION_DPI = 300
 BAR_GRAPH_FACE_COLOUR = numpy.array([166, 206, 227], dtype=float) / 255
 BAR_GRAPH_EDGE_COLOUR = numpy.full(3, 0.)
 BAR_GRAPH_EDGE_WIDTH = 2.
+
+FONT_SIZE = 30
+pyplot.rc('font', size=FONT_SIZE)
+pyplot.rc('axes', titlesize=FONT_SIZE)
+pyplot.rc('axes', labelsize=FONT_SIZE)
+pyplot.rc('xtick', labelsize=FONT_SIZE)
+pyplot.rc('ytick', labelsize=FONT_SIZE)
+pyplot.rc('legend', fontsize=FONT_SIZE)
+pyplot.rc('figure', titlesize=FONT_SIZE)
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
@@ -130,13 +138,13 @@ DENSE_LAYER_DROPOUT_FRACTION = 0.5
 MIN_LOSS_DECR_FOR_EARLY_STOPPING = 0.005
 NUM_EPOCHS_FOR_EARLY_STOPPING = 5
 
-LIST_OF_METRIC_FUNCTIONS = [
-    keras_metrics.accuracy, keras_metrics.binary_accuracy,
-    keras_metrics.binary_csi, keras_metrics.binary_frequency_bias,
-    keras_metrics.binary_pod, keras_metrics.binary_pofd,
-    keras_metrics.binary_peirce_score, keras_metrics.binary_success_ratio,
-    keras_metrics.binary_focn
-]
+# LIST_OF_METRIC_FUNCTIONS = [
+#     keras_metrics.accuracy, keras_metrics.binary_accuracy,
+#     keras_metrics.binary_csi, keras_metrics.binary_frequency_bias,
+#     keras_metrics.binary_pod, keras_metrics.binary_pofd,
+#     keras_metrics.binary_peirce_score, keras_metrics.binary_success_ratio,
+#     keras_metrics.binary_focn
+# ]
 
 TRAINING_FILES_KEY = 'training_file_names'
 NORMALIZATION_DICT_KEY = 'normalization_dict'
@@ -377,8 +385,8 @@ def _apply_cnn(model_object, predictor_matrix):
             [i + num_examples_per_batch - 1, num_examples - 1]
         )
 
-        print 'Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
-            this_first_index, this_last_index, num_examples)
+        print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
+            this_first_index, this_last_index, num_examples))
 
         these_indices = numpy.linspace(
             this_first_index, this_last_index,
@@ -514,7 +522,7 @@ def read_many_feature_files(csv_file_names):
     list_of_target_tables = [pandas.DataFrame()] * num_files
 
     for i in range(num_files):
-        print 'Reading data from: "{0:s}"...'.format(csv_file_names[i])
+        print('Reading data from: "{0:s}"...'.format(csv_file_names[i]))
 
         (list_of_metadata_tables[i], list_of_predictor_tables[i],
          list_of_target_tables[i]
@@ -647,7 +655,7 @@ def read_many_image_files(netcdf_file_names):
     ]
 
     for this_file_name in netcdf_file_names:
-        print 'Reading data from: "{0:s}"...'.format(this_file_name)
+        print('Reading data from: "{0:s}"...'.format(this_file_name))
         this_image_dict = read_image_file(this_file_name)
 
         if image_dict is None:
@@ -672,7 +680,7 @@ def get_image_normalization_params(netcdf_file_names):
     norm_dict_by_predictor = None
 
     for this_file_name in netcdf_file_names:
-        print 'Reading data from: "{0:s}"...'.format(this_file_name)
+        print('Reading data from: "{0:s}"...'.format(this_file_name))
         this_image_dict = read_image_file(this_file_name)
 
         if predictor_names is None:
@@ -684,7 +692,7 @@ def get_image_normalization_params(netcdf_file_names):
                 intermediate_normalization_dict=norm_dict_by_predictor[m],
                 new_values=this_image_dict[PREDICTOR_MATRIX_KEY][..., m])
 
-    print '\n'
+    print('\n')
     normalization_dict = {}
 
     for m in range(len(predictor_names)):
@@ -693,9 +701,9 @@ def get_image_normalization_params(netcdf_file_names):
         normalization_dict[predictor_names[m]] = numpy.array(
             [this_mean, this_stdev])
 
-        print (
+        print((
             'Mean and standard deviation for "{0:s}" = {1:.4f}, {2:.4f}'
-        ).format(predictor_names[m], this_mean, this_stdev)
+        ).format(predictor_names[m], this_mean, this_stdev))
 
     return normalization_dict
 
@@ -780,7 +788,7 @@ def get_binarization_threshold(netcdf_file_names, percentile_level):
     max_target_values = numpy.array([])
 
     for this_file_name in netcdf_file_names:
-        print 'Reading data from: "{0:s}"...'.format(this_file_name)
+        print('Reading data from: "{0:s}"...'.format(this_file_name))
         this_image_dict = read_image_file(this_file_name)
 
         this_target_matrix = this_image_dict[TARGET_MATRIX_KEY]
@@ -796,8 +804,8 @@ def get_binarization_threshold(netcdf_file_names, percentile_level):
     binarization_threshold = numpy.percentile(
         max_target_values, percentile_level)
 
-    print '\nBinarization threshold for "{0:s}" = {1:.4e}'.format(
-        TARGET_NAME, binarization_threshold)
+    print('\nBinarization threshold for "{0:s}" = {1:.4e}'.format(
+        TARGET_NAME, binarization_threshold))
 
     return binarization_threshold
 
@@ -867,8 +875,8 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
 
     while True:
         while num_examples_in_memory < num_examples_per_batch:
-            print 'Reading data from: "{0:s}"...'.format(
-                netcdf_file_names[file_index])
+            print('Reading data from: "{0:s}"...'.format(
+                netcdf_file_names[file_index]))
 
             this_image_dict = read_image_file(netcdf_file_names[file_index])
             predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
@@ -911,8 +919,8 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
             target_matrix=full_target_matrix[batch_indices, ...],
             binarization_threshold=binarization_threshold)
 
-        print 'Fraction of examples in positive class: {0:.4f}'.format(
-            numpy.mean(target_values))
+        print('Fraction of examples in positive class: {0:.4f}'.format(
+            numpy.mean(target_values)))
 
         num_examples_in_memory = 0
         full_predictor_matrix = None
@@ -1035,7 +1043,8 @@ def setup_cnn(num_grid_rows, num_grid_columns):
     model_object.compile(
         loss=keras.losses.binary_crossentropy,
         optimizer=keras.optimizers.Adam(),
-        metrics=LIST_OF_METRIC_FUNCTIONS)
+        # metrics=LIST_OF_METRIC_FUNCTIONS
+    )
 
     model_object.summary()
     return model_object
@@ -1171,41 +1180,44 @@ def evaluate_cnn(
 
     forecast_probabilities = _apply_cnn(model_object=model_object,
                                         predictor_matrix=predictor_matrix)
-    print MINOR_SEPARATOR_STRING
+    print(MINOR_SEPARATOR_STRING)
 
     pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
         observed_labels=target_values,
         forecast_probabilities=forecast_probabilities)
+    pyplot.show()
 
     area_under_roc_curve = scikit_learn_auc(pofd_by_threshold, pod_by_threshold)
-    print 'Area under ROC curve: {0:.4f}'.format(area_under_roc_curve)
+    print('Area under ROC curve: {0:.4f}'.format(area_under_roc_curve))
 
     _create_directory(directory_name=output_dir_name)
     roc_curve_file_name = '{0:s}/roc_curve.jpg'.format(output_dir_name)
 
-    print 'Saving figure to: "{0:s}"...'.format(roc_curve_file_name)
+    print('Saving figure to: "{0:s}"...'.format(roc_curve_file_name))
     pyplot.savefig(roc_curve_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
     performance_diagrams.plot_performance_diagram(
         observed_labels=target_values,
         forecast_probabilities=forecast_probabilities)
+    pyplot.show()
 
     perf_diagram_file_name = '{0:s}/performance_diagram.jpg'.format(
         output_dir_name)
 
-    print 'Saving figure to: "{0:s}"...'.format(perf_diagram_file_name)
+    print('Saving figure to: "{0:s}"...'.format(perf_diagram_file_name))
     pyplot.savefig(perf_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
     attributes_diagrams.plot_attributes_diagram(
         observed_labels=target_values,
         forecast_probabilities=forecast_probabilities, num_bins=20)
+    pyplot.show()
 
     attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
         output_dir_name)
 
-    print 'Saving figure to: "{0:s}"...'.format(attr_diagram_file_name)
+    print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
     pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
@@ -1267,10 +1279,10 @@ def permutation_test_for_cnn(
     # Get original cost (before permutation).
     these_probabilities = _apply_cnn(model_object=model_object,
                                      predictor_matrix=predictor_matrix)
-    print MINOR_SEPARATOR_STRING
+    print(MINOR_SEPARATOR_STRING)
 
     original_cost = cost_function(target_values, these_probabilities)
-    print 'Original cost (no permutation): {0:.4e}\n'.format(original_cost)
+    print('Original cost (no permutation): {0:.4e}\n'.format(original_cost))
 
     num_examples = len(target_values)
     remaining_predictor_names = predictor_names + []
@@ -1289,10 +1301,10 @@ def permutation_test_for_cnn(
         best_predictor_permuted_values = None
 
         for this_predictor_name in remaining_predictor_names:
-            print (
+            print((
                 'Trying predictor "{0:s}" at step {1:d} of permutation '
                 'test...'
-            ).format(this_predictor_name, current_step_num)
+            ).format(this_predictor_name, current_step_num))
 
             this_predictor_index = predictor_names.index(this_predictor_name)
             this_predictor_matrix = predictor_matrix + 0.
@@ -1303,14 +1315,14 @@ def permutation_test_for_cnn(
                         this_predictor_matrix[i, ..., this_predictor_index])
                 )
 
-            print MINOR_SEPARATOR_STRING
+            print(MINOR_SEPARATOR_STRING)
             these_probabilities = _apply_cnn(
                 model_object=model_object,
                 predictor_matrix=this_predictor_matrix)
-            print MINOR_SEPARATOR_STRING
+            print(MINOR_SEPARATOR_STRING)
 
             this_cost = cost_function(target_values, these_probabilities)
-            print 'Resulting cost = {0:.4e}'.format(this_cost)
+            print('Resulting cost = {0:.4e}'.format(this_cost))
 
             if current_step_num == 1:
                 predictor_names_step1.append(this_predictor_name)
@@ -1335,8 +1347,8 @@ def permutation_test_for_cnn(
         predictor_matrix[
             ..., this_predictor_index] = best_predictor_permuted_values
 
-        print '\nBest predictor = "{0:s}" ... new cost = {1:.4e}\n'.format(
-            best_predictor_name, highest_cost)
+        print('\nBest predictor = "{0:s}" ... new cost = {1:.4e}\n'.format(
+            best_predictor_name, highest_cost))
 
     result_dict = {
         PERMUTED_PREDICTORS_KEY: permuted_predictor_name_by_step,
@@ -1348,7 +1360,7 @@ def permutation_test_for_cnn(
 
     _create_directory(file_name=output_pickle_file_name)
 
-    print 'Writing results to: "{0:s}"...'.format(output_pickle_file_name)
+    print('Writing results to: "{0:s}"...'.format(output_pickle_file_name))
     file_handle = open(output_pickle_file_name, 'wb')
     pickle.dump(result_dict, file_handle)
     file_handle.close()
@@ -1403,9 +1415,10 @@ def plot_breiman_results(
 
     _label_bars_in_graph(
         axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
+    pyplot.show()
 
     _create_directory(file_name=output_file_name)
-    print 'Saving figure to: "{0:s}"...'.format(output_file_name)
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
     pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
@@ -1450,9 +1463,10 @@ def plot_lakshmanan_results(
 
     _label_bars_in_graph(
         axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
+    pyplot.show()
 
     _create_directory(file_name=output_file_name)
-    print 'Saving figure to: "{0:s}"...'.format(output_file_name)
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
     pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
@@ -1470,11 +1484,11 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         first_date_string='20100101', last_date_string='20141231')
 
     normalization_dict = get_image_normalization_params(training_file_names)
-    print SEPARATOR_STRING
+    print(SEPARATOR_STRING)
 
     binarization_threshold = get_binarization_threshold(
         netcdf_file_names=training_file_names, percentile_level=90.)
-    print SEPARATOR_STRING
+    print(SEPARATOR_STRING)
 
     this_image_dict = read_image_file(training_file_names[0])
     model_object = setup_cnn(
@@ -1495,17 +1509,17 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         validation_file_names=validation_file_names,
         num_validation_batches_per_epoch=10,
         output_model_file_name=cnn_file_name)
-    print SEPARATOR_STRING
+    print(SEPARATOR_STRING)
 
     validation_image_dict = read_many_image_files(validation_file_names)
-    print SEPARATOR_STRING
+    print(SEPARATOR_STRING)
 
     validation_dir_name = '{0:s}/validation'.format(output_dir_name)
     evaluate_cnn(
         model_object=model_object, image_dict=validation_image_dict,
         model_metadata_dict=model_metadata_dict,
         output_dir_name=validation_dir_name)
-    print SEPARATOR_STRING
+    print(SEPARATOR_STRING)
 
     permutation_dir_name = '{0:s}/permutation_test'.format(output_dir_name)
     main_permutation_file_name = '{0:s}/permutation_results.p'.format(
@@ -1515,7 +1529,7 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         model_object=model_object, image_dict=validation_image_dict,
         model_metadata_dict=model_metadata_dict,
         output_pickle_file_name=main_permutation_file_name)
-    print SEPARATOR_STRING
+    print(SEPARATOR_STRING)
 
     breiman_file_name = '{0:s}/breiman_results.jpg'.format(permutation_dir_name)
     plot_breiman_results(
