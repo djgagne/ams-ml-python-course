@@ -544,8 +544,9 @@ def read_image_file(netcdf_file_name):
 
     storm_ids = numpy.array(
         dataset_object.variables[NETCDF_TRACK_ID_NAME][:], dtype=int)
-    storm_steps = numpy.array(
-        dataset_object.variables[NETCDF_TRACK_STEP_NAME][:], dtype=int)
+    storm_steps = None
+    # storm_steps = numpy.array(
+    #     dataset_object.variables[NETCDF_TRACK_STEP_NAME][:], dtype=int)
 
     predictor_matrix = None
 
