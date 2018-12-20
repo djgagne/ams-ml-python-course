@@ -801,6 +801,7 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
                 netcdf_file_names[file_index])
 
             this_image_dict = read_image_file(netcdf_file_names[file_index])
+            print this_image_dict[PREDICTOR_MATRIX_KEY].shape
             predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
 
             file_index += 1
