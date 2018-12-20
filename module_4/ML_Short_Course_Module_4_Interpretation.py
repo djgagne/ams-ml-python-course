@@ -2,6 +2,7 @@
 
 import copy
 import glob
+import errno
 import random
 import os.path
 import time
@@ -9,9 +10,10 @@ import calendar
 import numpy
 import pandas
 import netCDF4
+import keras
+from gewittergefahr.deep_learning import keras_metrics
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
-
 DATE_FORMAT = '%Y%m%d'
 DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
 
@@ -21,6 +23,8 @@ DEFAULT_IMAGE_DIR_NAME = (
 DEFAULT_FEATURE_DIR_NAME = (
     '/home/ryan.lagerquist/Downloads/ams2019_short_course/'
     'track_data_ncar_ams_3km_csv_small')
+DEFAULT_CNN_FILE_NAME = (
+    '/home/ryan.lagerquist/Downloads/ams2019_short_course/cnn_model.h5')
 
 CSV_METADATA_COLUMNS = [
     'Step_ID', 'Track_ID', 'Ensemble_Name', 'Ensemble_Member', 'Run_Date',
@@ -35,7 +39,6 @@ CSV_EXTRANEOUS_COLUMNS = [
 
 CSV_TARGET_NAME = 'RVORT1_MAX-future_max'
 TARGET_NAME = 'max_future_vorticity_s01'
-BINARIZATION_THRESHOLD_S01 = 0.005
 
 NETCDF_REFL_NAME = 'REFL_COM_curr'
 NETCDF_TEMP_NAME = 'T2_curr'
@@ -57,12 +60,42 @@ NETCDF_TRACK_ID_NAME = 'track_id'
 NETCDF_TRACK_STEP_NAME = 'track_step'
 NETCDF_TARGET_NAME = 'RVORT1_MAX_future'
 
+NUM_VALUES_KEY = 'num_values'
+MEAN_VALUE_KEY = 'mean_value'
+MEAN_OF_SQUARES_KEY = 'mean_of_squares'
+
 STORM_IDS_KEY = 'storm_ids'
 STORM_STEPS_KEY = 'storm_steps'
 PREDICTOR_NAMES_KEY = 'predictor_names'
 PREDICTOR_MATRIX_KEY = 'predictor_matrix'
 TARGET_NAME_KEY = 'target_name'
 TARGET_MATRIX_KEY = 'target_matrix'
+
+L1_WEIGHT = 0.
+L2_WEIGHT = 0.001
+NUM_PREDICTORS_TO_FIRST_NUM_FILTERS = 8
+NUM_CONV_LAYER_SETS = 2
+NUM_CONV_LAYERS_PER_SET = 2
+NUM_CONV_FILTER_ROWS = 3
+NUM_CONV_FILTER_COLUMNS = 3
+CONV_LAYER_DROPOUT_FRACTION = None
+USE_BATCH_NORMALIZATION = True
+SLOPE_FOR_RELU = 0.2
+NUM_POOLING_ROWS = 2
+NUM_POOLING_COLUMNS = 2
+NUM_DENSE_LAYERS = 3
+DENSE_LAYER_DROPOUT_FRACTION = 0.5
+
+MIN_LOSS_DECR_FOR_EARLY_STOPPING = 0.005
+NUM_EPOCHS_FOR_EARLY_STOPPING = 5
+
+LIST_OF_METRIC_FUNCTIONS = [
+    keras_metrics.accuracy, keras_metrics.binary_accuracy,
+    keras_metrics.binary_csi, keras_metrics.binary_frequency_bias,
+    keras_metrics.binary_pod, keras_metrics.binary_pofd,
+    keras_metrics.binary_peirce_score, keras_metrics.binary_success_ratio,
+    keras_metrics.binary_focn
+]
 
 
 def _remove_future_data(predictor_table):
@@ -109,6 +142,131 @@ def _image_file_name_to_date(netcdf_file_name):
     # Verify.
     time_string_to_unix(time_string=date_string, time_format=DATE_FORMAT)
     return date_string
+
+
+def _get_dense_layer_dimensions(num_input_units, num_classes, num_dense_layers):
+    """Returns dimensions (number of input and output units) for each dense lyr.
+
+    D = number of dense layers
+
+    :param num_input_units: Number of input units (features created by
+        flattening layer).
+    :param num_classes: Number of output classes (possible values of target
+        variable).
+    :param num_dense_layers: Number of dense layers.
+    :return: num_inputs_by_layer: length-D numpy array with number of input
+        units by dense layer.
+    :return: num_outputs_by_layer: length-D numpy array with number of output
+        units by dense layer.
+    """
+
+    if num_classes == 2:
+        num_output_units = 1
+    else:
+        num_output_units = num_classes + 0
+
+    e_folding_param = (
+        float(-1 * num_dense_layers) /
+        numpy.log(float(num_output_units) / num_input_units)
+    )
+
+    dense_layer_indices = numpy.linspace(
+        0, num_dense_layers - 1, num=num_dense_layers, dtype=float)
+    num_inputs_by_layer = num_input_units * numpy.exp(
+        -1 * dense_layer_indices / e_folding_param)
+    num_inputs_by_layer = numpy.round(num_inputs_by_layer).astype(int)
+
+    num_outputs_by_layer = numpy.concatenate((
+        num_inputs_by_layer[1:],
+        numpy.array([num_output_units], dtype=int)
+    ))
+
+    return num_inputs_by_layer, num_outputs_by_layer
+
+
+def _update_normalization_params(intermediate_normalization_dict, new_values):
+    """Updates normalization params for one predictor.
+
+    :param intermediate_normalization_dict: Dictionary with the following keys.
+    intermediate_normalization_dict['num_values']: Number of values on which
+        current estimates are based.
+    intermediate_normalization_dict['mean_value']: Current estimate for mean.
+    intermediate_normalization_dict['mean_of_squares']: Current mean of squared
+        values.
+
+    :param new_values: numpy array of new values (will be used to update
+        `intermediate_normalization_dict`).
+    :return: intermediate_normalization_dict: Same as input but with updated
+        values.
+    """
+
+    if MEAN_VALUE_KEY not in intermediate_normalization_dict:
+        intermediate_normalization_dict = {
+            NUM_VALUES_KEY: 0,
+            MEAN_VALUE_KEY: 0.,
+            MEAN_OF_SQUARES_KEY: 0.
+        }
+
+    these_means = numpy.array([
+        intermediate_normalization_dict[MEAN_VALUE_KEY], numpy.mean(new_values)
+    ])
+    these_weights = numpy.array([
+        intermediate_normalization_dict[NUM_VALUES_KEY], new_values.size
+    ])
+
+    intermediate_normalization_dict[MEAN_VALUE_KEY] = numpy.average(
+        these_means, weights=these_weights)
+
+    these_means = numpy.array([
+        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY],
+        numpy.mean(new_values ** 2)
+    ])
+
+    intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] = numpy.average(
+        these_means, weights=these_weights)
+
+    intermediate_normalization_dict[NUM_VALUES_KEY] += new_values.size
+    return intermediate_normalization_dict
+
+
+def _get_standard_deviation(intermediate_normalization_dict):
+    """Computes stdev from intermediate normalization params.
+
+    :param intermediate_normalization_dict: See doc for
+        `_update_normalization_params`.
+    :return: standard_deviation: Standard deviation.
+    """
+
+    num_values = float(intermediate_normalization_dict[NUM_VALUES_KEY])
+    multiplier = num_values / (num_values - 1)
+
+    return numpy.sqrt(multiplier * (
+        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] -
+        intermediate_normalization_dict[MEAN_VALUE_KEY] ** 2
+    ))
+
+
+def _create_directory(directory_name=None, file_name=None):
+    """Creates directory (along with parents if necessary).
+
+    This method creates directories only when necessary, so you don't have to
+    worry about it overwriting anything.
+
+    :param directory_name: Name of desired directory.
+    :param file_name: [used only if `directory_name is None`]
+        Path to desired file.  All directories in path will be created.
+    """
+
+    if directory_name is None:
+        directory_name = os.path.split(file_name)[0]
+
+    try:
+        os.makedirs(directory_name)
+    except OSError as this_error:
+        if this_error.errno == errno.EEXIST and os.path.isdir(directory_name):
+            pass
+        else:
+            raise
 
 
 def time_string_to_unix(time_string, time_format):
@@ -360,6 +518,45 @@ def read_many_image_files(netcdf_file_names):
     return image_dict
 
 
+def get_image_normalization_params(netcdf_file_names):
+    """Computes normalization params (mean and stdev) for each predictor.
+
+    :param netcdf_file_names: 1-D list of paths to input files.
+    :return: normalization_dict: See input doc for `normalize_images`.
+    """
+
+    predictor_names = None
+    norm_dict_by_predictor = None
+
+    for this_file_name in netcdf_file_names:
+        print 'Reading data from: "{0:s}"...'.format(this_file_name)
+        this_image_dict = read_image_file(this_file_name)
+
+        if predictor_names is None:
+            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
+            norm_dict_by_predictor = [{}] * len(predictor_names)
+
+        for m in range(len(predictor_names)):
+            norm_dict_by_predictor[m] = _update_normalization_params(
+                intermediate_normalization_dict=norm_dict_by_predictor[m],
+                new_values=this_image_dict[PREDICTOR_MATRIX_KEY][..., m])
+
+    print '\n'
+    normalization_dict = {}
+
+    for m in range(len(predictor_names)):
+        this_mean = norm_dict_by_predictor[m][MEAN_VALUE_KEY]
+        this_stdev = _get_standard_deviation(norm_dict_by_predictor[m])
+        normalization_dict[predictor_names[m]] = numpy.array(
+            [this_mean, this_stdev])
+
+        print (
+            'Mean and standard deviation for "{0:s}" = {1:.4f}, {2:.4f}'
+        ).format(predictor_names[m], this_mean, this_stdev)
+
+    return normalization_dict
+
+
 def normalize_images(
         predictor_matrix, predictor_names, normalization_dict=None):
     """Normalizes images to z-scores.
@@ -425,6 +622,43 @@ def denormalize_images(predictor_matrix, predictor_names, normalization_dict):
     return predictor_matrix
 
 
+def get_binarization_threshold(netcdf_file_names, percentile_level):
+    """Computes binarization threshold for target variable.
+
+    Binarization threshold will be [q]th percentile of all image maxima, where
+    q = `percentile_level`.
+
+    :param netcdf_file_names: 1-D list of paths to input files.
+    :param percentile_level: q in the above discussion.
+    :return: binarization_threshold: Binarization threshold (used to turn each
+        target image into a yes-or-no label).
+    """
+
+    max_target_values = numpy.array([])
+
+    for this_file_name in netcdf_file_names:
+        print 'Reading data from: "{0:s}"...'.format(this_file_name)
+        this_image_dict = read_image_file(this_file_name)
+
+        this_target_matrix = this_image_dict[TARGET_MATRIX_KEY]
+        this_num_examples = this_target_matrix.shape[0]
+        these_max_target_values = numpy.full(this_num_examples, numpy.nan)
+
+        for i in range(this_num_examples):
+            these_max_target_values[i] = numpy.max(this_target_matrix[i, ...])
+
+        max_target_values = numpy.concatenate((
+            max_target_values, these_max_target_values))
+
+    binarization_threshold = numpy.percentile(
+        max_target_values, percentile_level)
+
+    print '\nBinarization threshold for "{0:s}" = {1:.4e}'.format(
+        TARGET_NAME, binarization_threshold)
+
+    return binarization_threshold
+
+
 def binarize_target_images(target_matrix, binarization_threshold):
     """Binarizes target images.
 
@@ -453,7 +687,7 @@ def binarize_target_images(target_matrix, binarization_threshold):
 
 
 def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
-                            normalization_dict, binarization_threshold_s01):
+                            normalization_dict, binarization_threshold):
     """Generates training examples for deep-learning model on the fly.
 
     E = number of examples (storm objects) in file
@@ -465,9 +699,8 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
     :param num_examples_per_batch: Number of examples per training batch.
     :param normalization_dict: See doc for `normalize_images`.  You cannot leave
         this as None.
-    :param binarization_threshold_s01: Binarization threshold (inverse seconds)
-        for target variable.  See `binarize_target_images` for details on what
-        this does.
+    :param binarization_threshold: Binarization threshold for target variable.
+        See `binarize_target_images` for details on what this does.
     :return: predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
     :return: target_values: length-E numpy array of target values (integers in
         0...1).
@@ -531,7 +764,7 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
 
         target_values = binarize_target_images(
             target_matrix=full_target_matrix[batch_indices, ...],
-            binarization_threshold=binarization_threshold_s01)
+            binarization_threshold=binarization_threshold)
 
         print 'Fraction of examples in positive class: {0:.4f}'.format(
             numpy.mean(target_values))
@@ -543,35 +776,241 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
         yield (predictor_matrix, target_values)
 
 
+def setup_cnn(num_grid_rows, num_grid_columns):
+    """Sets up (but does not train) CNN (convolutional neural net).
+
+    :param num_grid_rows: Number of rows in each predictor image.
+    :param num_grid_columns: Number of columns in each predictor image.
+    :return: model_object: Untrained instance of `keras.models.Model`.
+    """
+
+    regularizer_object = keras.regularizers.l1_l2(l1=L1_WEIGHT, l2=L2_WEIGHT)
+
+    num_predictors = len(NETCDF_PREDICTOR_NAMES)
+    input_layer_object = keras.layers.Input(
+        shape=(num_grid_rows, num_grid_columns, num_predictors)
+    )
+
+    current_num_filters = None
+    current_layer_object = None
+
+    # Add convolutional layers.
+    for _ in range(NUM_CONV_LAYER_SETS):
+        for _ in range(NUM_CONV_LAYERS_PER_SET):
+
+            if current_num_filters is None:
+                current_num_filters = (
+                    num_predictors * NUM_PREDICTORS_TO_FIRST_NUM_FILTERS)
+                this_input_layer_object = input_layer_object
+
+            else:
+                current_num_filters *= 2
+                this_input_layer_object = current_layer_object
+
+            current_layer_object = keras.layers.Conv2D(
+                filters=current_num_filters,
+                kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
+                strides=(1, 1), padding='valid', data_format='channels_last',
+                dilation_rate=(1, 1), activation=None, use_bias=True,
+                kernel_initializer='glorot_uniform', bias_initializer='zeros',
+                kernel_regularizer=regularizer_object
+            )(this_input_layer_object)
+
+            current_layer_object = keras.layers.LeakyReLU(
+                alpha=SLOPE_FOR_RELU
+            )(current_layer_object)
+
+            if CONV_LAYER_DROPOUT_FRACTION is not None:
+                current_layer_object = keras.layers.Dropout(
+                    rate=CONV_LAYER_DROPOUT_FRACTION
+                )(current_layer_object)
+
+            if USE_BATCH_NORMALIZATION:
+                current_layer_object = keras.layers.BatchNormalization(
+                    axis=-1, center=True, scale=True
+                )(current_layer_object)
+
+        current_layer_object = keras.layers.MaxPooling2D(
+            pool_size=(NUM_POOLING_ROWS, NUM_POOLING_COLUMNS),
+            strides=(NUM_POOLING_ROWS, NUM_POOLING_COLUMNS),
+            padding='valid', data_format='channels_last'
+        )(current_layer_object)
+
+    these_dimensions = numpy.array(
+        current_layer_object.get_shape().as_list()[1:], dtype=int)
+    num_features = numpy.prod(these_dimensions)
+
+    current_layer_object = keras.layers.Flatten()(current_layer_object)
+
+    # Add intermediate dense layers.
+    _, num_outputs_by_dense_layer = _get_dense_layer_dimensions(
+        num_input_units=num_features, num_classes=2,
+        num_dense_layers=NUM_DENSE_LAYERS)
+
+    for k in range(NUM_DENSE_LAYERS - 1):
+        current_layer_object = keras.layers.Dense(
+            num_outputs_by_dense_layer[k], activation=None, use_bias=True,
+            kernel_initializer='glorot_uniform', bias_initializer='zeros',
+            kernel_regularizer=regularizer_object
+        )(current_layer_object)
+
+        current_layer_object = keras.layers.LeakyReLU(
+            alpha=SLOPE_FOR_RELU
+        )(current_layer_object)
+
+        if DENSE_LAYER_DROPOUT_FRACTION is not None:
+            current_layer_object = keras.layers.Dropout(
+                rate=DENSE_LAYER_DROPOUT_FRACTION
+            )(current_layer_object)
+
+        if USE_BATCH_NORMALIZATION:
+            current_layer_object = keras.layers.BatchNormalization(
+                axis=-1, center=True, scale=True
+            )(current_layer_object)
+
+    # Add output layer (also dense).
+    current_layer_object = keras.layers.Dense(
+        1, activation=None, use_bias=True,
+        kernel_initializer='glorot_uniform', bias_initializer='zeros',
+        kernel_regularizer=regularizer_object
+    )(current_layer_object)
+
+    current_layer_object = keras.layers.Activation(
+        'sigmoid'
+    )(current_layer_object)
+
+    if DENSE_LAYER_DROPOUT_FRACTION is not None and NUM_DENSE_LAYERS == 1:
+        current_layer_object = keras.layers.Dropout(
+            rate=DENSE_LAYER_DROPOUT_FRACTION
+        )(current_layer_object)
+
+    # Put the whole thing together and compile.
+    model_object = keras.models.Model(
+        inputs=input_layer_object, outputs=current_layer_object)
+    model_object.compile(
+        loss=keras.losses.binary_crossentropy,
+        optimizer=keras.optimizers.Adam(),
+        metrics=LIST_OF_METRIC_FUNCTIONS)
+
+    model_object.summary()
+    return model_object
+
+
+def train_cnn(
+        model_object, training_file_names, normalization_dict,
+        binarization_threshold, num_examples_per_batch, num_epochs,
+        num_training_batches_per_epoch,
+        output_model_file_name=DEFAULT_CNN_FILE_NAME,
+        validation_file_names=None, num_validation_batches_per_epoch=None):
+    """Trains CNN (convolutional neural net).
+
+    :param model_object: Untrained instance of `keras.models.Model` (may be
+        created by `setup_cnn`).
+    :param training_file_names: 1-D list of paths to training files (must be
+        readable by `read_image_file`).
+    :param normalization_dict: See doc for `deep_learning_generator`.
+    :param binarization_threshold: Same.
+    :param num_examples_per_batch: Same.
+    :param num_epochs: Number of epochs.
+    :param num_training_batches_per_epoch: Number of training batches furnished
+        to model in each epoch.
+    :param output_model_file_name: Path to output file.  The model will be saved
+        as an HDF5 file (extension should be ".h5", but this is not enforced).
+    :param validation_file_names: 1-D list of paths to training files (must be
+        readable by `read_image_file`).  If `validation_file_names is None`,
+        will omit on-the-fly validation.
+    :param num_validation_batches_per_epoch:
+        [used only if `validation_file_names is not None`]
+        Number of validation batches furnished to model in each epoch.
+    """
+
+    _create_directory(file_name=output_model_file_name)
+
+    if validation_file_names is None:
+        checkpoint_object = keras.callbacks.ModelCheckpoint(
+            filepath=output_model_file_name, monitor='loss', verbose=1,
+            save_best_only=False, save_weights_only=False, mode='min',
+            period=1)
+    else:
+        checkpoint_object = keras.callbacks.ModelCheckpoint(
+            filepath=output_model_file_name, monitor='val_loss', verbose=1,
+            save_best_only=True, save_weights_only=False, mode='min',
+            period=1)
+
+    list_of_callback_objects = [checkpoint_object]
+
+    training_generator = deep_learning_generator(
+        netcdf_file_names=training_file_names,
+        num_examples_per_batch=num_examples_per_batch,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold)
+
+    if validation_file_names is None:
+        model_object.fit_generator(
+            generator=training_generator,
+            steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
+            verbose=1, callbacks=list_of_callback_objects)
+
+        return
+
+    early_stopping_object = keras.callbacks.EarlyStopping(
+        monitor='val_loss', min_delta=MIN_LOSS_DECR_FOR_EARLY_STOPPING,
+        patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
+
+    list_of_callback_objects.append(early_stopping_object)
+
+    validation_generator = deep_learning_generator(
+        netcdf_file_names=validation_file_names,
+        num_examples_per_batch=num_examples_per_batch,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold)
+
+    model_object.fit_generator(
+        generator=training_generator,
+        steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
+        verbose=1, callbacks=list_of_callback_objects,
+        validation_data=validation_generator,
+        validation_steps=num_validation_batches_per_epoch)
+
+
 def _run():
     """This is effectively the main method for now."""
 
-    csv_file_names = find_many_feature_files(
+    # csv_file_names = find_many_feature_files(
+    #     first_date_string='20150101', last_date_string='20151231')
+    # metadata_table, predictor_table, target_table = read_many_feature_files(
+    #     csv_file_names)
+    #
+    # print SEPARATOR_STRING
+    # print 'Number of storm objects in feature dataset: {0:d}'.format(
+    #     len(metadata_table.index))
+    # print SEPARATOR_STRING
+
+    training_file_names = find_many_image_files(
+        first_date_string='20100101', last_date_string='20141231')
+    normalization_dict = get_image_normalization_params(training_file_names)
+    print SEPARATOR_STRING
+
+    binarization_threshold = get_binarization_threshold(
+        netcdf_file_names=training_file_names, percentile_level=90.)
+    print SEPARATOR_STRING
+
+    image_dict = read_image_file(training_file_names[0])
+    model_object = setup_cnn(
+        num_grid_rows=image_dict[PREDICTOR_MATRIX_KEY].shape[1],
+        num_grid_columns=image_dict[PREDICTOR_MATRIX_KEY].shape[2])
+
+    validation_file_names = find_many_image_files(
         first_date_string='20150101', last_date_string='20151231')
-    metadata_table, predictor_table, target_table = read_many_feature_files(
-        csv_file_names)
 
-    print SEPARATOR_STRING
-    print 'Number of storm objects in feature dataset: {0:d}'.format(
-        len(metadata_table.index))
-    print SEPARATOR_STRING
-
-    netcdf_file_names = find_many_image_files(
-        first_date_string='20150101', last_date_string='20151231')
-    image_dict = read_many_image_files(netcdf_file_names)
-
-    print SEPARATOR_STRING
-    print 'Shape of predictor matrix: {0:s}'.format(
-        str(image_dict[PREDICTOR_MATRIX_KEY].shape)
-    )
-
-    image_dict[PREDICTOR_MATRIX_KEY] = normalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
-        predictor_names=image_dict[PREDICTOR_NAMES_KEY])
-
-    target_values = binarize_target_images(
-        target_matrix=image_dict[TARGET_MATRIX_KEY],
-        binarization_threshold=BINARIZATION_THRESHOLD_S01)
+    train_cnn(
+        model_object=model_object, training_file_names=training_file_names,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold,
+        num_examples_per_batch=32, num_epochs=10,
+        num_training_batches_per_epoch=10,
+        validation_file_names=validation_file_names,
+        num_validation_batches_per_epoch=10)
 
 
 if __name__ == '__main__':
