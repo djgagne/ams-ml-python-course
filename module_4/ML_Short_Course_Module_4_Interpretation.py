@@ -806,7 +806,6 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
                 netcdf_file_names[file_index])
 
             this_image_dict = read_image_file(netcdf_file_names[file_index])
-            print this_image_dict[PREDICTOR_MATRIX_KEY].shape
             predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
 
             file_index += 1
@@ -1051,11 +1050,11 @@ def train_cnn(
 
         return model_metadata_dict
 
-    # early_stopping_object = keras.callbacks.EarlyStopping(
-    #     monitor='val_loss', min_delta=MIN_LOSS_DECR_FOR_EARLY_STOPPING,
-    #     patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
-    #
-    # list_of_callback_objects.append(early_stopping_object)
+    early_stopping_object = keras.callbacks.EarlyStopping(
+        monitor='val_loss', min_delta=MIN_LOSS_DECR_FOR_EARLY_STOPPING,
+        patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
+
+    list_of_callback_objects.append(early_stopping_object)
 
     validation_generator = deep_learning_generator(
         netcdf_file_names=validation_file_names,
@@ -1308,11 +1307,11 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         first_date_string='20150101', last_date_string='20151231')
 
     cnn_file_name = '{0:s}/cnn_model.h5'.format(output_dir_name)
-    model_metadata_dict = train_cnn(
+    train_cnn(
         model_object=model_object, training_file_names=training_file_names,
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold,
-        num_examples_per_batch=100, num_epochs=10,
+        num_examples_per_batch=512, num_epochs=10,
         num_training_batches_per_epoch=10,
         validation_file_names=validation_file_names,
         num_validation_batches_per_epoch=10,
