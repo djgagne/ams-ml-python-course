@@ -12,6 +12,7 @@ import numpy
 import pandas
 import netCDF4
 import keras
+import keras.backend as K
 from sklearn.metrics import auc as scikit_learn_auc
 import matplotlib
 matplotlib.use('agg')
@@ -20,6 +21,10 @@ from gewittergefahr.deep_learning import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
+
+K.set_session(K.tf.Session(config=K.tf.ConfigProto(
+    intra_op_parallelism_threads=1, inter_op_parallelism_threads=1
+)))
 
 # Input arguments (this is a script).
 IMAGE_DIR_ARG_NAME = 'input_image_dir_name'
@@ -1314,19 +1319,19 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         output_model_file_name=cnn_file_name)
     print SEPARATOR_STRING
 
-    validation_image_dict = read_many_image_files(validation_file_names)
-    print SEPARATOR_STRING
-
-    validation_dir_name = '{0:s}/validation'.format(output_dir_name)
-    evaluate_cnn(
-        model_object=model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict,
-        output_dir_name=validation_dir_name)
-    print SEPARATOR_STRING
-
-    permutation_dict = permutation_test_for_cnn(
-        model_object=model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict)
+    # validation_image_dict = read_many_image_files(validation_file_names)
+    # print SEPARATOR_STRING
+    #
+    # validation_dir_name = '{0:s}/validation'.format(output_dir_name)
+    # evaluate_cnn(
+    #     model_object=model_object, image_dict=validation_image_dict,
+    #     model_metadata_dict=model_metadata_dict,
+    #     output_dir_name=validation_dir_name)
+    # print SEPARATOR_STRING
+    #
+    # permutation_dict = permutation_test_for_cnn(
+    #     model_object=model_object, image_dict=validation_image_dict,
+    #     model_metadata_dict=model_metadata_dict)
 
 
 if __name__ == '__main__':
