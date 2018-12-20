@@ -1317,7 +1317,7 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         binarization_threshold=binarization_threshold,
         num_examples_per_batch=512, num_epochs=10,
         num_training_batches_per_epoch=10,
-        validation_file_names=validation_file_names,
+        validation_file_names=None,
         num_validation_batches_per_epoch=10,
         output_model_file_name=cnn_file_name)
     print SEPARATOR_STRING
