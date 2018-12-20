@@ -11,6 +11,7 @@ import calendar
 import numpy
 import pandas
 import netCDF4
+import faulthandler
 import keras
 import keras.backend as K
 from sklearn.metrics import auc as scikit_learn_auc
@@ -21,6 +22,8 @@ from gewittergefahr.deep_learning import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
+
+faulthandler.enable()
 
 K.set_session(K.tf.Session(config=K.tf.ConfigProto(
     intra_op_parallelism_threads=1, inter_op_parallelism_threads=1

@@ -16,11 +16,9 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="497">
-              <caret line="1315" column="50" lean-forward="false" selection-start-line="1315" selection-start-column="50" selection-end-line="1315" selection-end-column="50" />
-              <folding>
-                <element signature="e#39#50#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="270">
+              <caret line="15" column="25" lean-forward="true" selection-start-line="15" selection-start-column="25" selection-end-line="15" selection-end-column="25" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -422,11 +420,9 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="497">
-          <caret line="1315" column="50" lean-forward="false" selection-start-line="1315" selection-start-column="50" selection-end-line="1315" selection-end-column="50" />
-          <folding>
-            <element signature="e#39#50#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="270">
+          <caret line="15" column="25" lean-forward="true" selection-start-line="15" selection-start-column="25" selection-end-line="15" selection-end-column="25" />
+          <folding />
         </state>
       </provider>
     </entry>
