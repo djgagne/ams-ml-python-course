@@ -55,6 +55,8 @@ INPUT_ARG_PARSER.add_argument(
 FIGURE_RESOLUTION_DPI = 300
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
+MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
+
 DATE_FORMAT = '%Y%m%d'
 DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
 
@@ -342,6 +344,45 @@ def _create_directory(directory_name=None, file_name=None):
             pass
         else:
             raise
+
+
+def _apply_cnn(model_object, predictor_matrix):
+    """Applies trained CNN (convolutional neural net) to new data.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :return: forecast_probabilities: length-E numpy array with forecast
+        probabilities of positive class (label = 1).
+    """
+
+    num_examples = predictor_matrix.shape[0]
+    forecast_probabilities = numpy.full(num_examples, numpy.nan)
+    num_examples_per_batch = 1000
+
+    for i in range(0, num_examples, num_examples_per_batch):
+        this_first_index = i
+        this_last_index = min(
+            [i + num_examples_per_batch - 1, num_examples - 1]
+        )
+
+        print 'Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
+            this_first_index, this_last_index, num_examples)
+
+        these_indices = numpy.linspace(
+            this_first_index, this_last_index,
+            num=this_last_index - this_first_index + 1, dtype=int)
+
+        forecast_probabilities[these_indices] = model_object.predict(
+            predictor_matrix[these_indices, ...],
+            batch_size=num_examples_per_batch
+        )[:, -1]
+
+    return forecast_probabilities
 
 
 def time_string_to_unix(time_string, time_format):
@@ -1101,27 +1142,9 @@ def evaluate_cnn(
         target_matrix=image_dict[TARGET_MATRIX_KEY],
         binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
 
-    num_examples = len(target_values)
-    forecast_probabilities = numpy.full(num_examples, numpy.nan)
-    num_examples_per_batch = 1000
-
-    for i in range(0, num_examples, num_examples_per_batch):
-        this_first_index = i
-        this_last_index = min(
-            [i + num_examples_per_batch - 1, num_examples - 1]
-        )
-
-        print 'Applying model to examples {0:d}-{1:d}...'.format(
-            this_first_index, this_last_index)
-
-        these_indices = numpy.linspace(
-            this_first_index, this_last_index,
-            num=this_last_index - this_first_index + 1, dtype=int)
-
-        forecast_probabilities[these_indices] = model_object.predict(
-            predictor_matrix[these_indices, ...],
-            batch_size=num_examples_per_batch
-        )[:, -1]
+    forecast_probabilities = _apply_cnn(model_object=model_object,
+                                        predictor_matrix=predictor_matrix)
+    print MINOR_SEPARATOR_STRING
 
     pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
         observed_labels=target_values,
@@ -1213,14 +1236,14 @@ def permutation_test_for_cnn(
         binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
 
     # Get original cost (before permutation).
-    num_examples = predictor_matrix.shape[0]
-    these_probabilities = model_object.predict(
-        predictor_matrix, batch_size=num_examples
-    )[:, -1]
+    these_probabilities = _apply_cnn(model_object=model_object,
+                                     predictor_matrix=predictor_matrix)
+    print MINOR_SEPARATOR_STRING
 
     original_cost = cost_function(target_values, these_probabilities)
-    print 'Original cost (no permutation): {0:.4e}'.format(original_cost)
+    print 'Original cost (no permutation): {0:.4e}\n'.format(original_cost)
 
+    num_examples = len(target_values)
     remaining_predictor_names = predictor_names + []
     current_step_num = 0
 
@@ -1230,7 +1253,6 @@ def permutation_test_for_cnn(
     costs_step1 = []
 
     while len(remaining_predictor_names) > 0:
-        print '\n'
         current_step_num += 1
 
         highest_cost = -numpy.inf
@@ -1252,9 +1274,11 @@ def permutation_test_for_cnn(
                         this_predictor_matrix[i, ..., this_predictor_index])
                 )
 
-            these_probabilities = model_object.predict(
-                this_predictor_matrix, batch_size=num_examples
-            )[:, -1]
+            print MINOR_SEPARATOR_STRING
+            these_probabilities = _apply_cnn(
+                model_object=model_object,
+                predictor_matrix=this_predictor_matrix)
+            print MINOR_SEPARATOR_STRING
 
             this_cost = cost_function(target_values, these_probabilities)
             print 'Resulting cost = {0:.4e}'.format(this_cost)
