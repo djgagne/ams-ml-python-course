@@ -1238,6 +1238,7 @@ def permutation_test_for_cnn(
     # Get original cost (before permutation).
     these_probabilities = _apply_cnn(model_object=model_object,
                                      predictor_matrix=predictor_matrix)
+    print these_probabilities[:10]
     print MINOR_SEPARATOR_STRING
 
     original_cost = cost_function(target_values, these_probabilities)
@@ -1278,6 +1279,7 @@ def permutation_test_for_cnn(
             these_probabilities = _apply_cnn(
                 model_object=model_object,
                 predictor_matrix=this_predictor_matrix)
+            print these_probabilities[:10]
             print MINOR_SEPARATOR_STRING
 
             this_cost = cost_function(target_values, these_probabilities)
