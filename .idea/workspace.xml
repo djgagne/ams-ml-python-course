@@ -16,8 +16,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="705">
-              <caret line="1278" column="45" lean-forward="true" selection-start-line="1278" selection-start-column="45" selection-end-line="1278" selection-end-column="45" />
+            <state relative-caret-position="327">
+              <caret line="1282" column="40" lean-forward="true" selection-start-line="1282" selection-start-column="40" selection-end-line="1282" selection-end-column="40" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -67,6 +67,8 @@
       <find>.predict</find>
       <find>MINOR_SEPARATOR_STRING</find>
       <find>_apply_cnn(</find>
+      <find>normalize_images(</find>
+      <find>print these</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -426,8 +428,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="705">
-          <caret line="1278" column="45" lean-forward="true" selection-start-line="1278" selection-start-column="45" selection-end-line="1278" selection-end-column="45" />
+        <state relative-caret-position="327">
+          <caret line="1282" column="40" lean-forward="true" selection-start-line="1282" selection-start-column="40" selection-end-line="1282" selection-end-column="40" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

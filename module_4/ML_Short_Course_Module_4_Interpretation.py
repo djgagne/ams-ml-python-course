@@ -1133,7 +1133,7 @@ def evaluate_cnn(
     """
 
     predictor_matrix, _ = normalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
         predictor_names=image_dict[PREDICTOR_NAMES_KEY],
         normalization_dict=model_metadata_dict[NORMALIZATION_DICT_KEY])
     predictor_matrix = predictor_matrix.astype('float32')
@@ -1226,7 +1226,7 @@ def permutation_test_for_cnn(
     predictor_names = image_dict[PREDICTOR_NAMES_KEY]
 
     predictor_matrix, _ = normalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
         predictor_names=image_dict[PREDICTOR_NAMES_KEY],
         normalization_dict=model_metadata_dict[NORMALIZATION_DICT_KEY])
     predictor_matrix = predictor_matrix.astype('float32')
