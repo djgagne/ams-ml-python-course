@@ -11,9 +11,7 @@ import calendar
 import numpy
 import pandas
 import netCDF4
-import faulthandler
 import keras
-import keras.backend as K
 from sklearn.metrics import auc as scikit_learn_auc
 import matplotlib
 matplotlib.use('agg')
@@ -22,12 +20,6 @@ from gewittergefahr.deep_learning import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
-
-faulthandler.enable()
-
-K.set_session(K.tf.Session(config=K.tf.ConfigProto(
-    intra_op_parallelism_threads=1, inter_op_parallelism_threads=1
-)))
 
 # Input arguments (this is a script).
 IMAGE_DIR_ARG_NAME = 'input_image_dir_name'
@@ -790,6 +782,8 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
     :raises: TypeError: if `normalization_dict is None`.
     """
 
+    # TODO(thunderhoser): Probably need downsampling or upsampling.
+
     if normalization_dict is None:
         error_string = 'normalization_dict cannot be None.  Must be specified.'
         raise TypeError(error_string)
@@ -1039,16 +1033,24 @@ def train_cnn(
         NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch
     }
 
+    training_generator = deep_learning_generator(
+        netcdf_file_names=training_file_names,
+        num_examples_per_batch=num_examples_per_batch,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold)
+
+    # TODO(thunderhoser): This is a HACK to prevent segmentation faults on
+    # Schooner.
+    if num_examples_per_batch < 500:
+        workers_arg = 0
+    else:
+        workers_arg = 1
+
     if validation_file_names is None:
         model_object.fit_generator(
-            generator=deep_learning_generator(
-                netcdf_file_names=training_file_names,
-                num_examples_per_batch=num_examples_per_batch,
-                normalization_dict=normalization_dict,
-                binarization_threshold=binarization_threshold),
+            generator=training_generator,
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-            verbose=1, callbacks=list_of_callback_objects,
-            use_multiprocessing=False, workers=0)
+            verbose=1, callbacks=list_of_callback_objects, workers=workers_arg)
 
         return model_metadata_dict
 
@@ -1058,20 +1060,17 @@ def train_cnn(
 
     list_of_callback_objects.append(early_stopping_object)
 
+    validation_generator = deep_learning_generator(
+        netcdf_file_names=validation_file_names,
+        num_examples_per_batch=num_examples_per_batch,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold)
+
     model_object.fit_generator(
-        generator=deep_learning_generator(
-            netcdf_file_names=training_file_names,
-            num_examples_per_batch=num_examples_per_batch,
-            normalization_dict=normalization_dict,
-            binarization_threshold=binarization_threshold),
+        generator=training_generator,
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-        verbose=1, callbacks=list_of_callback_objects,
-        use_multiprocessing=False, workers=0,
-        validation_data=deep_learning_generator(
-            netcdf_file_names=validation_file_names,
-            num_examples_per_batch=num_examples_per_batch,
-            normalization_dict=normalization_dict,
-            binarization_threshold=binarization_threshold),
+        verbose=1, callbacks=list_of_callback_objects, workers=workers_arg,
+        validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
 
     return model_metadata_dict
@@ -1102,8 +1101,26 @@ def evaluate_cnn(
         target_matrix=image_dict[TARGET_MATRIX_KEY],
         binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
 
-    forecast_probabilities = model_object.predict(
-        predictor_matrix, batch_size=predictor_matrix.shape[0])
+    num_examples = len(target_values)
+    forecast_probabilities = numpy.full(num_examples, numpy.nan)
+    num_examples_per_batch = 1000
+
+    for i in range(0, num_examples, num_examples_per_batch):
+        this_first_index = i
+        this_last_index = min(
+            [i + num_examples_per_batch - 1, num_examples - 1]
+        )
+
+        print 'Applying model to examples {0:d}-{1:d}...'.format(
+            this_first_index, this_last_index)
+
+        these_indices = numpy.linspace(
+            this_first_index, this_last_index,
+            num=this_last_index - this_first_index + 1, dtype=int)
+
+        forecast_probabilities[these_indices] = model_object.predict(
+            predictor_matrix[these_indices, ...],
+            batch_size=num_examples_per_batch)
 
     pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
         observed_labels=target_values,
@@ -1307,9 +1324,9 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold,
         num_examples_per_batch=100, num_epochs=10,
-        num_training_batches_per_epoch=10,
+        num_training_batches_per_epoch=5,
         validation_file_names=validation_file_names,
-        num_validation_batches_per_epoch=10,
+        num_validation_batches_per_epoch=5,
         output_model_file_name=cnn_file_name)
     print SEPARATOR_STRING
 
