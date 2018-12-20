@@ -1047,7 +1047,8 @@ def train_cnn(
                 normalization_dict=normalization_dict,
                 binarization_threshold=binarization_threshold),
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-            verbose=1, callbacks=list_of_callback_objects)
+            verbose=1, callbacks=list_of_callback_objects,
+            use_multiprocessing=False, workers=0)
 
         return model_metadata_dict
 
@@ -1065,6 +1066,7 @@ def train_cnn(
             binarization_threshold=binarization_threshold),
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
         verbose=1, callbacks=list_of_callback_objects,
+        use_multiprocessing=False, workers=0,
         validation_data=deep_learning_generator(
             netcdf_file_names=validation_file_names,
             num_examples_per_batch=num_examples_per_batch,
@@ -1279,16 +1281,6 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
     :param output_dir_name: Same.
     """
 
-    # csv_file_names = find_many_feature_files(
-    #     first_date_string='20150101', last_date_string='20151231')
-    # metadata_table, predictor_table, target_table = read_many_feature_files(
-    #     csv_file_names)
-    #
-    # print SEPARATOR_STRING
-    # print 'Number of storm objects in feature dataset: {0:d}'.format(
-    #     len(metadata_table.index))
-    # print SEPARATOR_STRING
-
     training_file_names = find_many_image_files(
         image_dir_name=input_image_dir_name,
         first_date_string='20100101', last_date_string='20141231')
@@ -1321,19 +1313,19 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         output_model_file_name=cnn_file_name)
     print SEPARATOR_STRING
 
-    # validation_image_dict = read_many_image_files(validation_file_names)
-    # print SEPARATOR_STRING
-    #
-    # validation_dir_name = '{0:s}/validation'.format(output_dir_name)
-    # evaluate_cnn(
-    #     model_object=model_object, image_dict=validation_image_dict,
-    #     model_metadata_dict=model_metadata_dict,
-    #     output_dir_name=validation_dir_name)
-    # print SEPARATOR_STRING
-    #
-    # permutation_dict = permutation_test_for_cnn(
-    #     model_object=model_object, image_dict=validation_image_dict,
-    #     model_metadata_dict=model_metadata_dict)
+    validation_image_dict = read_many_image_files(validation_file_names)
+    print SEPARATOR_STRING
+
+    validation_dir_name = '{0:s}/validation'.format(output_dir_name)
+    evaluate_cnn(
+        model_object=model_object, image_dict=validation_image_dict,
+        model_metadata_dict=model_metadata_dict,
+        output_dir_name=validation_dir_name)
+    print SEPARATOR_STRING
+
+    permutation_dict = permutation_test_for_cnn(
+        model_object=model_object, image_dict=validation_image_dict,
+        model_metadata_dict=model_metadata_dict)
 
 
 if __name__ == '__main__':
