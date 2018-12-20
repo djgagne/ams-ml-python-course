@@ -12,6 +12,7 @@ import pandas
 import netCDF4
 import keras
 from gewittergefahr.deep_learning import keras_metrics
+from module_4 import performance_diagrams
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 DATE_FORMAT = '%Y%m%d'
