@@ -16,8 +16,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="479">
-              <caret line="1319" column="34" lean-forward="false" selection-start-line="1319" selection-start-column="34" selection-end-line="1319" selection-end-column="34" />
+            <state relative-caret-position="273">
+              <caret line="544" column="28" lean-forward="true" selection-start-line="544" selection-start-column="28" selection-end-line="544" selection-end-column="28" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -63,6 +63,7 @@
       <find>def _csi_from_sr_and_pod</find>
       <find>CNN_FILE</find>
       <find>train_cnn(</find>
+      <find>= None</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -422,8 +423,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="479">
-          <caret line="1319" column="34" lean-forward="false" selection-start-line="1319" selection-start-column="34" selection-end-line="1319" selection-end-column="34" />
+        <state relative-caret-position="273">
+          <caret line="544" column="28" lean-forward="true" selection-start-line="544" selection-start-column="28" selection-end-line="544" selection-end-column="28" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

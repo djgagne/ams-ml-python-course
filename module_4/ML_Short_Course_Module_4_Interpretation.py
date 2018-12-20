@@ -544,9 +544,8 @@ def read_image_file(netcdf_file_name):
 
     storm_ids = numpy.array(
         dataset_object.variables[NETCDF_TRACK_ID_NAME][:], dtype=int)
-    storm_steps = None
-    # storm_steps = numpy.array(
-    #     dataset_object.variables[NETCDF_TRACK_STEP_NAME][:], dtype=int)
+    storm_steps = numpy.array(
+        dataset_object.variables[NETCDF_TRACK_STEP_NAME][:], dtype=int)
 
     predictor_matrix = None
 
@@ -1030,12 +1029,6 @@ def train_cnn(
 
     list_of_callback_objects = [checkpoint_object]
 
-    training_generator = deep_learning_generator(
-        netcdf_file_names=training_file_names,
-        num_examples_per_batch=num_examples_per_batch,
-        normalization_dict=normalization_dict,
-        binarization_threshold=binarization_threshold)
-
     model_metadata_dict = {
         TRAINING_FILES_KEY: training_file_names,
         NORMALIZATION_DICT_KEY: normalization_dict,
@@ -1048,7 +1041,11 @@ def train_cnn(
 
     if validation_file_names is None:
         model_object.fit_generator(
-            generator=training_generator,
+            generator=deep_learning_generator(
+                netcdf_file_names=training_file_names,
+                num_examples_per_batch=num_examples_per_batch,
+                normalization_dict=normalization_dict,
+                binarization_threshold=binarization_threshold),
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
             verbose=1, callbacks=list_of_callback_objects)
 
@@ -1060,17 +1057,19 @@ def train_cnn(
 
     list_of_callback_objects.append(early_stopping_object)
 
-    validation_generator = deep_learning_generator(
-        netcdf_file_names=validation_file_names,
-        num_examples_per_batch=num_examples_per_batch,
-        normalization_dict=normalization_dict,
-        binarization_threshold=binarization_threshold)
-
     model_object.fit_generator(
-        generator=training_generator,
+        generator=deep_learning_generator(
+            netcdf_file_names=training_file_names,
+            num_examples_per_batch=num_examples_per_batch,
+            normalization_dict=normalization_dict,
+            binarization_threshold=binarization_threshold),
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
         verbose=1, callbacks=list_of_callback_objects,
-        validation_data=validation_generator,
+        validation_data=deep_learning_generator(
+            netcdf_file_names=validation_file_names,
+            num_examples_per_batch=num_examples_per_batch,
+            normalization_dict=normalization_dict,
+            binarization_threshold=binarization_threshold),
         validation_steps=num_validation_batches_per_epoch)
 
     return model_metadata_dict
@@ -1311,13 +1310,13 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         first_date_string='20150101', last_date_string='20151231')
 
     cnn_file_name = '{0:s}/cnn_model.h5'.format(output_dir_name)
-    train_cnn(
+    model_metadata_dict = train_cnn(
         model_object=model_object, training_file_names=training_file_names,
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold,
         num_examples_per_batch=512, num_epochs=10,
         num_training_batches_per_epoch=10,
-        validation_file_names=None,
+        validation_file_names=validation_file_names,
         num_validation_batches_per_epoch=10,
         output_model_file_name=cnn_file_name)
     print SEPARATOR_STRING
