@@ -272,12 +272,12 @@ def plot_reliability_curve(
     :param num_bins: Number of bins for forecast probability.
     :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
         Will plot on these axes.
-    :return: mean_observation_by_bin: See doc for `_get_points_in_relia_curve`.
-    :return: mean_forecast_by_bin: Same.
+    :return: mean_forecast_probs: See doc for `_get_points_in_relia_curve`.
+    :return: mean_event_frequencies: Same.
     :return: num_examples_by_bin: Same.
     """
 
-    mean_observation_by_bin, mean_forecast_by_bin, num_examples_by_bin = (
+    mean_forecast_probs, mean_event_frequencies, num_examples_by_bin = (
         _get_points_in_relia_curve(
             observed_labels=observed_labels,
             forecast_probabilities=forecast_probabilities, num_bins=num_bins)
@@ -295,13 +295,12 @@ def plot_reliability_curve(
         linestyle='dashed', linewidth=PERFECT_LINE_WIDTH)
 
     real_indices = numpy.where(numpy.invert(numpy.logical_or(
-        numpy.isnan(mean_forecast_by_bin),
-        numpy.isnan(mean_observation_by_bin)
+        numpy.isnan(mean_forecast_probs), numpy.isnan(mean_event_frequencies)
     )))[0]
 
     axes_object.plot(
-        mean_forecast_by_bin[real_indices],
-        mean_observation_by_bin[real_indices], color=RELIABILITY_LINE_COLOUR,
+        mean_forecast_probs[real_indices], mean_event_frequencies[real_indices],
+        color=RELIABILITY_LINE_COLOUR,
         linestyle='solid', linewidth=RELIABILITY_LINE_WIDTH)
 
     axes_object.set_xlabel('Forecast probability')
@@ -309,7 +308,7 @@ def plot_reliability_curve(
     axes_object.set_xlim(0., 1.)
     axes_object.set_ylim(0., 1.)
 
-    return mean_observation_by_bin, mean_forecast_by_bin, num_examples_by_bin
+    return mean_forecast_probs, mean_event_frequencies, num_examples_by_bin
 
 
 def plot_attributes_diagram(
@@ -319,12 +318,12 @@ def plot_attributes_diagram(
     :param observed_labels: See doc for `plot_reliability_curve`.
     :param forecast_probabilities: Same.
     :param num_bins: Same.
-    :return: mean_observation_by_bin: See doc for `_get_points_in_relia_curve`.
-    :return: mean_forecast_by_bin: Same.
+    :return: mean_forecast_probs: See doc for `_get_points_in_relia_curve`.
+    :return: mean_event_frequencies: Same.
     :return: num_examples_by_bin: Same.
     """
 
-    mean_observation_by_bin, mean_forecast_by_bin, num_examples_by_bin = (
+    mean_forecast_probs, mean_event_frequencies, num_examples_by_bin = (
         _get_points_in_relia_curve(
             observed_labels=observed_labels,
             forecast_probabilities=forecast_probabilities, num_bins=num_bins)
@@ -343,4 +342,4 @@ def plot_attributes_diagram(
         forecast_probabilities=forecast_probabilities, num_bins=num_bins,
         axes_object=axes_object)
 
-    return mean_observation_by_bin, mean_forecast_by_bin, num_examples_by_bin
+    return mean_forecast_probs, mean_event_frequencies, num_examples_by_bin
