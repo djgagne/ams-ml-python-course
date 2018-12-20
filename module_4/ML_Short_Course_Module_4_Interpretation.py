@@ -17,6 +17,7 @@ from sklearn.metrics import auc as scikit_learn_auc
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as pyplot
+from module_4 import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
@@ -138,13 +139,13 @@ DENSE_LAYER_DROPOUT_FRACTION = 0.5
 MIN_LOSS_DECR_FOR_EARLY_STOPPING = 0.005
 NUM_EPOCHS_FOR_EARLY_STOPPING = 5
 
-# LIST_OF_METRIC_FUNCTIONS = [
-#     keras_metrics.accuracy, keras_metrics.binary_accuracy,
-#     keras_metrics.binary_csi, keras_metrics.binary_frequency_bias,
-#     keras_metrics.binary_pod, keras_metrics.binary_pofd,
-#     keras_metrics.binary_peirce_score, keras_metrics.binary_success_ratio,
-#     keras_metrics.binary_focn
-# ]
+LIST_OF_METRIC_FUNCTIONS = [
+    keras_metrics.accuracy, keras_metrics.binary_accuracy,
+    keras_metrics.binary_csi, keras_metrics.binary_frequency_bias,
+    keras_metrics.binary_pod, keras_metrics.binary_pofd,
+    keras_metrics.binary_peirce_score, keras_metrics.binary_success_ratio,
+    keras_metrics.binary_focn
+]
 
 TRAINING_FILES_KEY = 'training_file_names'
 NORMALIZATION_DICT_KEY = 'normalization_dict'
@@ -1043,8 +1044,7 @@ def setup_cnn(num_grid_rows, num_grid_columns):
     model_object.compile(
         loss=keras.losses.binary_crossentropy,
         optimizer=keras.optimizers.Adam(),
-        # metrics=LIST_OF_METRIC_FUNCTIONS
-    )
+        metrics=LIST_OF_METRIC_FUNCTIONS)
 
     model_object.summary()
     return model_object

@@ -2,8 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/misc.xml" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -18,11 +16,21 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="565">
-              <caret line="1542" column="36" lean-forward="true" selection-start-line="1538" selection-start-column="4" selection-end-line="1542" selection-end-column="36" />
+            <state relative-caret-position="417">
+              <caret line="1052" column="14" lean-forward="true" selection-start-line="1052" selection-start-column="14" selection-end-line="1052" selection-end-column="14" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="keras_metrics.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/module_4/keras_metrics.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="468">
+              <caret line="26" column="58" lean-forward="true" selection-start-line="26" selection-start-column="58" selection-end-line="26" selection-end-column="58" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -63,7 +71,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>_get_histogram</find>
       <find>.</find>
       <find>HISTOGRAM_EDGE_COLOUR</find>
       <find>input_to_bin_indices</find>
@@ -91,8 +98,9 @@
       <find>def</find>
       <find>def get_</find>
       <find>print</find>
-      <find>LIST_OF_METRIC_FUNCTIONS</find>
       <find>def eval</find>
+      <find>keras_metrics</find>
+      <find>LIST_OF_METRIC_FUNCTIONS</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -125,8 +133,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="1920" />
+    <option name="y" value="28" />
     <option name="width" value="1920" />
-    <option name="height" value="1080" />
+    <option name="height" value="1138" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -367,7 +377,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="0" y="0" width="1920" height="1080" extended-state="6" />
+    <frame x="1920" y="28" width="1920" height="1138" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
@@ -497,10 +507,18 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/module_4/keras_metrics.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="468">
+          <caret line="26" column="58" lean-forward="true" selection-start-line="26" selection-start-column="58" selection-end-line="26" selection-end-column="58" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="565">
-          <caret line="1542" column="36" lean-forward="true" selection-start-line="1538" selection-start-column="4" selection-end-line="1542" selection-end-column="36" />
+        <state relative-caret-position="417">
+          <caret line="1052" column="14" lean-forward="true" selection-start-line="1052" selection-start-column="14" selection-end-line="1052" selection-end-column="14" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>
