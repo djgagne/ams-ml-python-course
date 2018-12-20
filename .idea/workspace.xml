@@ -2,10 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/attributes_diagrams.py" afterPath="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/performance_diagrams.py" afterPath="$PROJECT_DIR$/module_4/performance_diagrams.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/roc_curves.py" afterPath="$PROJECT_DIR$/module_4/roc_curves.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -19,8 +17,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="402">
-              <caret line="1187" column="0" lean-forward="true" selection-start-line="1187" selection-start-column="0" selection-end-line="1187" selection-end-column="0" />
+            <state relative-caret-position="309">
+              <caret line="1185" column="0" lean-forward="true" selection-start-line="1185" selection-start-column="0" selection-end-line="1185" selection-end-column="0" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -64,6 +62,8 @@
       <find>TRAINING_FILES_KEY</find>
       <find>:return: pofd_by_threshold:</find>
       <find>def _csi_from_sr_and_pod</find>
+      <find>CNN_FILE</find>
+      <find>train_cnn(</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -423,8 +423,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="402">
-          <caret line="1187" column="0" lean-forward="true" selection-start-line="1187" selection-start-column="0" selection-end-line="1187" selection-end-column="0" />
+        <state relative-caret-position="309">
+          <caret line="1185" column="0" lean-forward="true" selection-start-line="1185" selection-start-column="0" selection-end-line="1185" selection-end-column="0" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

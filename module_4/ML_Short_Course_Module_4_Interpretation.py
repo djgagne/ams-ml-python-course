@@ -5,6 +5,7 @@ import glob
 import errno
 import random
 import os.path
+import argparse
 import time
 import calendar
 import numpy
@@ -20,11 +21,14 @@ from module_4 import roc_curves
 from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
 
-FIGURE_RESOLUTION_DPI = 300
+# Input arguments (this is a script).
+IMAGE_DIR_ARG_NAME = 'input_image_dir_name'
+FEATURE_DIR_ARG_NAME = 'input_feature_dir_name'
+OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
-SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
-DATE_FORMAT = '%Y%m%d'
-DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
+IMAGE_DIR_HELP_STRING = 'Name of directory with image data (in NetCDF files).'
+FEATURE_DIR_HELP_STRING = 'Name of directory with feature data (in CSV files).'
+OUTPUT_DIR_HELP_STRING = 'Name of output directory.'
 
 DEFAULT_IMAGE_DIR_NAME = (
     '/home/ryan.lagerquist/Downloads/ams2019_short_course/'
@@ -32,8 +36,27 @@ DEFAULT_IMAGE_DIR_NAME = (
 DEFAULT_FEATURE_DIR_NAME = (
     '/home/ryan.lagerquist/Downloads/ams2019_short_course/'
     'track_data_ncar_ams_3km_csv_small')
-DEFAULT_CNN_FILE_NAME = (
-    '/home/ryan.lagerquist/Downloads/ams2019_short_course/cnn_model.h5')
+DEFAULT_OUTPUT_DIR_NAME = '/home/ryan.lagerquist/Downloads/ams2019_short_course'
+
+INPUT_ARG_PARSER = argparse.ArgumentParser()
+INPUT_ARG_PARSER.add_argument(
+    '--' + IMAGE_DIR_ARG_NAME, type=str, required=False,
+    default=DEFAULT_IMAGE_DIR_NAME, help=IMAGE_DIR_HELP_STRING)
+
+INPUT_ARG_PARSER.add_argument(
+    '--' + FEATURE_DIR_ARG_NAME, type=str, required=False,
+    default=DEFAULT_FEATURE_DIR_NAME, help=FEATURE_DIR_HELP_STRING)
+
+INPUT_ARG_PARSER.add_argument(
+    '--' + OUTPUT_DIR_ARG_NAME, type=str, required=False,
+    default=DEFAULT_OUTPUT_DIR_NAME, help=OUTPUT_DIR_HELP_STRING)
+
+# Constants.
+FIGURE_RESOLUTION_DPI = 300
+
+SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
+DATE_FORMAT = '%Y%m%d'
+DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
 
 CSV_METADATA_COLUMNS = [
     'Step_ID', 'Track_ID', 'Ensemble_Name', 'Ensemble_Member', 'Run_Date',
@@ -951,8 +974,7 @@ def setup_cnn(num_grid_rows, num_grid_columns):
 def train_cnn(
         model_object, training_file_names, normalization_dict,
         binarization_threshold, num_examples_per_batch, num_epochs,
-        num_training_batches_per_epoch,
-        output_model_file_name=DEFAULT_CNN_FILE_NAME,
+        num_training_batches_per_epoch, output_model_file_name,
         validation_file_names=None, num_validation_batches_per_epoch=None):
     """Trains CNN (convolutional neural net).
 
@@ -1161,7 +1183,7 @@ def permutation_test_for_cnn(
     target_values = binarize_target_images(
         target_matrix=image_dict[TARGET_MATRIX_KEY],
         binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
-    
+
     # Get original cost (before permutation).
     num_examples = predictor_matrix.shape[0]
     these_probabilities = model_object.predict(
@@ -1241,8 +1263,13 @@ def permutation_test_for_cnn(
     }
 
 
-def _run():
-    """This is effectively the main method for now."""
+def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
+    """Main method.
+
+    :param input_image_dir_name: See documentation at top of file.
+    :param input_feature_dir_name: Same.
+    :param output_dir_name: Same.
+    """
 
     # csv_file_names = find_many_feature_files(
     #     first_date_string='20150101', last_date_string='20151231')
@@ -1255,7 +1282,9 @@ def _run():
     # print SEPARATOR_STRING
 
     training_file_names = find_many_image_files(
+        image_dir_name=input_image_dir_name,
         first_date_string='20100101', last_date_string='20141231')
+
     normalization_dict = get_image_normalization_params(training_file_names)
     print SEPARATOR_STRING
 
@@ -1269,8 +1298,10 @@ def _run():
         num_grid_columns=this_image_dict[PREDICTOR_MATRIX_KEY].shape[2])
 
     validation_file_names = find_many_image_files(
+        image_dir_name=input_image_dir_name,
         first_date_string='20150101', last_date_string='20151231')
 
+    cnn_file_name = '{0:s}/cnn_model.h5'.format(output_dir_name)
     model_metadata_dict = train_cnn(
         model_object=model_object, training_file_names=training_file_names,
         normalization_dict=normalization_dict,
@@ -1278,16 +1309,14 @@ def _run():
         num_examples_per_batch=100, num_epochs=10,
         num_training_batches_per_epoch=10,
         validation_file_names=validation_file_names,
-        num_validation_batches_per_epoch=10)
+        num_validation_batches_per_epoch=10,
+        output_model_file_name=cnn_file_name)
     print SEPARATOR_STRING
 
     validation_image_dict = read_many_image_files(validation_file_names)
     print SEPARATOR_STRING
 
-    validation_dir_name = '{0:s}/validation'.format(
-        os.path.split(DEFAULT_CNN_FILE_NAME)[0]
-    )
-
+    validation_dir_name = '{0:s}/validation'.format(output_dir_name)
     evaluate_cnn(
         model_object=model_object, image_dict=validation_image_dict,
         model_metadata_dict=model_metadata_dict,
@@ -1300,4 +1329,10 @@ def _run():
 
 
 if __name__ == '__main__':
-    _run()
+    INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
+
+    _run(
+        input_image_dir_name=getattr(INPUT_ARG_OBJECT, IMAGE_DIR_ARG_NAME),
+        input_feature_dir_name=getattr(INPUT_ARG_OBJECT, FEATURE_DIR_ARG_NAME),
+        output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
+    )
