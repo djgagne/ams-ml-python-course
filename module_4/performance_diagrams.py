@@ -170,12 +170,12 @@ def _add_colour_bar(
 def _get_points_in_perf_diagram(observed_labels, forecast_probabilities):
     """Creates points for performance diagram.
 
-    N = number of examples
+    E = number of examples
     T = number of binarization thresholds
 
-    :param observed_labels: length-N numpy array of observed labels (must be
-        integers in 0...1).
-    :param forecast_probabilities: length-N numpy array with forecast
+    :param observed_labels: length-E numpy array of class labels (integers in
+        0...1).
+    :param forecast_probabilities: length-E numpy array with forecast
         probabilities of label = 1.
     :return: pod_by_threshold: length-T numpy array of POD (probability of
         detection) values.
@@ -183,9 +183,12 @@ def _get_points_in_perf_diagram(observed_labels, forecast_probabilities):
     """
 
     assert numpy.all(numpy.logical_or(
-        observed_labels == 0, observed_labels == 1))
+        observed_labels == 0, observed_labels == 1
+    ))
+
     assert numpy.all(numpy.logical_and(
-        forecast_probabilities >= 0, forecast_probabilities <= 1))
+        forecast_probabilities >= 0, forecast_probabilities <= 1
+    ))
 
     observed_labels = observed_labels.astype(int)
     binarization_thresholds = numpy.linspace(0, 1, num=1001, dtype=float)
@@ -200,11 +203,16 @@ def _get_points_in_perf_diagram(observed_labels, forecast_probabilities):
         ).astype(int)
 
         this_num_hits = numpy.sum(numpy.logical_and(
-            these_forecast_labels == 1, observed_labels == 1))
+            these_forecast_labels == 1, observed_labels == 1
+        ))
+
         this_num_false_alarms = numpy.sum(numpy.logical_and(
-            these_forecast_labels == 1, observed_labels == 0))
+            these_forecast_labels == 1, observed_labels == 0
+        ))
+
         this_num_misses = numpy.sum(numpy.logical_and(
-            these_forecast_labels == 0, observed_labels == 1))
+            these_forecast_labels == 0, observed_labels == 1
+        ))
 
         try:
             pod_by_threshold[k] = (
@@ -235,11 +243,11 @@ def plot_performance_diagram(
         bias_line_width=DEFAULT_BIAS_LINE_WIDTH):
     """Plots performance diagram.
 
-    N = number of examples
+    E = number of examples
 
-    :param observed_labels: length-N numpy array of observed labels (must be
-        integers in 0...1).
-    :param forecast_probabilities: length-N numpy array with forecast
+    :param observed_labels: length-E numpy array of class labels (integers in
+        0...1).
+    :param forecast_probabilities: length-E numpy array with forecast
         probabilities of label = 1.
     :param line_colour: Colour (in any format accepted by `matplotlib.colors`).
     :param line_width: Line width (real positive number).
@@ -290,6 +298,7 @@ def plot_performance_diagram(
     nan_flags = numpy.logical_or(
         numpy.isnan(success_ratio_by_threshold), numpy.isnan(pod_by_threshold)
     )
+
     if not numpy.all(nan_flags):
         real_indices = numpy.where(numpy.invert(nan_flags))[0]
         axes_object.plot(
