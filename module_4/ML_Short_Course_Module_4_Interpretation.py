@@ -3,6 +3,7 @@
 import copy
 import glob
 import errno
+import pickle
 import random
 import os.path
 import argparse
@@ -52,7 +53,13 @@ INPUT_ARG_PARSER.add_argument(
     default=DEFAULT_OUTPUT_DIR_NAME, help=OUTPUT_DIR_HELP_STRING)
 
 # Constants.
+FIGURE_WIDTH_INCHES = 15
+FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
+
+BAR_GRAPH_FACE_COLOUR = numpy.array([166, 206, 227], dtype=float) / 255
+BAR_GRAPH_EDGE_COLOUR = numpy.full(3, 0.)
+BAR_GRAPH_EDGE_WIDTH = 2.
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
@@ -383,6 +390,26 @@ def _apply_cnn(model_object, predictor_matrix):
         )[:, -1]
 
     return forecast_probabilities
+
+
+def _label_bars_in_graph(axes_object, y_coords, y_strings):
+    """Labels bars in graph.
+
+    J = number of bars
+
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :param y_coords: length-J numpy array with y-coordinates of bars.
+    :param y_strings: length-J list of labels.
+    """
+
+    x_min, x_max = pyplot.xlim()
+    x_coord_for_text = x_min + 0.01 * (x_max - x_min)
+
+    for j in range(len(y_coords)):
+        axes_object.text(
+            x_coord_for_text, y_coords[j], y_strings[j], color='k',
+            horizontalalignment='left', verticalalignment='center')
 
 
 def time_string_to_unix(time_string, time_format):
@@ -1184,7 +1211,7 @@ def evaluate_cnn(
 
 
 def permutation_test_for_cnn(
-        model_object, image_dict, model_metadata_dict,
+        model_object, image_dict, model_metadata_dict, output_pickle_file_name,
         cost_function=_get_binary_xentropy):
     """Runs permutation test on CNN (convolutional neural net).
 
@@ -1198,6 +1225,8 @@ def permutation_test_for_cnn(
     :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
         ensure that data in `image_dict` are processed the exact same way as the
         training data for `model_object`.
+    :param output_pickle_file_name: Path to output file.  `result_dict` (the
+        output variable) will be saved here.
 
     :param cost_function: Cost function (used to evaluate model predictions).
         Must be negatively oriented (lower values are better).  Must have the
@@ -1238,7 +1267,6 @@ def permutation_test_for_cnn(
     # Get original cost (before permutation).
     these_probabilities = _apply_cnn(model_object=model_object,
                                      predictor_matrix=predictor_matrix)
-    print these_probabilities[:10]
     print MINOR_SEPARATOR_STRING
 
     original_cost = cost_function(target_values, these_probabilities)
@@ -1279,7 +1307,6 @@ def permutation_test_for_cnn(
             these_probabilities = _apply_cnn(
                 model_object=model_object,
                 predictor_matrix=this_predictor_matrix)
-            print these_probabilities[:10]
             print MINOR_SEPARATOR_STRING
 
             this_cost = cost_function(target_values, these_probabilities)
@@ -1311,13 +1338,123 @@ def permutation_test_for_cnn(
         print '\nBest predictor = "{0:s}" ... new cost = {1:.4e}\n'.format(
             best_predictor_name, highest_cost)
 
-    return {
+    result_dict = {
         PERMUTED_PREDICTORS_KEY: permuted_predictor_name_by_step,
         HIGHEST_COSTS_KEY: numpy.array(highest_cost_by_step),
         ORIGINAL_COST_KEY: original_cost,
         STEP1_PREDICTORS_KEY: predictor_names_step1,
         STEP1_COSTS_KEY: numpy.array(costs_step1)
     }
+
+    _create_directory(file_name=output_pickle_file_name)
+
+    print 'Writing results to: "{0:s}"...'.format(output_pickle_file_name)
+    file_handle = open(output_pickle_file_name, 'wb')
+    pickle.dump(result_dict, file_handle)
+    file_handle.close()
+
+    return result_dict
+
+
+def plot_breiman_results(
+        result_dict, output_file_name, plot_percent_increase=False):
+    """Plots results of Breiman (single-pass) permutation test.
+
+    :param result_dict: Dictionary created by `permutation_test_for_cnn`.
+    :param output_file_name: Path to output file.  Figure will be saved here.
+    :param plot_percent_increase: Boolean flag.  If True, x-axis will be
+        percentage of original cost (before permutation).  If False, will be
+        actual cost.
+    """
+
+    cost_values = result_dict[STEP1_COSTS_KEY]
+    predictor_names = result_dict[STEP1_PREDICTORS_KEY]
+
+    sort_indices = numpy.argsort(cost_values)
+    cost_values = cost_values[sort_indices]
+    predictor_names = [predictor_names[k] for k in sort_indices]
+
+    x_coords = numpy.concatenate((
+        numpy.array([result_dict[ORIGINAL_COST_KEY]]), cost_values
+    ))
+
+    if plot_percent_increase:
+        x_coords = 100 * x_coords / x_coords[0]
+
+    y_strings = ['No permutation'] + predictor_names
+    y_coords = numpy.linspace(
+        0, len(y_strings) - 1, num=len(y_strings), dtype=float)
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, x_coords, color=BAR_GRAPH_FACE_COLOUR,
+        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
+
+    pyplot.yticks([], [])
+    pyplot.ylabel('Predictor permuted')
+
+    if plot_percent_increase:
+        pyplot.xlabel('Cost (percentage of original)')
+    else:
+        pyplot.xlabel('Cost')
+
+    _label_bars_in_graph(
+        axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
+
+    _create_directory(file_name=output_file_name)
+    print 'Saving figure to: "{0:s}"...'.format(output_file_name)
+    pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+
+def plot_lakshmanan_results(
+        result_dict, output_file_name, plot_percent_increase=False):
+    """Plots results of Lakshmanan (multi-pass) permutation test.
+
+    :param result_dict: See doc for `plot_breiman_results`.
+    :param output_file_name: Same.
+    :param plot_percent_increase: Same.
+    """
+
+    x_coords = numpy.concatenate((
+        numpy.array([result_dict[ORIGINAL_COST_KEY]]),
+        result_dict[HIGHEST_COSTS_KEY]
+    ))
+
+    if plot_percent_increase:
+        x_coords = 100 * x_coords / x_coords[0]
+
+    y_strings = ['No permutation'] + result_dict[PERMUTED_PREDICTORS_KEY]
+    y_coords = numpy.linspace(
+        0, len(y_strings) - 1, num=len(y_strings), dtype=float
+    )[::-1]
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, x_coords, color=BAR_GRAPH_FACE_COLOUR,
+        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
+
+    pyplot.yticks([], [])
+    pyplot.ylabel('Predictor permuted')
+
+    if plot_percent_increase:
+        pyplot.xlabel('Cost (percentage of original)')
+    else:
+        pyplot.xlabel('Cost')
+
+    _label_bars_in_graph(
+        axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
+
+    _create_directory(file_name=output_file_name)
+    print 'Saving figure to: "{0:s}"...'.format(output_file_name)
+    pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
 
 
 def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
@@ -1353,7 +1490,7 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         model_object=model_object, training_file_names=training_file_names,
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold,
-        num_examples_per_batch=100, num_epochs=10,
+        num_examples_per_batch=256, num_epochs=10,
         num_training_batches_per_epoch=10,
         validation_file_names=validation_file_names,
         num_validation_batches_per_epoch=10,
@@ -1370,9 +1507,26 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         output_dir_name=validation_dir_name)
     print SEPARATOR_STRING
 
+    permutation_dir_name = '{0:s}/permutation_test'.format(output_dir_name)
+    main_permutation_file_name = '{0:s}/permutation_results.p'.format(
+        permutation_dir_name)
+
     permutation_dict = permutation_test_for_cnn(
         model_object=model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict)
+        model_metadata_dict=model_metadata_dict,
+        output_pickle_file_name=main_permutation_file_name)
+    print SEPARATOR_STRING
+
+    breiman_file_name = '{0:s}/breiman_results.jpg'.format(permutation_dir_name)
+    plot_breiman_results(
+        result_dict=permutation_dict, output_file_name=breiman_file_name,
+        plot_percent_increase=False)
+
+    lakshmanan_file_name = '{0:s}/lakshmanan_results.jpg'.format(
+        permutation_dir_name)
+    plot_lakshmanan_results(
+        result_dict=permutation_dict, output_file_name=lakshmanan_file_name,
+        plot_percent_increase=False)
 
 
 if __name__ == '__main__':

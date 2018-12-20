@@ -16,8 +16,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="327">
-              <caret line="1282" column="40" lean-forward="true" selection-start-line="1282" selection-start-column="40" selection-end-line="1282" selection-end-column="40" />
+            <state relative-caret-position="443">
+              <caret line="1500" column="26" lean-forward="true" selection-start-line="1500" selection-start-column="26" selection-end-line="1500" selection-end-column="26" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -28,8 +28,8 @@
       <file leaf-file-name="attributes_diagrams.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/module_4/attributes_diagrams.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="834">
-              <caret line="345" column="77" lean-forward="true" selection-start-line="345" selection-start-column="11" selection-end-line="345" selection-end-column="77" />
+            <state relative-caret-position="309">
+              <caret line="150" column="4" lean-forward="false" selection-start-line="150" selection-start-column="4" selection-end-line="151" selection-end-column="32" />
               <folding>
                 <element signature="e#48#60#0" expanded="true" />
               </folding>
@@ -69,6 +69,8 @@
       <find>_apply_cnn(</find>
       <find>normalize_images(</find>
       <find>print these</find>
+      <find>axes_object =</find>
+      <find>:param axes_object:</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -418,8 +420,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/attributes_diagrams.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="834">
-          <caret line="345" column="77" lean-forward="true" selection-start-line="345" selection-start-column="11" selection-end-line="345" selection-end-column="77" />
+        <state relative-caret-position="309">
+          <caret line="150" column="4" lean-forward="false" selection-start-line="150" selection-start-column="4" selection-end-line="151" selection-end-column="32" />
           <folding>
             <element signature="e#48#60#0" expanded="true" />
           </folding>
@@ -428,8 +430,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="327">
-          <caret line="1282" column="40" lean-forward="true" selection-start-line="1282" selection-start-column="40" selection-end-line="1282" selection-end-column="40" />
+        <state relative-caret-position="443">
+          <caret line="1500" column="26" lean-forward="true" selection-start-line="1500" selection-start-column="26" selection-end-line="1500" selection-end-column="26" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>
