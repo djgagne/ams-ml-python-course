@@ -1120,7 +1120,8 @@ def evaluate_cnn(
 
         forecast_probabilities[these_indices] = model_object.predict(
             predictor_matrix[these_indices, ...],
-            batch_size=num_examples_per_batch)
+            batch_size=num_examples_per_batch
+        )[:, -1]
 
     pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
         observed_labels=target_values,
@@ -1214,7 +1215,8 @@ def permutation_test_for_cnn(
     # Get original cost (before permutation).
     num_examples = predictor_matrix.shape[0]
     these_probabilities = model_object.predict(
-        predictor_matrix, batch_size=num_examples)
+        predictor_matrix, batch_size=num_examples
+    )[:, -1]
 
     original_cost = cost_function(target_values, these_probabilities)
     print 'Original cost (no permutation): {0:.4e}'.format(original_cost)
@@ -1251,7 +1253,9 @@ def permutation_test_for_cnn(
                 )
 
             these_probabilities = model_object.predict(
-                this_predictor_matrix, batch_size=num_examples)
+                this_predictor_matrix, batch_size=num_examples
+            )[:, -1]
+
             this_cost = cost_function(target_values, these_probabilities)
             print 'Resulting cost = {0:.4e}'.format(this_cost)
 
