@@ -1051,11 +1051,11 @@ def train_cnn(
 
         return model_metadata_dict
 
-    early_stopping_object = keras.callbacks.EarlyStopping(
-        monitor='val_loss', min_delta=MIN_LOSS_DECR_FOR_EARLY_STOPPING,
-        patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
-
-    list_of_callback_objects.append(early_stopping_object)
+    # early_stopping_object = keras.callbacks.EarlyStopping(
+    #     monitor='val_loss', min_delta=MIN_LOSS_DECR_FOR_EARLY_STOPPING,
+    #     patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
+    #
+    # list_of_callback_objects.append(early_stopping_object)
 
     validation_generator = deep_learning_generator(
         netcdf_file_names=validation_file_names,
