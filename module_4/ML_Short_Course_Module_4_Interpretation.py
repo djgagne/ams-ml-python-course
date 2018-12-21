@@ -1,6 +1,5 @@
 """Code for AMS 2019 short course."""
 
-import argparse
 import copy
 import glob
 import errno
@@ -20,15 +19,7 @@ from module_4 import roc_curves
 from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
 
-# Input arguments (this is a script).
-IMAGE_DIR_ARG_NAME = 'input_image_dir_name'
-FEATURE_DIR_ARG_NAME = 'input_feature_dir_name'
-OUTPUT_DIR_ARG_NAME = 'output_dir_name'
-
-IMAGE_DIR_HELP_STRING = 'Name of directory with image data (in NetCDF files).'
-FEATURE_DIR_HELP_STRING = 'Name of directory with feature data (in CSV files).'
-OUTPUT_DIR_HELP_STRING = 'Name of output directory.'
-
+# Directories.
 DEFAULT_IMAGE_DIR_NAME = (
     '/home/ryan.lagerquist/Downloads/ams2019_short_course/'
     'track_data_ncar_ams_3km_nc_small')
@@ -36,19 +27,6 @@ DEFAULT_FEATURE_DIR_NAME = (
     '/home/ryan.lagerquist/Downloads/ams2019_short_course/'
     'track_data_ncar_ams_3km_csv_small')
 DEFAULT_OUTPUT_DIR_NAME = '/home/ryan.lagerquist/Downloads/ams2019_short_course'
-
-INPUT_ARG_PARSER = argparse.ArgumentParser()
-INPUT_ARG_PARSER.add_argument(
-    '--' + IMAGE_DIR_ARG_NAME, type=str, required=False,
-    default=DEFAULT_IMAGE_DIR_NAME, help=IMAGE_DIR_HELP_STRING)
-
-INPUT_ARG_PARSER.add_argument(
-    '--' + FEATURE_DIR_ARG_NAME, type=str, required=False,
-    default=DEFAULT_FEATURE_DIR_NAME, help=FEATURE_DIR_HELP_STRING)
-
-INPUT_ARG_PARSER.add_argument(
-    '--' + OUTPUT_DIR_ARG_NAME, type=str, required=False,
-    default=DEFAULT_OUTPUT_DIR_NAME, help=OUTPUT_DIR_HELP_STRING)
 
 # Plotting constants.
 FIGURE_WIDTH_INCHES = 15
@@ -1496,10 +1474,10 @@ def permutation_test_for_cnn(
         best_predictor_permuted_values = None
 
         for this_predictor_name in remaining_predictor_names:
-            print((
-                      'Trying predictor "{0:s}" at step {1:d} of permutation '
-                      'test...'
-                  ).format(this_predictor_name, current_step_num))
+            print(
+                ('Trying predictor "{0:s}" at step {1:d} of permutation test...'
+                 ).format(this_predictor_name, current_step_num)
+            )
 
             this_predictor_index = predictor_names.index(this_predictor_name)
             this_predictor_matrix = predictor_matrix + 0.
@@ -1719,31 +1697,15 @@ def plot_breiman_results_example(permutation_dir_name, permutation_dict):
         plot_percent_increase=False)
 
 
-def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
-    """Main method.
+def plot_lakshmanan_results_example(permutation_dir_name, permutation_dict):
+    """Plots results of Lakshmanan permutation test.
 
-    :param input_image_dir_name: See documentation at top of file.
-    :param input_feature_dir_name: Same.
-    :param output_dir_name: Same.
+    :param permutation_dir_name: Name of output directory.
+    :param permutation_dict: Dictionary created by `permutation_test_for_cnn`.
     """
-
-    breiman_file_name = '{0:s}/breiman_results.jpg'.format(permutation_dir_name)
-    plot_breiman_results(
-        result_dict=permutation_dict, output_file_name=breiman_file_name,
-        plot_percent_increase=False)
 
     lakshmanan_file_name = '{0:s}/lakshmanan_results.jpg'.format(
         permutation_dir_name)
     plot_lakshmanan_results(
         result_dict=permutation_dict, output_file_name=lakshmanan_file_name,
         plot_percent_increase=False)
-
-
-if __name__ == '__main__':
-    INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
-
-    _run(
-        input_image_dir_name=getattr(INPUT_ARG_OBJECT, IMAGE_DIR_ARG_NAME),
-        input_feature_dir_name=getattr(INPUT_ARG_OBJECT, FEATURE_DIR_ARG_NAME),
-        output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
-    )
