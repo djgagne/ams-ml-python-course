@@ -1,12 +1,12 @@
 """Code for AMS 2019 short course."""
 
+import argparse
 import copy
 import glob
 import errno
-import pickle
 import random
 import os.path
-import argparse
+import pickle
 import time
 import calendar
 import numpy
@@ -14,8 +14,6 @@ import pandas
 import netCDF4
 import keras
 from sklearn.metrics import auc as scikit_learn_auc
-import matplotlib
-matplotlib.use('agg')
 import matplotlib.pyplot as pyplot
 from module_4 import keras_metrics
 from module_4 import roc_curves
@@ -52,7 +50,7 @@ INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=False,
     default=DEFAULT_OUTPUT_DIR_NAME, help=OUTPUT_DIR_HELP_STRING)
 
-# Constants.
+# Plotting constants.
 FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
@@ -70,12 +68,7 @@ pyplot.rc('ytick', labelsize=FONT_SIZE)
 pyplot.rc('legend', fontsize=FONT_SIZE)
 pyplot.rc('figure', titlesize=FONT_SIZE)
 
-SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
-MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
-
-DATE_FORMAT = '%Y%m%d'
-DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
-
+# Naming constants.
 CSV_METADATA_COLUMNS = [
     'Step_ID', 'Track_ID', 'Ensemble_Name', 'Ensemble_Member', 'Run_Date',
     'Valid_Date', 'Forecast_Hour', 'Valid_Hour_UTC'
@@ -121,6 +114,21 @@ PREDICTOR_MATRIX_KEY = 'predictor_matrix'
 TARGET_NAME_KEY = 'target_name'
 TARGET_MATRIX_KEY = 'target_matrix'
 
+TRAINING_FILES_KEY = 'training_file_names'
+NORMALIZATION_DICT_KEY = 'normalization_dict'
+BINARIZATION_THRESHOLD_KEY = 'binarization_threshold'
+NUM_EXAMPLES_PER_BATCH_KEY = 'num_examples_per_batch'
+NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
+VALIDATION_FILES_KEY = 'validation_file_names'
+NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
+
+PERMUTED_PREDICTORS_KEY = 'permuted_predictor_name_by_step'
+HIGHEST_COSTS_KEY = 'highest_cost_by_step'
+ORIGINAL_COST_KEY = 'original_cost'
+STEP1_PREDICTORS_KEY = 'predictor_names_step1'
+STEP1_COSTS_KEY = 'costs_step1'
+
+# Deep-learning constants.
 L1_WEIGHT = 0.
 L2_WEIGHT = 0.001
 NUM_PREDICTORS_TO_FIRST_NUM_FILTERS = 8
@@ -147,22 +155,43 @@ LIST_OF_METRIC_FUNCTIONS = [
     keras_metrics.binary_focn
 ]
 
-TRAINING_FILES_KEY = 'training_file_names'
-NORMALIZATION_DICT_KEY = 'normalization_dict'
-BINARIZATION_THRESHOLD_KEY = 'binarization_threshold'
-NUM_EXAMPLES_PER_BATCH_KEY = 'num_examples_per_batch'
-NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
-VALIDATION_FILES_KEY = 'validation_file_names'
-NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
+# Misc constants.
+SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
+MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
+
+DATE_FORMAT = '%Y%m%d'
+DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
 
 MIN_PROBABILITY = 1e-15
 MAX_PROBABILITY = 1. - MIN_PROBABILITY
 
-PERMUTED_PREDICTORS_KEY = 'permuted_predictor_name_by_step'
-HIGHEST_COSTS_KEY = 'highest_cost_by_step'
-ORIGINAL_COST_KEY = 'original_cost'
-STEP1_PREDICTORS_KEY = 'predictor_names_step1'
-STEP1_COSTS_KEY = 'costs_step1'
+
+def time_string_to_unix(time_string, time_format):
+    """Converts time from string to Unix format.
+
+    Unix format = seconds since 0000 UTC 1 Jan 1970.
+
+    :param time_string: Time string.
+    :param time_format: Format of time string (example: "%Y%m%d" or
+        "%Y-%m-%d-%H%M%S").
+    :return: unix_time_sec: Time in Unix format.
+    """
+
+    return calendar.timegm(time.strptime(time_string, time_format))
+
+
+def time_unix_to_string(unix_time_sec, time_format):
+    """Converts time from Unix format to string.
+
+    Unix format = seconds since 0000 UTC 1 Jan 1970.
+
+    :param unix_time_sec: Time in Unix format.
+    :param time_format: Desired format of time string (example: "%Y%m%d" or
+        "%Y-%m-%d-%H%M%S").
+    :return: time_string: Time string.
+    """
+
+    return time.strftime(time_format, time.gmtime(unix_time_sec))
 
 
 def _remove_future_data(predictor_table):
@@ -193,261 +222,6 @@ def _feature_file_name_to_date(csv_file_name):
     # Verify.
     time_string_to_unix(time_string=date_string, time_format=DATE_FORMAT)
     return date_string
-
-
-def _image_file_name_to_date(netcdf_file_name):
-    """Parses date from name of image (NetCDF) file.
-
-    :param netcdf_file_name: Path to input file.
-    :return: date_string: Date (format "yyyymmdd").
-    """
-
-    pathless_file_name = os.path.split(netcdf_file_name)[-1]
-    date_string = pathless_file_name.replace(
-        'NCARSTORM_', '').replace('-0000_d01_model_patches.nc', '')
-
-    # Verify.
-    time_string_to_unix(time_string=date_string, time_format=DATE_FORMAT)
-    return date_string
-
-
-def _get_dense_layer_dimensions(num_input_units, num_classes, num_dense_layers):
-    """Returns dimensions (number of input and output units) for each dense lyr.
-
-    D = number of dense layers
-
-    :param num_input_units: Number of input units (features created by
-        flattening layer).
-    :param num_classes: Number of output classes (possible values of target
-        variable).
-    :param num_dense_layers: Number of dense layers.
-    :return: num_inputs_by_layer: length-D numpy array with number of input
-        units by dense layer.
-    :return: num_outputs_by_layer: length-D numpy array with number of output
-        units by dense layer.
-    """
-
-    if num_classes == 2:
-        num_output_units = 1
-    else:
-        num_output_units = num_classes + 0
-
-    e_folding_param = (
-        float(-1 * num_dense_layers) /
-        numpy.log(float(num_output_units) / num_input_units)
-    )
-
-    dense_layer_indices = numpy.linspace(
-        0, num_dense_layers - 1, num=num_dense_layers, dtype=float)
-    num_inputs_by_layer = num_input_units * numpy.exp(
-        -1 * dense_layer_indices / e_folding_param)
-    num_inputs_by_layer = numpy.round(num_inputs_by_layer).astype(int)
-
-    num_outputs_by_layer = numpy.concatenate((
-        num_inputs_by_layer[1:],
-        numpy.array([num_output_units], dtype=int)
-    ))
-
-    return num_inputs_by_layer, num_outputs_by_layer
-
-
-def _update_normalization_params(intermediate_normalization_dict, new_values):
-    """Updates normalization params for one predictor.
-
-    :param intermediate_normalization_dict: Dictionary with the following keys.
-    intermediate_normalization_dict['num_values']: Number of values on which
-        current estimates are based.
-    intermediate_normalization_dict['mean_value']: Current estimate for mean.
-    intermediate_normalization_dict['mean_of_squares']: Current mean of squared
-        values.
-
-    :param new_values: numpy array of new values (will be used to update
-        `intermediate_normalization_dict`).
-    :return: intermediate_normalization_dict: Same as input but with updated
-        values.
-    """
-
-    if MEAN_VALUE_KEY not in intermediate_normalization_dict:
-        intermediate_normalization_dict = {
-            NUM_VALUES_KEY: 0,
-            MEAN_VALUE_KEY: 0.,
-            MEAN_OF_SQUARES_KEY: 0.
-        }
-
-    these_means = numpy.array([
-        intermediate_normalization_dict[MEAN_VALUE_KEY], numpy.mean(new_values)
-    ])
-    these_weights = numpy.array([
-        intermediate_normalization_dict[NUM_VALUES_KEY], new_values.size
-    ])
-
-    intermediate_normalization_dict[MEAN_VALUE_KEY] = numpy.average(
-        these_means, weights=these_weights)
-
-    these_means = numpy.array([
-        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY],
-        numpy.mean(new_values ** 2)
-    ])
-
-    intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] = numpy.average(
-        these_means, weights=these_weights)
-
-    intermediate_normalization_dict[NUM_VALUES_KEY] += new_values.size
-    return intermediate_normalization_dict
-
-
-def _get_standard_deviation(intermediate_normalization_dict):
-    """Computes stdev from intermediate normalization params.
-
-    :param intermediate_normalization_dict: See doc for
-        `_update_normalization_params`.
-    :return: standard_deviation: Standard deviation.
-    """
-
-    num_values = float(intermediate_normalization_dict[NUM_VALUES_KEY])
-    multiplier = num_values / (num_values - 1)
-
-    return numpy.sqrt(multiplier * (
-        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] -
-        intermediate_normalization_dict[MEAN_VALUE_KEY] ** 2
-    ))
-
-
-def _get_binary_xentropy(target_values, forecast_probabilities):
-    """Computes binary cross-entropy.
-
-    This function satisfies the requirements for `cost_function` in the input to
-    `run_permutation_test`.
-
-    E = number of examples
-
-    :param: target_values: length-E numpy array of target values (integer class
-        labels).
-    :param: forecast_probabilities: length-E numpy array with predicted
-        probabilities of positive class (target value = 1).
-    :return: cross_entropy: Cross-entropy.
-    """
-
-    forecast_probabilities[
-        forecast_probabilities < MIN_PROBABILITY] = MIN_PROBABILITY
-    forecast_probabilities[
-        forecast_probabilities > MAX_PROBABILITY] = MAX_PROBABILITY
-
-    return -1 * numpy.mean(
-        target_values * numpy.log2(forecast_probabilities) +
-        (1 - target_values) * numpy.log2(1 - forecast_probabilities)
-    )
-
-
-def _create_directory(directory_name=None, file_name=None):
-    """Creates directory (along with parents if necessary).
-
-    This method creates directories only when necessary, so you don't have to
-    worry about it overwriting anything.
-
-    :param directory_name: Name of desired directory.
-    :param file_name: [used only if `directory_name is None`]
-        Path to desired file.  All directories in path will be created.
-    """
-
-    if directory_name is None:
-        directory_name = os.path.split(file_name)[0]
-
-    try:
-        os.makedirs(directory_name)
-    except OSError as this_error:
-        if this_error.errno == errno.EEXIST and os.path.isdir(directory_name):
-            pass
-        else:
-            raise
-
-
-def _apply_cnn(model_object, predictor_matrix):
-    """Applies trained CNN (convolutional neural net) to new data.
-
-    E = number of examples (storm objects) in file
-    M = number of rows in each storm-centered grid
-    N = number of columns in each storm-centered grid
-    C = number of channels (predictor variables)
-
-    :param model_object: Trained instance of `keras.models.Model`.
-    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
-    :return: forecast_probabilities: length-E numpy array with forecast
-        probabilities of positive class (label = 1).
-    """
-
-    num_examples = predictor_matrix.shape[0]
-    forecast_probabilities = numpy.full(num_examples, numpy.nan)
-    num_examples_per_batch = 1000
-
-    for i in range(0, num_examples, num_examples_per_batch):
-        this_first_index = i
-        this_last_index = min(
-            [i + num_examples_per_batch - 1, num_examples - 1]
-        )
-
-        print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
-            this_first_index, this_last_index, num_examples))
-
-        these_indices = numpy.linspace(
-            this_first_index, this_last_index,
-            num=this_last_index - this_first_index + 1, dtype=int)
-
-        forecast_probabilities[these_indices] = model_object.predict(
-            predictor_matrix[these_indices, ...],
-            batch_size=num_examples_per_batch
-        )[:, -1]
-
-    return forecast_probabilities
-
-
-def _label_bars_in_graph(axes_object, y_coords, y_strings):
-    """Labels bars in graph.
-
-    J = number of bars
-
-    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
-        Will plot on these axes.
-    :param y_coords: length-J numpy array with y-coordinates of bars.
-    :param y_strings: length-J list of labels.
-    """
-
-    x_min, x_max = pyplot.xlim()
-    x_coord_for_text = x_min + 0.01 * (x_max - x_min)
-
-    for j in range(len(y_coords)):
-        axes_object.text(
-            x_coord_for_text, y_coords[j], y_strings[j], color='k',
-            horizontalalignment='left', verticalalignment='center')
-
-
-def time_string_to_unix(time_string, time_format):
-    """Converts time from string to Unix format.
-
-    Unix format = seconds since 0000 UTC 1 Jan 1970.
-
-    :param time_string: Time string.
-    :param time_format: Format of time string (example: "%Y%m%d" or
-        "%Y-%m-%d-%H%M%S").
-    :return: unix_time_sec: Time in Unix format.
-    """
-
-    return calendar.timegm(time.strptime(time_string, time_format))
-
-
-def time_unix_to_string(unix_time_sec, time_format):
-    """Converts time from Unix format to string.
-
-    Unix format = seconds since 0000 UTC 1 Jan 1970.
-
-    :param unix_time_sec: Time in Unix format.
-    :param time_format: Desired format of time string (example: "%Y%m%d" or
-        "%Y-%m-%d-%H%M%S").
-    :return: time_string: Time string.
-    """
-
-    return time.strftime(time_format, time.gmtime(unix_time_sec))
-
 
 def find_many_feature_files(first_date_string, last_date_string,
                             feature_dir_name=DEFAULT_FEATURE_DIR_NAME):
@@ -527,7 +301,7 @@ def read_many_feature_files(csv_file_names):
 
         (list_of_metadata_tables[i], list_of_predictor_tables[i],
          list_of_target_tables[i]
-        ) = read_feature_file(csv_file_names[i])
+         ) = read_feature_file(csv_file_names[i])
 
         if i == 0:
             continue
@@ -552,6 +326,56 @@ def read_many_feature_files(csv_file_names):
         list_of_target_tables, axis=0, ignore_index=True)
 
     return metadata_table, predictor_table, target_table
+
+
+def feature_files_example1():
+    """Runs Example 1 for feature files."""
+
+    feature_file_names = find_many_feature_files(
+        first_date_string='20150701', last_date_string='20150731')
+    metadata_table, predictor_table, target_table = read_many_feature_files(
+        feature_file_names)
+
+    print(MINOR_SEPARATOR_STRING)
+    print('Variables in metadata are as follows:')
+    for this_column in list(metadata_table):
+        print(this_column)
+
+    print('\nPredictor variables are as follows:')
+    for this_column in list(predictor_table):
+        print(this_column)
+
+    print('\nTarget variables are as follows:')
+    for this_column in list(target_table):
+        print(this_column)
+
+    this_predictor_name = list(predictor_table)[0]
+    these_predictor_values = predictor_table[this_predictor_name].values[:10]
+    print('\nSome values of predictor variable "{0:s}":\n{1:s}'.format(
+        this_predictor_name, str(these_predictor_values)
+    ))
+
+    this_target_name = list(target_table)[0]
+    these_target_values = target_table[this_target_name].values[:10]
+    print('\nSome values of target variable "{0:s}":\n{1:s}'.format(
+        this_target_name, str(these_target_values)
+    ))
+
+
+def _image_file_name_to_date(netcdf_file_name):
+    """Parses date from name of image (NetCDF) file.
+
+    :param netcdf_file_name: Path to input file.
+    :return: date_string: Date (format "yyyymmdd").
+    """
+
+    pathless_file_name = os.path.split(netcdf_file_name)[-1]
+    date_string = pathless_file_name.replace(
+        'NCARSTORM_', '').replace('-0000_d01_model_patches.nc', '')
+
+    # Verify.
+    time_string_to_unix(time_string=date_string, time_format=DATE_FORMAT)
+    return date_string
 
 
 def find_many_image_files(first_date_string, last_date_string,
@@ -670,6 +494,107 @@ def read_many_image_files(netcdf_file_names):
     return image_dict
 
 
+def image_files_example1():
+    """Runs Example 1 for feature files."""
+
+    image_file_names = find_many_image_files(
+        first_date_string='20150701', last_date_string='20150731')
+    image_dict = read_many_image_files(image_file_names)
+
+    print(MINOR_SEPARATOR_STRING)
+    print('Variables in dictionary are as follows:')
+    for this_key in image_dict.keys():
+        print(this_key)
+
+    print('\nPredictor variables are as follows:')
+    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
+    for this_name in predictor_names:
+        print(this_name)
+
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+    print(
+        ('\nSome values of predictor variable "{0:s}" for first storm object:'
+         '\n{1:s}'
+         ).format(predictor_names[0], str(these_predictor_values))
+    )
+
+    these_target_values = image_dict[TARGET_MATRIX_KEY][0, :5, :5]
+    print(
+        ('\nSome values of target variable "{0:s}" for first storm object:'
+         '\n{1:s}'
+         ).format(image_dict[TARGET_NAME_KEY], str(these_target_values))
+    )
+
+
+def find_training_files_example():
+    """Finds training files."""
+
+    training_file_names = find_many_image_files(
+        first_date_string='20100101', last_date_string='20141231')
+
+
+def _update_normalization_params(intermediate_normalization_dict, new_values):
+    """Updates normalization params for one predictor.
+
+    :param intermediate_normalization_dict: Dictionary with the following keys.
+    intermediate_normalization_dict['num_values']: Number of values on which
+        current estimates are based.
+    intermediate_normalization_dict['mean_value']: Current estimate for mean.
+    intermediate_normalization_dict['mean_of_squares']: Current mean of squared
+        values.
+
+    :param new_values: numpy array of new values (will be used to update
+        `intermediate_normalization_dict`).
+    :return: intermediate_normalization_dict: Same as input but with updated
+        values.
+    """
+
+    if MEAN_VALUE_KEY not in intermediate_normalization_dict:
+        intermediate_normalization_dict = {
+            NUM_VALUES_KEY: 0,
+            MEAN_VALUE_KEY: 0.,
+            MEAN_OF_SQUARES_KEY: 0.
+        }
+
+    these_means = numpy.array([
+        intermediate_normalization_dict[MEAN_VALUE_KEY], numpy.mean(new_values)
+    ])
+    these_weights = numpy.array([
+        intermediate_normalization_dict[NUM_VALUES_KEY], new_values.size
+    ])
+
+    intermediate_normalization_dict[MEAN_VALUE_KEY] = numpy.average(
+        these_means, weights=these_weights)
+
+    these_means = numpy.array([
+        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY],
+        numpy.mean(new_values ** 2)
+    ])
+
+    intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] = numpy.average(
+        these_means, weights=these_weights)
+
+    intermediate_normalization_dict[NUM_VALUES_KEY] += new_values.size
+    return intermediate_normalization_dict
+
+
+def _get_standard_deviation(intermediate_normalization_dict):
+    """Computes stdev from intermediate normalization params.
+
+    :param intermediate_normalization_dict: See doc for
+        `_update_normalization_params`.
+    :return: standard_deviation: Standard deviation.
+    """
+
+    num_values = float(intermediate_normalization_dict[NUM_VALUES_KEY])
+    multiplier = num_values / (num_values - 1)
+
+    return numpy.sqrt(multiplier * (
+        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] -
+        intermediate_normalization_dict[MEAN_VALUE_KEY] ** 2
+    ))
+
+
 def get_image_normalization_params(netcdf_file_names):
     """Computes normalization params (mean and stdev) for each predictor.
 
@@ -702,11 +627,21 @@ def get_image_normalization_params(netcdf_file_names):
         normalization_dict[predictor_names[m]] = numpy.array(
             [this_mean, this_stdev])
 
-        print((
-            'Mean and standard deviation for "{0:s}" = {1:.4f}, {2:.4f}'
-        ).format(predictor_names[m], this_mean, this_stdev))
+        print(
+            ('Mean and standard deviation for "{0:s}" = {1:.4f}, {2:.4f}'
+             ).format(predictor_names[m], this_mean, this_stdev)
+        )
 
     return normalization_dict
+
+
+def get_norm_params_example(training_file_names):
+    """Gets normalization parameters.
+
+    :param training_file_names: 1-D list of paths to input files.
+    """
+
+    normalization_dict = get_image_normalization_params(training_file_names)
 
 
 def normalize_images(
@@ -774,6 +709,44 @@ def denormalize_images(predictor_matrix, predictor_names, normalization_dict):
     return predictor_matrix
 
 
+def norm_denorm_example(training_file_names, normalization_dict):
+    """Normalizes and denormalizes images.
+
+    :param training_file_names: 1-D list of paths to input files.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    """
+
+    image_dict = read_image_file(training_file_names[0])
+
+    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+
+    print('\nOriginal values of "{0:s}" for first storm object:\n{1:s}'.format(
+        predictor_names[0], str(these_predictor_values)
+    ))
+
+    image_dict[PREDICTOR_MATRIX_KEY], _ = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+    print(
+        '\nNormalized values of "{0:s}" for first storm object:\n{1:s}'.format(
+            predictor_names[0], str(these_predictor_values))
+    )
+
+    image_dict[PREDICTOR_MATRIX_KEY] = denormalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+    print(
+        ('\nDenormalized values of "{0:s}" for first storm object:\n{1:s}'
+         ).format(predictor_names[0], str(these_predictor_values))
+    )
+
+
 def get_binarization_threshold(netcdf_file_names, percentile_level):
     """Computes binarization threshold for target variable.
 
@@ -811,6 +784,16 @@ def get_binarization_threshold(netcdf_file_names, percentile_level):
     return binarization_threshold
 
 
+def find_binarization_threshold_example(training_file_names):
+    """Finds binarization threshold for target variable.
+
+    :param training_file_names: 1-D list of paths to input files.
+    """
+
+    binarization_threshold = get_binarization_threshold(
+        netcdf_file_names=training_file_names, percentile_level=90.)
+
+
 def binarize_target_images(target_matrix, binarization_threshold):
     """Binarizes target images.
 
@@ -838,96 +821,71 @@ def binarize_target_images(target_matrix, binarization_threshold):
     return target_values
 
 
-def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
-                            normalization_dict, binarization_threshold):
-    """Generates training examples for deep-learning model on the fly.
+def binarization_example(training_file_names, binarization_threshold):
+    """Binarizes target images.
 
-    E = number of examples (storm objects) in file
-    M = number of rows in each storm-centered grid
-    N = number of columns in each storm-centered grid
-    C = number of channels (predictor variables)
-
-    :param netcdf_file_names: 1-D list of paths to input (NetCDF) files.
-    :param num_examples_per_batch: Number of examples per training batch.
-    :param normalization_dict: See doc for `normalize_images`.  You cannot leave
-        this as None.
-    :param binarization_threshold: Binarization threshold for target variable.
-        See `binarize_target_images` for details on what this does.
-    :return: predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
-    :return: target_values: length-E numpy array of target values (integers in
-        0...1).
-    :raises: TypeError: if `normalization_dict is None`.
+    :param training_file_names: 1-D list of paths to input files.
+    :param binarization_threshold: Binarization threshold.
     """
 
-    # TODO(thunderhoser): Probably need downsampling or upsampling.
+    image_dict = read_image_file(training_file_names[0])
+    these_max_target_values = numpy.array(
+        [numpy.max(image_dict[TARGET_MATRIX_KEY][i, ...]) for i in range(10)]
+    )
 
-    if normalization_dict is None:
-        error_string = 'normalization_dict cannot be None.  Must be specified.'
-        raise TypeError(error_string)
+    print(
+        ('\nSpatial maxima of "{0:s}" for the first few storm objects:\n{1:s}'
+         ).format(image_dict[TARGET_NAME_KEY], str(these_max_target_values))
+    )
 
-    random.shuffle(netcdf_file_names)
-    num_files = len(netcdf_file_names)
-    file_index = 0
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=binarization_threshold)
 
-    num_examples_in_memory = 0
-    full_predictor_matrix = None
-    full_target_matrix = None
-    predictor_names = None
+    print(
+        ('\nBinarized target values for the first few storm objects:\n{0:s}'
+         ).format(str(target_values[:10]))
+    )
 
-    while True:
-        while num_examples_in_memory < num_examples_per_batch:
-            print('Reading data from: "{0:s}"...'.format(
-                netcdf_file_names[file_index]))
 
-            this_image_dict = read_image_file(netcdf_file_names[file_index])
-            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
+def _get_dense_layer_dimensions(num_input_units, num_classes, num_dense_layers):
+    """Returns dimensions (number of input and output units) for each dense lyr.
 
-            file_index += 1
-            if file_index >= num_files:
-                file_index = 0
+    D = number of dense layers
 
-            if full_target_matrix is None or full_target_matrix.size == 0:
-                full_predictor_matrix = (
-                    this_image_dict[PREDICTOR_MATRIX_KEY] + 0.
-                )
-                full_target_matrix = this_image_dict[TARGET_MATRIX_KEY] + 0.
+    :param num_input_units: Number of input units (features created by
+        flattening layer).
+    :param num_classes: Number of output classes (possible values of target
+        variable).
+    :param num_dense_layers: Number of dense layers.
+    :return: num_inputs_by_layer: length-D numpy array with number of input
+        units by dense layer.
+    :return: num_outputs_by_layer: length-D numpy array with number of output
+        units by dense layer.
+    """
 
-            else:
-                full_predictor_matrix = numpy.concatenate(
-                    (full_predictor_matrix,
-                     this_image_dict[PREDICTOR_MATRIX_KEY]),
-                    axis=0)
+    if num_classes == 2:
+        num_output_units = 1
+    else:
+        num_output_units = num_classes + 0
 
-                full_target_matrix = numpy.concatenate(
-                    (full_target_matrix, this_image_dict[TARGET_MATRIX_KEY]),
-                    axis=0)
+    e_folding_param = (
+        float(-1 * num_dense_layers) /
+        numpy.log(float(num_output_units) / num_input_units)
+    )
 
-            num_examples_in_memory = full_target_matrix.shape[0]
+    dense_layer_indices = numpy.linspace(
+        0, num_dense_layers - 1, num=num_dense_layers, dtype=float)
+    num_inputs_by_layer = num_input_units * numpy.exp(
+        -1 * dense_layer_indices / e_folding_param)
+    num_inputs_by_layer = numpy.round(num_inputs_by_layer).astype(int)
 
-        batch_indices = numpy.linspace(
-            0, num_examples_in_memory - 1, num=num_examples_in_memory,
-            dtype=int)
-        batch_indices = numpy.random.choice(
-            batch_indices, size=num_examples_per_batch, replace=False)
+    num_outputs_by_layer = numpy.concatenate((
+        num_inputs_by_layer[1:],
+        numpy.array([num_output_units], dtype=int)
+    ))
 
-        predictor_matrix, _ = normalize_images(
-            predictor_matrix=full_predictor_matrix[batch_indices, ...],
-            predictor_names=predictor_names,
-            normalization_dict=normalization_dict)
-        predictor_matrix = predictor_matrix.astype('float32')
-
-        target_values = binarize_target_images(
-            target_matrix=full_target_matrix[batch_indices, ...],
-            binarization_threshold=binarization_threshold)
-
-        print('Fraction of examples in positive class: {0:.4f}'.format(
-            numpy.mean(target_values)))
-
-        num_examples_in_memory = 0
-        full_predictor_matrix = None
-        full_target_matrix = None
-
-        yield (predictor_matrix, target_values)
+    return num_inputs_by_layer, num_outputs_by_layer
 
 
 def setup_cnn(num_grid_rows, num_grid_columns):
@@ -1048,6 +1006,218 @@ def setup_cnn(num_grid_rows, num_grid_columns):
 
     model_object.summary()
     return model_object
+
+
+def setup_cnn_example(training_file_names):
+    """Sets up CNN.
+
+    :param training_file_names: 1-D list of paths to input files.
+    """
+
+    this_image_dict = read_image_file(training_file_names[0])
+    model_object = setup_cnn(
+        num_grid_rows=this_image_dict[PREDICTOR_MATRIX_KEY].shape[1],
+        num_grid_columns=this_image_dict[PREDICTOR_MATRIX_KEY].shape[2])
+
+
+def _get_binary_xentropy(target_values, forecast_probabilities):
+    """Computes binary cross-entropy.
+
+    This function satisfies the requirements for `cost_function` in the input to
+    `run_permutation_test`.
+
+    E = number of examples
+
+    :param: target_values: length-E numpy array of target values (integer class
+        labels).
+    :param: forecast_probabilities: length-E numpy array with predicted
+        probabilities of positive class (target value = 1).
+    :return: cross_entropy: Cross-entropy.
+    """
+
+    forecast_probabilities[
+        forecast_probabilities < MIN_PROBABILITY] = MIN_PROBABILITY
+    forecast_probabilities[
+        forecast_probabilities > MAX_PROBABILITY] = MAX_PROBABILITY
+
+    return -1 * numpy.mean(
+        target_values * numpy.log2(forecast_probabilities) +
+        (1 - target_values) * numpy.log2(1 - forecast_probabilities)
+    )
+
+
+def _create_directory(directory_name=None, file_name=None):
+    """Creates directory (along with parents if necessary).
+
+    This method creates directories only when necessary, so you don't have to
+    worry about it overwriting anything.
+
+    :param directory_name: Name of desired directory.
+    :param file_name: [used only if `directory_name is None`]
+        Path to desired file.  All directories in path will be created.
+    """
+
+    if directory_name is None:
+        directory_name = os.path.split(file_name)[0]
+
+    try:
+        os.makedirs(directory_name)
+    except OSError as this_error:
+        if this_error.errno == errno.EEXIST and os.path.isdir(directory_name):
+            pass
+        else:
+            raise
+
+
+def _apply_cnn(model_object, predictor_matrix):
+    """Applies trained CNN (convolutional neural net) to new data.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :return: forecast_probabilities: length-E numpy array with forecast
+        probabilities of positive class (label = 1).
+    """
+
+    num_examples = predictor_matrix.shape[0]
+    forecast_probabilities = numpy.full(num_examples, numpy.nan)
+    num_examples_per_batch = 1000
+
+    for i in range(0, num_examples, num_examples_per_batch):
+        this_first_index = i
+        this_last_index = min(
+            [i + num_examples_per_batch - 1, num_examples - 1]
+        )
+
+        print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
+            this_first_index, this_last_index, num_examples))
+
+        these_indices = numpy.linspace(
+            this_first_index, this_last_index,
+            num=this_last_index - this_first_index + 1, dtype=int)
+
+        forecast_probabilities[these_indices] = model_object.predict(
+            predictor_matrix[these_indices, ...],
+            batch_size=num_examples_per_batch
+        )[:, -1]
+
+    return forecast_probabilities
+
+
+def _label_bars_in_graph(axes_object, y_coords, y_strings):
+    """Labels bars in graph.
+
+    J = number of bars
+
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :param y_coords: length-J numpy array with y-coordinates of bars.
+    :param y_strings: length-J list of labels.
+    """
+
+    x_min, x_max = pyplot.xlim()
+    x_coord_for_text = x_min + 0.01 * (x_max - x_min)
+
+    for j in range(len(y_coords)):
+        axes_object.text(
+            x_coord_for_text, y_coords[j], y_strings[j], color='k',
+            horizontalalignment='left', verticalalignment='center')
+
+
+def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
+                            normalization_dict, binarization_threshold):
+    """Generates training examples for deep-learning model on the fly.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param netcdf_file_names: 1-D list of paths to input (NetCDF) files.
+    :param num_examples_per_batch: Number of examples per training batch.
+    :param normalization_dict: See doc for `normalize_images`.  You cannot leave
+        this as None.
+    :param binarization_threshold: Binarization threshold for target variable.
+        See `binarize_target_images` for details on what this does.
+    :return: predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :return: target_values: length-E numpy array of target values (integers in
+        0...1).
+    :raises: TypeError: if `normalization_dict is None`.
+    """
+
+    # TODO(thunderhoser): Probably need downsampling or upsampling.
+
+    if normalization_dict is None:
+        error_string = 'normalization_dict cannot be None.  Must be specified.'
+        raise TypeError(error_string)
+
+    random.shuffle(netcdf_file_names)
+    num_files = len(netcdf_file_names)
+    file_index = 0
+
+    num_examples_in_memory = 0
+    full_predictor_matrix = None
+    full_target_matrix = None
+    predictor_names = None
+
+    while True:
+        while num_examples_in_memory < num_examples_per_batch:
+            print('Reading data from: "{0:s}"...'.format(
+                netcdf_file_names[file_index]))
+
+            this_image_dict = read_image_file(netcdf_file_names[file_index])
+            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
+
+            file_index += 1
+            if file_index >= num_files:
+                file_index = 0
+
+            if full_target_matrix is None or full_target_matrix.size == 0:
+                full_predictor_matrix = (
+                    this_image_dict[PREDICTOR_MATRIX_KEY] + 0.
+                )
+                full_target_matrix = this_image_dict[TARGET_MATRIX_KEY] + 0.
+
+            else:
+                full_predictor_matrix = numpy.concatenate(
+                    (full_predictor_matrix,
+                     this_image_dict[PREDICTOR_MATRIX_KEY]),
+                    axis=0)
+
+                full_target_matrix = numpy.concatenate(
+                    (full_target_matrix, this_image_dict[TARGET_MATRIX_KEY]),
+                    axis=0)
+
+            num_examples_in_memory = full_target_matrix.shape[0]
+
+        batch_indices = numpy.linspace(
+            0, num_examples_in_memory - 1, num=num_examples_in_memory,
+            dtype=int)
+        batch_indices = numpy.random.choice(
+            batch_indices, size=num_examples_per_batch, replace=False)
+
+        predictor_matrix, _ = normalize_images(
+            predictor_matrix=full_predictor_matrix[batch_indices, ...],
+            predictor_names=predictor_names,
+            normalization_dict=normalization_dict)
+        predictor_matrix = predictor_matrix.astype('float32')
+
+        target_values = binarize_target_images(
+            target_matrix=full_target_matrix[batch_indices, ...],
+            binarization_threshold=binarization_threshold)
+
+        print('Fraction of examples in positive class: {0:.4f}'.format(
+            numpy.mean(target_values)))
+
+        num_examples_in_memory = 0
+        full_predictor_matrix = None
+        full_target_matrix = None
+
+        yield (predictor_matrix, target_values)
 
 
 def train_cnn(
@@ -1479,17 +1649,6 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
     :param output_dir_name: Same.
     """
 
-    training_file_names = find_many_image_files(
-        image_dir_name=input_image_dir_name,
-        first_date_string='20100101', last_date_string='20141231')
-
-    normalization_dict = get_image_normalization_params(training_file_names)
-    print(SEPARATOR_STRING)
-
-    binarization_threshold = get_binarization_threshold(
-        netcdf_file_names=training_file_names, percentile_level=90.)
-    print(SEPARATOR_STRING)
-
     this_image_dict = read_image_file(training_file_names[0])
     model_object = setup_cnn(
         num_grid_rows=this_image_dict[PREDICTOR_MATRIX_KEY].shape[1],
@@ -1541,155 +1700,6 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
     plot_lakshmanan_results(
         result_dict=permutation_dict, output_file_name=lakshmanan_file_name,
         plot_percent_increase=False)
-
-
-def feature_files_example1():
-    """Runs Example 1 for feature files."""
-
-    feature_file_names = find_many_feature_files(
-        first_date_string='20150701', last_date_string='20150731')
-    metadata_table, predictor_table, target_table = read_many_feature_files(
-        feature_file_names)
-
-    print(MINOR_SEPARATOR_STRING)
-    print('Variables in metadata are as follows:')
-    for this_column in list(metadata_table):
-        print(this_column)
-
-    print('\nPredictor variables are as follows:')
-    for this_column in list(predictor_table):
-        print(this_column)
-
-    print('\nTarget variables are as follows:')
-    for this_column in list(target_table):
-        print(this_column)
-
-    this_predictor_name = list(predictor_table)[0]
-    these_predictor_values = predictor_table[this_predictor_name].values[:10]
-    print('\nSome values of predictor variable "{0:s}":\n{1:s}'.format(
-        this_predictor_name, str(these_predictor_values)))
-
-    this_target_name = list(target_table)[0]
-    these_target_values = target_table[this_target_name].values[:10]
-    print('\nSome values of target variable "{0:s}":\n{1:s}'.format(
-        this_target_name, str(these_target_values)))
-
-
-def image_files_example1():
-    """Runs Example 1 for feature files."""
-
-    image_file_names = find_many_image_files(
-        first_date_string='20150701', last_date_string='20150731')
-    image_dict = read_many_image_files(image_file_names)
-
-    print(MINOR_SEPARATOR_STRING)
-    print('Variables in dictionary are as follows:')
-    for this_key in image_dict.keys():
-        print(this_key)
-
-    print('\nPredictor variables are as follows:')
-    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
-    for this_name in predictor_names:
-        print(this_name)
-
-    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
-    print((
-        '\nSome values of predictor variable "{0:s}" for first storm object:'
-        '\n{1:s}'
-    ).format(predictor_names[0], str(these_predictor_values)))
-
-    these_target_values = image_dict[TARGET_MATRIX_KEY][0, :5, :5]
-    print((
-        '\nSome values of target variable "{0:s}" for first storm object:'
-        '\n{1:s}'
-    ).format(image_dict[TARGET_NAME_KEY], str(these_target_values)))
-
-
-def find_training_files_example():
-    """Finds training files."""
-
-    training_file_names = find_many_image_files(
-        first_date_string='20100101', last_date_string='20141231')
-
-
-def get_norm_params_example(training_file_names):
-    """Gets normalization parameters.
-
-    :param training_file_names: 1-D list of paths to input files.
-    """
-
-    normalization_dict = get_image_normalization_params(training_file_names)
-
-
-def norm_denorm_example(training_file_names, normalization_dict):
-    """Normalizes and denormalizes images.
-
-    :param training_file_names: 1-D list of paths to input files.
-    :param normalization_dict: Dictionary created by
-        `get_image_normalization_params`.
-    """
-
-    image_dict = read_image_file(training_file_names[0])
-
-    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
-    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
-
-    print((
-        '\nOriginal values of "{0:s}" for first storm object:\n{1:s}'
-    ).format(predictor_names[0], str(these_predictor_values)))
-
-    image_dict[PREDICTOR_MATRIX_KEY], _ = normalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
-        predictor_names=predictor_names, normalization_dict=normalization_dict)
-
-    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
-    print((
-        '\nNormalized values of "{0:s}" for first storm object:\n{1:s}'
-    ).format(predictor_names[0], str(these_predictor_values)))
-
-    image_dict[PREDICTOR_MATRIX_KEY] = denormalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
-        predictor_names=predictor_names, normalization_dict=normalization_dict)
-
-    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
-    print((
-        '\nDenormalized values of "{0:s}" for first storm object:\n{1:s}'
-    ).format(predictor_names[0], str(these_predictor_values)))
-
-
-def find_binarization_threshold_example(training_file_names):
-    """Finds binarization threshold for target variable.
-
-    :param training_file_names: 1-D list of paths to input files.
-    """
-
-    binarization_threshold = get_binarization_threshold(
-        netcdf_file_names=training_file_names, percentile_level=90.)
-
-
-def binarization_example(training_file_names, binarization_threshold):
-    """Binarizes target times.
-
-    :param training_file_names: 1-D list of paths to input files.
-    :param binarization_threshold: Binarization threshold.
-    """
-
-    image_dict = read_image_file(training_file_names[0])
-    these_max_target_values = numpy.array(
-        [numpy.max(image_dict[TARGET_MATRIX_KEY][i, ...]) for i in range(10)]
-    )
-
-    print((
-        '\nSpatial maxima of "{0:s}" for the first few storm objects:\n{1:s}'
-    ).format(image_dict[TARGET_NAME_KEY], str(these_max_target_values)))
-
-    target_values = binarize_target_images(
-        target_matrix=image_dict[TARGET_MATRIX_KEY],
-        binarization_threshold=binarization_threshold)
-
-    print((
-        '\nBinarized target values for the first few storm objects:\n{0:s}'
-    ).format(str(target_values[:10])))
 
 
 if __name__ == '__main__':
