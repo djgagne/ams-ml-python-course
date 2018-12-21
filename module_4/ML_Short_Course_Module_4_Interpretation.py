@@ -1020,114 +1020,6 @@ def setup_cnn_example(training_file_names):
         num_grid_columns=this_image_dict[PREDICTOR_MATRIX_KEY].shape[2])
 
 
-def _get_binary_xentropy(target_values, forecast_probabilities):
-    """Computes binary cross-entropy.
-
-    This function satisfies the requirements for `cost_function` in the input to
-    `run_permutation_test`.
-
-    E = number of examples
-
-    :param: target_values: length-E numpy array of target values (integer class
-        labels).
-    :param: forecast_probabilities: length-E numpy array with predicted
-        probabilities of positive class (target value = 1).
-    :return: cross_entropy: Cross-entropy.
-    """
-
-    forecast_probabilities[
-        forecast_probabilities < MIN_PROBABILITY] = MIN_PROBABILITY
-    forecast_probabilities[
-        forecast_probabilities > MAX_PROBABILITY] = MAX_PROBABILITY
-
-    return -1 * numpy.mean(
-        target_values * numpy.log2(forecast_probabilities) +
-        (1 - target_values) * numpy.log2(1 - forecast_probabilities)
-    )
-
-
-def _create_directory(directory_name=None, file_name=None):
-    """Creates directory (along with parents if necessary).
-
-    This method creates directories only when necessary, so you don't have to
-    worry about it overwriting anything.
-
-    :param directory_name: Name of desired directory.
-    :param file_name: [used only if `directory_name is None`]
-        Path to desired file.  All directories in path will be created.
-    """
-
-    if directory_name is None:
-        directory_name = os.path.split(file_name)[0]
-
-    try:
-        os.makedirs(directory_name)
-    except OSError as this_error:
-        if this_error.errno == errno.EEXIST and os.path.isdir(directory_name):
-            pass
-        else:
-            raise
-
-
-def _apply_cnn(model_object, predictor_matrix):
-    """Applies trained CNN (convolutional neural net) to new data.
-
-    E = number of examples (storm objects) in file
-    M = number of rows in each storm-centered grid
-    N = number of columns in each storm-centered grid
-    C = number of channels (predictor variables)
-
-    :param model_object: Trained instance of `keras.models.Model`.
-    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
-    :return: forecast_probabilities: length-E numpy array with forecast
-        probabilities of positive class (label = 1).
-    """
-
-    num_examples = predictor_matrix.shape[0]
-    forecast_probabilities = numpy.full(num_examples, numpy.nan)
-    num_examples_per_batch = 1000
-
-    for i in range(0, num_examples, num_examples_per_batch):
-        this_first_index = i
-        this_last_index = min(
-            [i + num_examples_per_batch - 1, num_examples - 1]
-        )
-
-        print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
-            this_first_index, this_last_index, num_examples))
-
-        these_indices = numpy.linspace(
-            this_first_index, this_last_index,
-            num=this_last_index - this_first_index + 1, dtype=int)
-
-        forecast_probabilities[these_indices] = model_object.predict(
-            predictor_matrix[these_indices, ...],
-            batch_size=num_examples_per_batch
-        )[:, -1]
-
-    return forecast_probabilities
-
-
-def _label_bars_in_graph(axes_object, y_coords, y_strings):
-    """Labels bars in graph.
-
-    J = number of bars
-
-    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
-        Will plot on these axes.
-    :param y_coords: length-J numpy array with y-coordinates of bars.
-    :param y_strings: length-J list of labels.
-    """
-
-    x_min, x_max = pyplot.xlim()
-    x_coord_for_text = x_min + 0.01 * (x_max - x_min)
-
-    for j in range(len(y_coords)):
-        axes_object.text(
-            x_coord_for_text, y_coords[j], y_strings[j], color='k',
-            horizontalalignment='left', verticalalignment='center')
-
-
 def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
                             normalization_dict, binarization_threshold):
     """Generates training examples for deep-learning model on the fly.
@@ -1323,6 +1215,93 @@ def train_cnn(
     return model_metadata_dict
 
 
+def _create_directory(directory_name=None, file_name=None):
+    """Creates directory (along with parents if necessary).
+
+    This method creates directories only when necessary, so you don't have to
+    worry about it overwriting anything.
+
+    :param directory_name: Name of desired directory.
+    :param file_name: [used only if `directory_name is None`]
+        Path to desired file.  All directories in path will be created.
+    """
+
+    if directory_name is None:
+        directory_name = os.path.split(file_name)[0]
+
+    try:
+        os.makedirs(directory_name)
+    except OSError as this_error:
+        if this_error.errno == errno.EEXIST and os.path.isdir(directory_name):
+            pass
+        else:
+            raise
+
+
+def train_cnn_example(model_object, training_file_names, normalization_dict,
+                      binarization_threshold):
+    """Actually trains the CNN.
+
+    :param model_object: See doc for `train_cnn`.
+    :param training_file_names: Same.
+    :param normalization_dict: Same.
+    :param binarization_threshold: Same.
+    """
+
+    validation_file_names = find_many_image_files(
+        first_date_string='20150101', last_date_string='20151231')
+
+    cnn_file_name = '{0:s}/cnn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
+    model_metadata_dict = train_cnn(
+        model_object=model_object, training_file_names=training_file_names,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold,
+        num_examples_per_batch=256, num_epochs=10,
+        num_training_batches_per_epoch=10,
+        validation_file_names=validation_file_names,
+        num_validation_batches_per_epoch=10,
+        output_model_file_name=cnn_file_name)
+
+
+def _apply_cnn(model_object, predictor_matrix):
+    """Applies trained CNN (convolutional neural net) to new data.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :return: forecast_probabilities: length-E numpy array with forecast
+        probabilities of positive class (label = 1).
+    """
+
+    num_examples = predictor_matrix.shape[0]
+    forecast_probabilities = numpy.full(num_examples, numpy.nan)
+    num_examples_per_batch = 1000
+
+    for i in range(0, num_examples, num_examples_per_batch):
+        this_first_index = i
+        this_last_index = min(
+            [i + num_examples_per_batch - 1, num_examples - 1]
+        )
+
+        print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
+            this_first_index, this_last_index, num_examples))
+
+        these_indices = numpy.linspace(
+            this_first_index, this_last_index,
+            num=this_last_index - this_first_index + 1, dtype=int)
+
+        forecast_probabilities[these_indices] = model_object.predict(
+            predictor_matrix[these_indices, ...],
+            batch_size=num_examples_per_batch
+        )[:, -1]
+
+    return forecast_probabilities
+
+
 def evaluate_cnn(
         model_object, image_dict, model_metadata_dict, output_dir_name):
     """Evaluates trained CNN (convolutional neural net).
@@ -1390,6 +1369,52 @@ def evaluate_cnn(
     print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
     pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
+
+
+def evaluate_cnn_example(validation_file_names, model_object,
+                         model_metadata_dict):
+    """Evaluates CNN on validation data.
+
+    :param validation_file_names: 1-D list of paths to input files.
+    :param model_object: See doc for `evaluate_cnn`.
+    :param model_metadata_dict: Same.
+    """
+
+    validation_image_dict = read_many_image_files(validation_file_names)
+    print(SEPARATOR_STRING)
+
+    validation_dir_name = '{0:s}/validation'.format(DEFAULT_OUTPUT_DIR_NAME)
+    evaluate_cnn(
+        model_object=model_object, image_dict=validation_image_dict,
+        model_metadata_dict=model_metadata_dict,
+        output_dir_name=validation_dir_name)
+    print(SEPARATOR_STRING)
+
+
+def _get_binary_xentropy(target_values, forecast_probabilities):
+    """Computes binary cross-entropy.
+
+    This function satisfies the requirements for `cost_function` in the input to
+    `run_permutation_test`.
+
+    E = number of examples
+
+    :param: target_values: length-E numpy array of target values (integer class
+        labels).
+    :param: forecast_probabilities: length-E numpy array with predicted
+        probabilities of positive class (target value = 1).
+    :return: cross_entropy: Cross-entropy.
+    """
+
+    forecast_probabilities[
+        forecast_probabilities < MIN_PROBABILITY] = MIN_PROBABILITY
+    forecast_probabilities[
+        forecast_probabilities > MAX_PROBABILITY] = MAX_PROBABILITY
+
+    return -1 * numpy.mean(
+        target_values * numpy.log2(forecast_probabilities) +
+        (1 - target_values) * numpy.log2(1 - forecast_probabilities)
+    )
 
 
 def permutation_test_for_cnn(
@@ -1472,9 +1497,9 @@ def permutation_test_for_cnn(
 
         for this_predictor_name in remaining_predictor_names:
             print((
-                'Trying predictor "{0:s}" at step {1:d} of permutation '
-                'test...'
-            ).format(this_predictor_name, current_step_num))
+                      'Trying predictor "{0:s}" at step {1:d} of permutation '
+                      'test...'
+                  ).format(this_predictor_name, current_step_num))
 
             this_predictor_index = predictor_names.index(this_predictor_name)
             this_predictor_matrix = predictor_matrix + 0.
@@ -1536,6 +1561,46 @@ def permutation_test_for_cnn(
     file_handle.close()
 
     return result_dict
+
+
+def permutation_test_example(model_object, validation_image_dict,
+                             model_metadata_dict):
+    """Runs the permutation test on validation data.
+
+    :param model_object: See doc for `permutation_test_for_cnn`.
+    :param validation_image_dict: Same.
+    :param model_metadata_dict: Same.
+    """
+
+    permutation_dir_name = '{0:s}/permutation_test'.format(
+        DEFAULT_OUTPUT_DIR_NAME)
+    main_permutation_file_name = '{0:s}/permutation_results.p'.format(
+        permutation_dir_name)
+
+    permutation_dict = permutation_test_for_cnn(
+        model_object=model_object, image_dict=validation_image_dict,
+        model_metadata_dict=model_metadata_dict,
+        output_pickle_file_name=main_permutation_file_name)
+
+
+def _label_bars_in_graph(axes_object, y_coords, y_strings):
+    """Labels bars in graph.
+
+    J = number of bars
+
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :param y_coords: length-J numpy array with y-coordinates of bars.
+    :param y_strings: length-J list of labels.
+    """
+
+    x_min, x_max = pyplot.xlim()
+    x_coord_for_text = x_min + 0.01 * (x_max - x_min)
+
+    for j in range(len(y_coords)):
+        axes_object.text(
+            x_coord_for_text, y_coords[j], y_strings[j], color='k',
+            horizontalalignment='left', verticalalignment='center')
 
 
 def plot_breiman_results(
@@ -1641,6 +1706,19 @@ def plot_lakshmanan_results(
     pyplot.close()
 
 
+def plot_breiman_results_example(permutation_dir_name, permutation_dict):
+    """Plots results of Breiman permutation test.
+
+    :param permutation_dir_name: Name of output directory.
+    :param permutation_dict: Dictionary created by `permutation_test_for_cnn`.
+    """
+
+    breiman_file_name = '{0:s}/breiman_results.jpg'.format(permutation_dir_name)
+    plot_breiman_results(
+        result_dict=permutation_dict, output_file_name=breiman_file_name,
+        plot_percent_increase=False)
+
+
 def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
     """Main method.
 
@@ -1648,47 +1726,6 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
     :param input_feature_dir_name: Same.
     :param output_dir_name: Same.
     """
-
-    this_image_dict = read_image_file(training_file_names[0])
-    model_object = setup_cnn(
-        num_grid_rows=this_image_dict[PREDICTOR_MATRIX_KEY].shape[1],
-        num_grid_columns=this_image_dict[PREDICTOR_MATRIX_KEY].shape[2])
-
-    validation_file_names = find_many_image_files(
-        image_dir_name=input_image_dir_name,
-        first_date_string='20150101', last_date_string='20151231')
-
-    cnn_file_name = '{0:s}/cnn_model.h5'.format(output_dir_name)
-    model_metadata_dict = train_cnn(
-        model_object=model_object, training_file_names=training_file_names,
-        normalization_dict=normalization_dict,
-        binarization_threshold=binarization_threshold,
-        num_examples_per_batch=256, num_epochs=10,
-        num_training_batches_per_epoch=10,
-        validation_file_names=validation_file_names,
-        num_validation_batches_per_epoch=10,
-        output_model_file_name=cnn_file_name)
-    print(SEPARATOR_STRING)
-
-    validation_image_dict = read_many_image_files(validation_file_names)
-    print(SEPARATOR_STRING)
-
-    validation_dir_name = '{0:s}/validation'.format(output_dir_name)
-    evaluate_cnn(
-        model_object=model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict,
-        output_dir_name=validation_dir_name)
-    print(SEPARATOR_STRING)
-
-    permutation_dir_name = '{0:s}/permutation_test'.format(output_dir_name)
-    main_permutation_file_name = '{0:s}/permutation_results.p'.format(
-        permutation_dir_name)
-
-    permutation_dict = permutation_test_for_cnn(
-        model_object=model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict,
-        output_pickle_file_name=main_permutation_file_name)
-    print(SEPARATOR_STRING)
 
     breiman_file_name = '{0:s}/breiman_results.jpg'.format(permutation_dir_name)
     plot_breiman_results(
