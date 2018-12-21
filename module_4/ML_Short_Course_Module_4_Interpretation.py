@@ -1543,6 +1543,155 @@ def _run(input_image_dir_name, input_feature_dir_name, output_dir_name):
         plot_percent_increase=False)
 
 
+def feature_files_example1():
+    """Runs Example 1 for feature files."""
+
+    feature_file_names = find_many_feature_files(
+        first_date_string='20150701', last_date_string='20150731')
+    metadata_table, predictor_table, target_table = read_many_feature_files(
+        feature_file_names)
+
+    print(MINOR_SEPARATOR_STRING)
+    print('Variables in metadata are as follows:')
+    for this_column in list(metadata_table):
+        print(this_column)
+
+    print('\nPredictor variables are as follows:')
+    for this_column in list(predictor_table):
+        print(this_column)
+
+    print('\nTarget variables are as follows:')
+    for this_column in list(target_table):
+        print(this_column)
+
+    this_predictor_name = list(predictor_table)[0]
+    these_predictor_values = predictor_table[this_predictor_name].values[:10]
+    print('\nSome values of predictor variable "{0:s}":\n{1:s}'.format(
+        this_predictor_name, str(these_predictor_values)))
+
+    this_target_name = list(target_table)[0]
+    these_target_values = target_table[this_target_name].values[:10]
+    print('\nSome values of target variable "{0:s}":\n{1:s}'.format(
+        this_target_name, str(these_target_values)))
+
+
+def image_files_example1():
+    """Runs Example 1 for feature files."""
+
+    image_file_names = find_many_image_files(
+        first_date_string='20150701', last_date_string='20150731')
+    image_dict = read_many_image_files(image_file_names)
+
+    print(MINOR_SEPARATOR_STRING)
+    print('Variables in dictionary are as follows:')
+    for this_key in image_dict.keys():
+        print(this_key)
+
+    print('\nPredictor variables are as follows:')
+    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
+    for this_name in predictor_names:
+        print(this_name)
+
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+    print((
+        '\nSome values of predictor variable "{0:s}" for first storm object:'
+        '\n{1:s}'
+    ).format(predictor_names[0], str(these_predictor_values)))
+
+    these_target_values = image_dict[TARGET_MATRIX_KEY][0, :5, :5]
+    print((
+        '\nSome values of target variable "{0:s}" for first storm object:'
+        '\n{1:s}'
+    ).format(image_dict[TARGET_NAME_KEY], str(these_target_values)))
+
+
+def find_training_files_example():
+    """Finds training files."""
+
+    training_file_names = find_many_image_files(
+        first_date_string='20100101', last_date_string='20141231')
+
+
+def get_norm_params_example(training_file_names):
+    """Gets normalization parameters.
+
+    :param training_file_names: 1-D list of paths to input files.
+    """
+
+    normalization_dict = get_image_normalization_params(training_file_names)
+
+
+def norm_denorm_example(training_file_names, normalization_dict):
+    """Normalizes and denormalizes images.
+
+    :param training_file_names: 1-D list of paths to input files.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    """
+
+    image_dict = read_image_file(training_file_names[0])
+
+    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+
+    print((
+        '\nOriginal values of "{0:s}" for first storm object:\n{1:s}'
+    ).format(predictor_names[0], str(these_predictor_values)))
+
+    image_dict[PREDICTOR_MATRIX_KEY], _ = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+    print((
+        '\nNormalized values of "{0:s}" for first storm object:\n{1:s}'
+    ).format(predictor_names[0], str(these_predictor_values)))
+
+    image_dict[PREDICTOR_MATRIX_KEY] = denormalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+    print((
+        '\nDenormalized values of "{0:s}" for first storm object:\n{1:s}'
+    ).format(predictor_names[0], str(these_predictor_values)))
+
+
+def find_binarization_threshold_example(training_file_names):
+    """Finds binarization threshold for target variable.
+
+    :param training_file_names: 1-D list of paths to input files.
+    """
+
+    binarization_threshold = get_binarization_threshold(
+        netcdf_file_names=training_file_names, percentile_level=90.)
+
+
+def binarization_example(training_file_names, binarization_threshold):
+    """Binarizes target times.
+
+    :param training_file_names: 1-D list of paths to input files.
+    :param binarization_threshold: Binarization threshold.
+    """
+
+    image_dict = read_image_file(training_file_names[0])
+    these_max_target_values = numpy.array(
+        [numpy.max(image_dict[TARGET_MATRIX_KEY][i, ...]) for i in range(10)]
+    )
+
+    print((
+        '\nSpatial maxima of "{0:s}" for the first few storm objects:\n{1:s}'
+    ).format(image_dict[TARGET_NAME_KEY], str(these_max_target_values)))
+
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=binarization_threshold)
+
+    print((
+        '\nBinarized target values for the first few storm objects:\n{0:s}'
+    ).format(str(target_values[:10])))
+
+
 if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
