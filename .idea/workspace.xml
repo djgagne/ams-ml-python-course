@@ -17,8 +17,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="763">
-              <caret line="2385" column="0" lean-forward="true" selection-start-line="2385" selection-start-column="0" selection-end-line="2385" selection-end-column="0" />
+            <state relative-caret-position="211">
+              <caret line="2421" column="43" lean-forward="true" selection-start-line="2421" selection-start-column="43" selection-end-line="2421" selection-end-column="43" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -40,7 +40,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>_apply_cnn(</find>
       <find>normalize_images(</find>
       <find>print these</find>
       <find>axes_object =</find>
@@ -67,9 +66,10 @@
       <find>axes</find>
       <find>.]</find>
       <find>REFLECTIVITY_COLOUR_NORM_OBJECT</find>
-      <find>PREDICTOR_TO_COLOUR_MAP_DICT</find>
       <find>PREDICTOR_TO_COLOUR_NORM_DICT</find>
       <find>:param normalization_dict</find>
+      <find>0</find>
+      <find>PREDICTOR_TO_COLOUR_MAP_DICT</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -84,6 +84,7 @@
       <replace>,</replace>
       <replace>]</replace>
       <replace>REFL_COLOUR_NORM_OBJECT</replace>
+      <replace>[m][0]</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -506,8 +507,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="763">
-          <caret line="2385" column="0" lean-forward="true" selection-start-line="2385" selection-start-column="0" selection-end-line="2385" selection-end-column="0" />
+        <state relative-caret-position="211">
+          <caret line="2421" column="43" lean-forward="true" selection-start-line="2421" selection-start-column="43" selection-end-line="2421" selection-end-column="43" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

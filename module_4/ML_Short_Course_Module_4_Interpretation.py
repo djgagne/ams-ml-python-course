@@ -127,7 +127,9 @@ REFL_COLOUR_MAP_OBJECT.set_under(numpy.ones(3))
 
 PREDICTOR_TO_COLOUR_MAP_DICT = {
     TEMPERATURE_NAME: pyplot.cm.YlOrRd,
-    REFLECTIVITY_NAME: REFL_COLOUR_MAP_OBJECT
+    REFLECTIVITY_NAME: REFL_COLOUR_MAP_OBJECT,
+    U_WIND_NAME: pyplot.cm.seismic,
+    V_WIND_NAME: pyplot.cm.seismic
 }
 
 THESE_COLOUR_BOUNDS = numpy.array(
@@ -2064,10 +2066,10 @@ def plot_wind_2d(u_wind_matrix_m_s01, v_wind_matrix_m_s01, axes_object=None):
     return axes_object
 
 
-def plot_many_predictors_2d(
+def plot_many_predictors_with_barbs(
         predictor_matrix, predictor_names, min_colour_temp_kelvins,
         max_colour_temp_kelvins):
-    """Plots many predictor variables on 2-D grid.
+    """Plots many predictor variables on 2-D grid with wind barbs overlain.
 
     M = number of rows in grid
     N = number of columns in grid
@@ -2125,6 +2127,73 @@ def plot_many_predictors_2d(
     return figure_object, axes_objects_2d_list
 
 
+def plot_many_predictors_sans_barbs(
+        predictor_matrix, predictor_names, min_colour_temp_kelvins,
+        max_colour_temp_kelvins, max_colour_wind_speed_m_s01):
+    """Plots many predictor variables on 2-D grid; no wind barbs overlain.
+
+    In this case, both u-wind and v-wind are plotted as separate maps.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    C = number of predictors
+
+    :param predictor_matrix: M-by-N-by-C numpy array of predictor values.
+    :param predictor_names: length-C list of predictor names.
+    :param min_colour_temp_kelvins: Minimum value in temperature colour scheme.
+    :param max_colour_temp_kelvins: Max value in temperature colour scheme.
+    :param max_colour_wind_speed_m_s01: Max wind speed (metres per second) in
+        colour maps for both u- and v-components.  The minimum wind speed be
+        `-1 * max_colour_wind_speed_m_s01`, so the diverging colour scheme will
+        be zero-centered.
+    :return: figure_object: See doc for `_init_figure_panels`.
+    :return: axes_objects_2d_list: Same.
+    """
+
+    num_predictors = len(predictor_names)
+    num_panel_rows = int(numpy.floor(numpy.sqrt(num_predictors)))
+    num_panel_columns = int(numpy.ceil(float(num_predictors) / num_panel_rows))
+
+    figure_object, axes_objects_2d_list = _init_figure_panels(
+        num_rows=num_panel_rows, num_columns=num_panel_columns)
+
+    for i in range(num_panel_rows):
+        for j in range(num_panel_columns):
+            this_linear_index = i * num_panel_columns + j
+            if this_linear_index >= num_predictors:
+                break
+
+            this_colour_map_object = PREDICTOR_TO_COLOUR_MAP_DICT[
+                predictor_names[this_linear_index]]
+
+            if predictor_names[this_linear_index] == REFLECTIVITY_NAME:
+                this_colour_norm_object = REFL_COLOUR_NORM_OBJECT
+                this_min_colour_value = None
+                this_max_colour_value = None
+            elif predictor_names[this_linear_index] == TEMPERATURE_NAME:
+                this_colour_norm_object = None
+                this_min_colour_value = min_colour_temp_kelvins + 0.
+                this_max_colour_value = max_colour_temp_kelvins + 0.
+            else:
+                this_colour_norm_object = None
+                this_min_colour_value = -1 * max_colour_wind_speed_m_s01
+                this_max_colour_value = max_colour_wind_speed_m_s01 + 0.
+
+            plot_predictor_2d(
+                predictor_matrix=predictor_matrix[..., this_linear_index],
+                colour_map_object=this_colour_map_object,
+                colour_norm_object=this_colour_norm_object,
+                min_colour_value=this_min_colour_value,
+                max_colour_value=this_max_colour_value,
+                axes_object=axes_objects_2d_list[i][j])
+
+            axes_objects_2d_list[i][j].set_title(
+                predictor_names[this_linear_index])
+
+    pyplot.show()
+    return figure_object, axes_objects_2d_list
+
+
 def plot_predictors_example1(validation_image_dict):
     """Plots all predictors for random example (storm object).
 
@@ -2136,7 +2205,7 @@ def plot_predictors_example1(validation_image_dict):
     temperature_matrix_kelvins = predictor_matrix[
         ..., predictor_names.index(TEMPERATURE_NAME)]
 
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
@@ -2161,7 +2230,7 @@ def plot_predictors_example2(validation_image_dict):
     temperature_matrix_kelvins = predictor_matrix[
         ..., predictor_names.index(TEMPERATURE_NAME)]
 
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
@@ -2206,14 +2275,14 @@ def bwo_example1(validation_image_dict, normalization_dict, model_object):
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
     print('\nReal example (before optimization):\n')
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
     print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
@@ -2257,14 +2326,14 @@ def bwo_example2(validation_image_dict, normalization_dict, model_object):
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
     print('\nReal example (before optimization):\n')
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
     print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
@@ -2314,14 +2383,14 @@ def bwo_example3(validation_image_dict, normalization_dict, model_object):
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
     print('\nReal example (before optimization):\n')
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
     print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
@@ -2371,14 +2440,14 @@ def bwo_example4(validation_image_dict, normalization_dict, model_object):
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
     print('\nReal example (before optimization):\n')
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
     print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_2d(
+    plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
