@@ -12,7 +12,9 @@ import numpy
 import pandas
 import netCDF4
 import keras
+from keras import backend as K
 from sklearn.metrics import auc as scikit_learn_auc
+import matplotlib.colors
 import matplotlib.pyplot as pyplot
 from module_4 import keras_metrics
 from module_4 import roc_curves
@@ -106,6 +108,42 @@ ORIGINAL_COST_KEY = 'original_cost'
 STEP1_PREDICTORS_KEY = 'predictor_names_step1'
 STEP1_COSTS_KEY = 'costs_step1'
 
+# More plotting constants.
+THIS_COLOUR_LIST = [
+    numpy.array([4, 233, 231]), numpy.array([1, 159, 244]),
+    numpy.array([3, 0, 244]), numpy.array([2, 253, 2]),
+    numpy.array([1, 197, 1]), numpy.array([0, 142, 0]),
+    numpy.array([253, 248, 2]), numpy.array([229, 188, 0]),
+    numpy.array([253, 149, 0]), numpy.array([253, 0, 0]),
+    numpy.array([212, 0, 0]), numpy.array([188, 0, 0]),
+    numpy.array([248, 0, 253]), numpy.array([152, 84, 198])
+]
+
+for p in range(len(THIS_COLOUR_LIST)):
+    THIS_COLOUR_LIST[p] = THIS_COLOUR_LIST[p].astype(float) / 255
+
+REFL_COLOUR_MAP_OBJECT = matplotlib.colors.ListedColormap(THIS_COLOUR_LIST)
+REFL_COLOUR_MAP_OBJECT.set_under(numpy.ones(3))
+
+PREDICTOR_TO_COLOUR_MAP_DICT = {
+    TEMPERATURE_NAME: pyplot.cm.YlOrRd,
+    REFLECTIVITY_NAME: REFL_COLOUR_MAP_OBJECT,
+    U_WIND_NAME: pyplot.cm.seismic,
+    V_WIND_NAME: pyplot.cm.seismic
+}
+
+THESE_COLOUR_BOUNDS = numpy.array(
+    [0.1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70])
+REFL_COLOUR_NORM_OBJECT = matplotlib.colors.BoundaryNorm(
+    THESE_COLOUR_BOUNDS, REFL_COLOUR_MAP_OBJECT.N)
+
+PREDICTOR_TO_COLOUR_NORM_DICT = {
+    TEMPERATURE_NAME: None,
+    REFLECTIVITY_NAME: REFL_COLOUR_NORM_OBJECT,
+    U_WIND_NAME: None,
+    V_WIND_NAME: None
+}
+
 # Deep-learning constants.
 L1_WEIGHT = 0.
 L2_WEIGHT = 0.001
@@ -132,6 +170,9 @@ LIST_OF_METRIC_FUNCTIONS = [
     keras_metrics.binary_peirce_score, keras_metrics.binary_success_ratio,
     keras_metrics.binary_focn
 ]
+
+DEFAULT_NUM_BWO_ITERATIONS = 200
+DEFAULT_BWO_LEARNING_RATE = 0.01
 
 # Misc constants.
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -1709,3 +1750,360 @@ def plot_lakshmanan_results_example(permutation_dir_name, permutation_dict):
     plot_lakshmanan_results(
         result_dict=permutation_dict, output_file_name=lakshmanan_file_name,
         plot_percent_increase=False)
+
+
+def _gradient_descent_for_bwo(
+        model_object, loss_tensor, init_function_or_matrices, num_iterations,
+        learning_rate):
+    """Does gradient descent (the nitty-gritty part) for backwards optimization.
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param loss_tensor: Keras tensor, defining the loss function to be
+        minimized.
+    :param init_function_or_matrices: Either a function or list of numpy arrays.
+
+    If function, will be used to initialize input matrices.  See
+    `create_gaussian_initializer` for an example.
+
+    If list of numpy arrays, these are the input matrices themselves.  Matrices
+    should be processed in the exact same way that training data were processed
+    (e.g., normalization method).  Matrices must also be in the same order as
+    training matrices, and the [q]th matrix in this list must have the same
+    shape as the [q]th training matrix.
+
+    :param num_iterations: Number of gradient-descent iterations (number of
+        times that the input matrices are adjusted).
+    :param learning_rate: Learning rate.  At each iteration, each input value x
+        will be decremented by `learning_rate * gradient`, where `gradient` is
+        the gradient of the loss function with respect to x.
+    :return: list_of_optimized_input_matrices: length-T list of optimized input
+        matrices (numpy arrays), where T = number of input tensors to the model.
+        If the input arg `init_function_or_matrices` is a list of numpy arrays
+        (rather than a function), `list_of_optimized_input_matrices` will have
+        the exact same shape, just with different values.
+    """
+
+    if isinstance(model_object.input, list):
+        list_of_input_tensors = model_object.input
+    else:
+        list_of_input_tensors = [model_object.input]
+
+    num_input_tensors = len(list_of_input_tensors)
+
+    list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
+    for i in range(num_input_tensors):
+        list_of_gradient_tensors[i] /= K.maximum(
+            K.sqrt(K.mean(list_of_gradient_tensors[i] ** 2)),
+            K.epsilon()
+        )
+
+    inputs_to_loss_and_gradients = K.function(
+        list_of_input_tensors + [K.learning_phase()],
+        ([loss_tensor] + list_of_gradient_tensors)
+    )
+
+    if isinstance(init_function_or_matrices, list):
+        list_of_optimized_input_matrices = copy.deepcopy(
+            init_function_or_matrices)
+    else:
+        list_of_optimized_input_matrices = [None] * num_input_tensors
+
+        for i in range(num_input_tensors):
+            these_dimensions = numpy.array(
+                [1] + list_of_input_tensors[i].get_shape().as_list()[1:],
+                dtype=int)
+
+            list_of_optimized_input_matrices[i] = init_function_or_matrices(
+                these_dimensions)
+
+    for j in range(num_iterations):
+        these_outputs = inputs_to_loss_and_gradients(
+            list_of_optimized_input_matrices + [0])
+
+        if numpy.mod(j, 100) == 0:
+            print('Loss after {0:d} of {1:d} iterations: {2:.2e}'.format(
+                j, num_iterations, these_outputs[0]))
+
+        for i in range(num_input_tensors):
+            list_of_optimized_input_matrices[i] -= (
+                these_outputs[i + 1] * learning_rate)
+
+    print('Loss after {0:d} iterations: {1:.2e}'.format(
+        num_iterations, these_outputs[0]))
+    return list_of_optimized_input_matrices
+
+
+def bwo_for_class(
+        model_object, target_class, init_function_or_matrices,
+        num_iterations=DEFAULT_NUM_BWO_ITERATIONS,
+        learning_rate=DEFAULT_BWO_LEARNING_RATE):
+    """Does backwards optimization to maximize probability of target class.
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param target_class: Synthetic input data will be created to maximize
+        probability of this class.
+    :param init_function_or_matrices: See doc for `_gradient_descent_for_bwo`.
+    :param num_iterations: Same.
+    :param learning_rate: Same.
+    :return: list_of_optimized_input_matrices: Same.
+    """
+
+    target_class = int(numpy.round(target_class))
+    num_iterations = int(numpy.round(num_iterations))
+
+    assert target_class >= 0
+    assert num_iterations > 0
+    assert learning_rate > 0.
+    assert  learning_rate < 1.
+
+    num_output_neurons = (
+        model_object.layers[-1].output.get_shape().as_list()[-1]
+    )
+
+    if num_output_neurons == 1:
+        assert target_class <= 1
+
+        if target_class == 1:
+            loss_tensor = K.mean(
+                (model_object.layers[-1].output[..., 0] - 1) ** 2
+            )
+        else:
+            loss_tensor = K.mean(
+                model_object.layers[-1].output[..., 0] ** 2
+            )
+    else:
+        assert target_class < num_output_neurons
+
+        loss_tensor = K.mean(
+            (model_object.layers[-1].output[..., target_class] - 1) ** 2
+        )
+
+    return _gradient_descent_for_bwo(
+        model_object=model_object, loss_tensor=loss_tensor,
+        init_function_or_matrices=init_function_or_matrices,
+        num_iterations=num_iterations, learning_rate=learning_rate)
+
+
+def _init_figure_panels(num_rows, num_columns, horizontal_space_fraction=0.1,
+                        vertical_space_fraction=0.1):
+    """Initializes paneled figure.
+
+    :param num_rows: Number of panel rows.
+    :param num_columns: Number of panel columns.
+    :param horizontal_space_fraction: Horizontal space between panels (as
+        fraction of panel size).
+    :param vertical_space_fraction: Vertical space between panels (as fraction
+        of panel size).
+    :return: figure_object: Instance of `matplotlib.figure.Figure`.
+    :return: axes_objects_2d_list: 2-D list, where axes_objects_2d_list[i][j] is
+        the handle (instance of `matplotlib.axes._subplots.AxesSubplot`) for the
+        [i]th row and [j]th column.
+    """
+
+    figure_object, axes_objects_2d_list = pyplot.subplots(
+        num_rows, num_columns, sharex=False, sharey=False,
+        figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    if num_rows == num_columns == 1:
+        axes_objects_2d_list = [[axes_objects_2d_list]]
+    elif num_columns == 1:
+        axes_objects_2d_list = [[a] for a in axes_objects_2d_list]
+    elif num_rows == 1:
+        axes_objects_2d_list = [axes_objects_2d_list]
+
+    pyplot.subplots_adjust(
+        left=0.02, bottom=0.02, right=0.98, top=0.95,
+        hspace=vertical_space_fraction, wspace=horizontal_space_fraction)
+
+    return figure_object, axes_objects_2d_list
+
+
+def _add_colour_bar(
+        axes_object, colour_map_object, values_to_colour, min_colour_value,
+        max_colour_value, colour_norm_object=None,
+        orientation_string='vertical', extend_min=True, extend_max=True):
+    """Adds colour bar to existing axes.
+
+    :param axes_object: Existing axes (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).
+    :param colour_map_object: Colour scheme (instance of
+        `matplotlib.pyplot.cm`).
+    :param values_to_colour: numpy array of values to colour.
+    :param min_colour_value: Minimum value in colour map.
+    :param max_colour_value: Max value in colour map.
+    :param colour_norm_object: Instance of `matplotlib.colors.BoundaryNorm`,
+        defining the scale of the colour map.  If `colour_norm_object is None`,
+        will assume that scale is linear.
+    :param orientation_string: Orientation of colour bar ("vertical" or
+        "horizontal").
+    :param extend_min: Boolean flag.  If True, the bottom of the colour bar will
+        have an arrow.  If False, it will be a flat line, suggesting that lower
+        values are not possible.
+    :param extend_max: Same but for top of colour bar.
+    :return: colour_bar_object: Colour bar (instance of
+        `matplotlib.pyplot.colorbar`) created by this method.
+    """
+
+    if colour_norm_object is None:
+        colour_norm_object = matplotlib.colors.Normalize(
+            vmin=min_colour_value, vmax=max_colour_value, clip=False)
+
+    scalar_mappable_object = pyplot.cm.ScalarMappable(
+        cmap=colour_map_object, norm=colour_norm_object)
+    scalar_mappable_object.set_array(values_to_colour)
+
+    if extend_min and extend_max:
+        extend_string = 'both'
+    elif extend_min:
+        extend_string = 'min'
+    elif extend_max:
+        extend_string = 'max'
+    else:
+        extend_string = 'neither'
+
+    if orientation_string == 'horizontal':
+        padding = 0.075
+    else:
+        padding = 0.05
+
+    colour_bar_object = pyplot.colorbar(
+        ax=axes_object, mappable=scalar_mappable_object,
+        orientation=orientation_string, pad=padding, extend=extend_string,
+        shrink=0.8)
+
+    colour_bar_object.ax.tick_params(labelsize=FONT_SIZE)
+    return colour_bar_object
+
+
+def plot_predictor_2d(
+        predictor_matrix, colour_map_object, colour_norm_object=None,
+        min_colour_value=None, max_colour_value=None, axes_object=None):
+    """Plots predictor variable on 2-D grid.
+
+    If `colour_norm_object is None`, both `min_colour_value` and
+    `max_colour_value` must be specified.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param predictor_matrix: M-by-N numpy array of predictor values.
+    :param colour_map_object: Instance of `matplotlib.pyplot.cm`.
+    :param min_colour_value: Minimum value in colour scheme.
+    :param max_colour_value: Max value in colour scheme.
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :return: axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot` on
+        which field was plotted.
+    """
+
+    if colour_norm_object is not None:
+        min_colour_value = colour_norm_object.boundaries[0]
+        max_colour_value = colour_norm_object.boundaries[-1]
+
+    axes_object.pcolormesh(
+        predictor_matrix, cmap=colour_map_object, norm=colour_norm_object,
+        vmin=min_colour_value, vmax=max_colour_value, shading='flat',
+        edgecolors='None')
+
+    axes_object.set_xticks([])
+    axes_object.set_yticks([])
+
+    _add_colour_bar(
+        axes_object=axes_object, colour_map_object=colour_map_object,
+        values_to_colour=predictor_matrix, min_colour_value=min_colour_value,
+        max_colour_value=max_colour_value)
+
+
+def plot_many_predictors_2d(
+        predictor_matrix, predictor_names, predictor_min_colour_values,
+        predictor_max_colour_values):
+    """Plots many predictor variables on 2-D grid.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    C = number of predictors
+
+    :param predictor_matrix: M-by-N-by-C numpy array of predictor values.
+    :param predictor_names: length-C list of predictor names.
+    :param predictor_min_colour_values: length-C numpy array with minimum value
+        in colour scheme for each predictor.
+    :param predictor_max_colour_values: length-C numpy array with max value
+        in colour scheme for each predictor.
+    :return: axes_objects_2d_list: See doc for `_init_figure_panels`.
+    """
+
+    num_predictors = len(predictor_names)
+    num_panel_rows = int(numpy.floor(numpy.sqrt(num_predictors)))
+    num_panel_columns = int(numpy.ceil(float(num_predictors) / num_panel_rows))
+
+    _, axes_objects_2d_list = _init_figure_panels(
+        num_rows=num_panel_rows, num_columns=num_panel_columns)
+
+    for i in range(num_panel_rows):
+        for j in range(num_panel_columns):
+            this_linear_index = i * num_panel_columns + j
+            if this_linear_index >= num_predictors:
+                break
+
+            this_colour_map_object = PREDICTOR_TO_COLOUR_MAP_DICT[
+                predictor_names[this_linear_index]]
+
+            if predictor_names[this_linear_index] == REFLECTIVITY_NAME:
+                this_colour_norm_object = PREDICTOR_TO_COLOUR_NORM_DICT[
+                    REFLECTIVITY_NAME]
+                this_min_colour_value = None
+                this_max_colour_value = None
+            else:
+                this_colour_norm_object = None
+                this_min_colour_value = predictor_min_colour_values[
+                    this_linear_index]
+                this_max_colour_value = predictor_max_colour_values[
+                    this_linear_index]
+
+            plot_predictor_2d(
+                predictor_matrix=predictor_matrix[..., this_linear_index],
+                colour_map_object=this_colour_map_object,
+                colour_norm_object=this_colour_norm_object,
+                min_colour_value=this_min_colour_value,
+                max_colour_value=this_max_colour_value,
+                axes_object=axes_objects_2d_list[i][j])
+
+    pyplot.show()
+    return axes_objects_2d_list
+
+
+def plot_predictors_example1(validation_image_dict):
+    """Plots all predictors for random example (storm object).
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    """
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    num_predictors = predictor_matrix.shape[-1]
+    predictor_min_colour_values = numpy.full(num_predictors, numpy.nan)
+    predictor_max_colour_values = numpy.full(num_predictors, numpy.nan)
+
+    wind_indices = [
+        predictor_names.index(U_WIND_NAME), predictor_names.index(V_WIND_NAME)
+    ]
+
+    for m in range(num_predictors):
+        if m in wind_indices:
+            predictor_min_colour_values[m] = numpy.percentile(
+                predictor_matrix[..., wind_indices], 1)
+            predictor_max_colour_values[m] = numpy.percentile(
+                predictor_matrix[..., wind_indices], 99)
+        else:
+            predictor_min_colour_values[m] = numpy.percentile(
+                predictor_matrix[..., m], 1)
+            predictor_max_colour_values[m] = numpy.percentile(
+                predictor_matrix[..., m], 99)
+
+    plot_many_predictors_2d(
+        predictor_matrix=predictor_matrix,
+        predictor_names=predictor_names,
+        predictor_min_colour_values=predictor_min_colour_values,
+        predictor_max_colour_values=predictor_max_colour_values)
