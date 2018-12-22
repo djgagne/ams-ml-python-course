@@ -127,22 +127,13 @@ REFL_COLOUR_MAP_OBJECT.set_under(numpy.ones(3))
 
 PREDICTOR_TO_COLOUR_MAP_DICT = {
     TEMPERATURE_NAME: pyplot.cm.YlOrRd,
-    REFLECTIVITY_NAME: REFL_COLOUR_MAP_OBJECT,
-    U_WIND_NAME: pyplot.cm.seismic,
-    V_WIND_NAME: pyplot.cm.seismic
+    REFLECTIVITY_NAME: REFL_COLOUR_MAP_OBJECT
 }
 
 THESE_COLOUR_BOUNDS = numpy.array(
     [0.1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70])
 REFL_COLOUR_NORM_OBJECT = matplotlib.colors.BoundaryNorm(
     THESE_COLOUR_BOUNDS, REFL_COLOUR_MAP_OBJECT.N)
-
-PREDICTOR_TO_COLOUR_NORM_DICT = {
-    TEMPERATURE_NAME: None,
-    REFLECTIVITY_NAME: REFL_COLOUR_NORM_OBJECT,
-    U_WIND_NAME: None,
-    V_WIND_NAME: None
-}
 
 # Deep-learning constants.
 L1_WEIGHT = 0.
@@ -183,6 +174,7 @@ DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
 
 MIN_PROBABILITY = 1e-15
 MAX_PROBABILITY = 1. - MIN_PROBABILITY
+METRES_PER_SECOND_TO_KT = 3.6 / 1.852
 
 
 def time_string_to_unix(time_string, time_format):
@@ -1997,6 +1989,11 @@ def plot_predictor_2d(
         which field was plotted.
     """
 
+    if axes_object is None:
+        _, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
+
     if colour_norm_object is not None:
         min_colour_value = colour_norm_object.boundaries[0]
         max_colour_value = colour_norm_object.boundaries[-1]
@@ -2015,9 +2012,61 @@ def plot_predictor_2d(
         max_colour_value=max_colour_value)
 
 
+def plot_wind_2d(u_wind_matrix_m_s01, v_wind_matrix_m_s01, axes_object=None):
+    """Plots wind velocity on 2-D grid.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param u_wind_matrix_m_s01: M-by-N numpy array of eastward components
+        (metres per second).
+    :param v_wind_matrix_m_s01: M-by-N numpy array of northward components
+        (metres per second).
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :return: axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot` on
+        which field was plotted.
+    """
+
+    if axes_object is None:
+        _, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
+
+    num_grid_rows = u_wind_matrix_m_s01.shape[0]
+    num_grid_columns = u_wind_matrix_m_s01.shape[1]
+
+    x_coords_unique = numpy.linspace(
+        0, num_grid_columns, num=num_grid_columns + 1, dtype=float)
+    x_coords_unique = x_coords_unique[:-1]
+    x_coords_unique = x_coords_unique + numpy.diff(x_coords_unique[:2]) / 2
+
+    y_coords_unique = numpy.linspace(
+        0, num_grid_rows, num=num_grid_rows + 1, dtype=float)
+    y_coords_unique = y_coords_unique[:-1]
+    y_coords_unique = y_coords_unique + numpy.diff(y_coords_unique[:2]) / 2
+
+    x_coord_matrix, y_coord_matrix = numpy.meshgrid(x_coords_unique,
+                                                    y_coords_unique)
+
+    speed_matrix_m_s01 = numpy.sqrt(u_wind_matrix_m_s01 ** 2
+                                    + v_wind_matrix_m_s01 ** 2)
+
+    axes_object.barbs(
+        x_coord_matrix, y_coord_matrix,
+        u_wind_matrix_m_s01 * METRES_PER_SECOND_TO_KT,
+        v_wind_matrix_m_s01 * METRES_PER_SECOND_TO_KT,
+        speed_matrix_m_s01 * METRES_PER_SECOND_TO_KT, color='k', length=6,
+        sizes={'emptybarb': 0.1}, fill_empty=True, rounding=False)
+
+    axes_object.set_xlim(0, num_grid_columns)
+    axes_object.set_ylim(0, num_grid_rows)
+    return axes_object
+
+
 def plot_many_predictors_2d(
-        predictor_matrix, predictor_names, predictor_min_colour_values,
-        predictor_max_colour_values):
+        predictor_matrix, predictor_names, min_colour_temp_kelvins,
+        max_colour_temp_kelvins):
     """Plots many predictor variables on 2-D grid.
 
     M = number of rows in grid
@@ -2026,48 +2075,50 @@ def plot_many_predictors_2d(
 
     :param predictor_matrix: M-by-N-by-C numpy array of predictor values.
     :param predictor_names: length-C list of predictor names.
-    :param predictor_min_colour_values: length-C numpy array with minimum value
-        in colour scheme for each predictor.
-    :param predictor_max_colour_values: length-C numpy array with max value
-        in colour scheme for each predictor.
+    :param min_colour_temp_kelvins: Minimum value in temperature colour scheme.
+    :param max_colour_temp_kelvins: Max value in temperature colour scheme.
     :return: axes_objects_2d_list: See doc for `_init_figure_panels`.
     """
 
-    num_predictors = len(predictor_names)
-    num_panel_rows = int(numpy.floor(numpy.sqrt(num_predictors)))
-    num_panel_columns = int(numpy.ceil(float(num_predictors) / num_panel_rows))
+    u_wind_matrix_m_s01 = predictor_matrix[
+        ..., predictor_names.index(U_WIND_NAME)]
+    v_wind_matrix_m_s01 = predictor_matrix[
+        ..., predictor_names.index(V_WIND_NAME)]
+
+    non_wind_predictor_names = [
+        p for p in predictor_names if p not in [U_WIND_NAME, V_WIND_NAME]
+    ]
 
     _, axes_objects_2d_list = _init_figure_panels(
-        num_rows=num_panel_rows, num_columns=num_panel_columns)
+        num_rows=len(non_wind_predictor_names), num_columns=1)
 
-    for i in range(num_panel_rows):
-        for j in range(num_panel_columns):
-            this_linear_index = i * num_panel_columns + j
-            if this_linear_index >= num_predictors:
-                break
+    for m in range(len(non_wind_predictor_names)):
+        this_predictor_index = predictor_names.index(
+            non_wind_predictor_names[m])
 
-            this_colour_map_object = PREDICTOR_TO_COLOUR_MAP_DICT[
-                predictor_names[this_linear_index]]
+        if non_wind_predictor_names[m] == REFLECTIVITY_NAME:
+            this_colour_norm_object = REFL_COLOUR_NORM_OBJECT
+            this_min_colour_value = None
+            this_max_colour_value = None
+        else:
+            this_colour_norm_object = None
+            this_min_colour_value = min_colour_temp_kelvins + 0.
+            this_max_colour_value = max_colour_temp_kelvins + 0.
 
-            if predictor_names[this_linear_index] == REFLECTIVITY_NAME:
-                this_colour_norm_object = PREDICTOR_TO_COLOUR_NORM_DICT[
-                    REFLECTIVITY_NAME]
-                this_min_colour_value = None
-                this_max_colour_value = None
-            else:
-                this_colour_norm_object = None
-                this_min_colour_value = predictor_min_colour_values[
-                    this_linear_index]
-                this_max_colour_value = predictor_max_colour_values[
-                    this_linear_index]
+        plot_predictor_2d(
+            predictor_matrix=predictor_matrix[..., this_predictor_index],
+            colour_map_object=PREDICTOR_TO_COLOUR_MAP_DICT[
+                non_wind_predictor_names[m]],
+            colour_norm_object=this_colour_norm_object,
+            min_colour_value=this_min_colour_value,
+            max_colour_value=this_max_colour_value,
+            axes_object=axes_objects_2d_list[m][0])
 
-            plot_predictor_2d(
-                predictor_matrix=predictor_matrix[..., this_linear_index],
-                colour_map_object=this_colour_map_object,
-                colour_norm_object=this_colour_norm_object,
-                min_colour_value=this_min_colour_value,
-                max_colour_value=this_max_colour_value,
-                axes_object=axes_objects_2d_list[i][j])
+        plot_wind_2d(u_wind_matrix_m_s01=u_wind_matrix_m_s01,
+                     v_wind_matrix_m_s01=v_wind_matrix_m_s01,
+                     axes_object=axes_objects_2d_list[m][0])
+
+        axes_objects_2d_list[m][0].set_title(non_wind_predictor_names[m])
 
     pyplot.show()
     return axes_objects_2d_list
@@ -2081,29 +2132,12 @@ def plot_predictors_example1(validation_image_dict):
 
     predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
     predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
-
-    num_predictors = predictor_matrix.shape[-1]
-    predictor_min_colour_values = numpy.full(num_predictors, numpy.nan)
-    predictor_max_colour_values = numpy.full(num_predictors, numpy.nan)
-
-    wind_indices = [
-        predictor_names.index(U_WIND_NAME), predictor_names.index(V_WIND_NAME)
-    ]
-
-    for m in range(num_predictors):
-        if m in wind_indices:
-            predictor_min_colour_values[m] = numpy.percentile(
-                predictor_matrix[..., wind_indices], 1)
-            predictor_max_colour_values[m] = numpy.percentile(
-                predictor_matrix[..., wind_indices], 99)
-        else:
-            predictor_min_colour_values[m] = numpy.percentile(
-                predictor_matrix[..., m], 1)
-            predictor_max_colour_values[m] = numpy.percentile(
-                predictor_matrix[..., m], 99)
+    temperature_matrix_kelvins = predictor_matrix[
+        ..., predictor_names.index(TEMPERATURE_NAME)]
 
     plot_many_predictors_2d(
         predictor_matrix=predictor_matrix,
         predictor_names=predictor_names,
-        predictor_min_colour_values=predictor_min_colour_values,
-        predictor_max_colour_values=predictor_max_colour_values)
+        min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
+        max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
+    )

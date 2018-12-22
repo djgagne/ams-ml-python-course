@@ -17,8 +17,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="317">
-              <caret line="2081" column="4" lean-forward="true" selection-start-line="2081" selection-start-column="4" selection-end-line="2108" selection-end-column="64" />
+            <state relative-caret-position="611">
+              <caret line="2050" column="0" lean-forward="true" selection-start-line="2050" selection-start-column="0" selection-end-line="2050" selection-end-column="0" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -40,8 +40,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>= None</find>
-      <find>.predict</find>
       <find>MINOR_SEPARATOR_STRING</find>
       <find>_apply_cnn(</find>
       <find>normalize_images(</find>
@@ -70,6 +68,8 @@
       <find>axes</find>
       <find>.]</find>
       <find>REFLECTIVITY_COLOUR_NORM_OBJECT</find>
+      <find>PREDICTOR_TO_COLOUR_MAP_DICT</find>
+      <find>PREDICTOR_TO_COLOUR_NORM_DICT</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -506,8 +506,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="317">
-          <caret line="2081" column="4" lean-forward="true" selection-start-line="2081" selection-start-column="4" selection-end-line="2108" selection-end-column="64" />
+        <state relative-caret-position="611">
+          <caret line="2050" column="0" lean-forward="true" selection-start-line="2050" selection-start-column="0" selection-end-line="2050" selection-end-column="0" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>
