@@ -2702,3 +2702,180 @@ def saliency_example1(validation_image_dict, normalization_dict, model_object):
         contour_interval=contour_interval)
 
     pyplot.show()
+
+
+def saliency_example2(validation_image_dict, normalization_dict, model_object):
+    """Computes saliency map for random example wrt negative-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param model_object: Trained instance of `keras.models.Model`.
+    """
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    saliency_matrix = saliency_for_class(
+        model_object=model_object, target_class=0,
+        list_of_input_matrices=[predictor_matrix_norm]
+    )[0][0, ...]
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    min_colour_temp_kelvins = numpy.percentile(
+        predictor_matrix[..., temperature_index], 1)
+    max_colour_temp_kelvins = numpy.percentile(
+        predictor_matrix[..., temperature_index], 99)
+
+    wind_indices = numpy.array([
+        predictor_names.index(U_WIND_NAME), predictor_names.index(V_WIND_NAME)
+    ], dtype=int)
+
+    max_colour_wind_speed_m_s01 = numpy.percentile(
+        numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+    _, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+        predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins,
+        max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+    max_absolute_contour_level = numpy.percentile(
+        numpy.absolute(saliency_matrix), 99)
+    contour_interval = max_absolute_contour_level / 10
+
+    plot_many_saliency_maps(
+        saliency_matrix=saliency_matrix,
+        axes_objects_2d_list=axes_objects_2d_list,
+        colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+        max_absolute_contour_level=max_absolute_contour_level,
+        contour_interval=contour_interval)
+
+    pyplot.show()
+
+
+def saliency_example3(validation_image_dict, normalization_dict, model_object):
+    """Computes saliency map for extreme example wrt positive-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param model_object: Trained instance of `keras.models.Model`.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    saliency_matrix = saliency_for_class(
+        model_object=model_object, target_class=1,
+        list_of_input_matrices=[predictor_matrix_norm]
+    )[0][0, ...]
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    min_colour_temp_kelvins = numpy.percentile(
+        predictor_matrix[..., temperature_index], 1)
+    max_colour_temp_kelvins = numpy.percentile(
+        predictor_matrix[..., temperature_index], 99)
+
+    wind_indices = numpy.array([
+        predictor_names.index(U_WIND_NAME), predictor_names.index(V_WIND_NAME)
+    ], dtype=int)
+
+    max_colour_wind_speed_m_s01 = numpy.percentile(
+        numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+    _, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+        predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins,
+        max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+    max_absolute_contour_level = numpy.percentile(
+        numpy.absolute(saliency_matrix), 99)
+    contour_interval = max_absolute_contour_level / 10
+
+    plot_many_saliency_maps(
+        saliency_matrix=saliency_matrix,
+        axes_objects_2d_list=axes_objects_2d_list,
+        colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+        max_absolute_contour_level=max_absolute_contour_level,
+        contour_interval=contour_interval)
+
+    pyplot.show()
+
+
+def saliency_example4(validation_image_dict, normalization_dict, model_object):
+    """Computes saliency map for extreme example wrt negative-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param model_object: Trained instance of `keras.models.Model`.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    saliency_matrix = saliency_for_class(
+        model_object=model_object, target_class=0,
+        list_of_input_matrices=[predictor_matrix_norm]
+    )[0][0, ...]
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    min_colour_temp_kelvins = numpy.percentile(
+        predictor_matrix[..., temperature_index], 1)
+    max_colour_temp_kelvins = numpy.percentile(
+        predictor_matrix[..., temperature_index], 99)
+
+    wind_indices = numpy.array([
+        predictor_names.index(U_WIND_NAME), predictor_names.index(V_WIND_NAME)
+    ], dtype=int)
+
+    max_colour_wind_speed_m_s01 = numpy.percentile(
+        numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+    _, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+        predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins,
+        max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+    max_absolute_contour_level = numpy.percentile(
+        numpy.absolute(saliency_matrix), 99)
+    contour_interval = max_absolute_contour_level / 10
+
+    plot_many_saliency_maps(
+        saliency_matrix=saliency_matrix,
+        axes_objects_2d_list=axes_objects_2d_list,
+        colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+        max_absolute_contour_level=max_absolute_contour_level,
+        contour_interval=contour_interval)
+
+    pyplot.show()
