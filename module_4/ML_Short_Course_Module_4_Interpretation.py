@@ -2077,7 +2077,8 @@ def plot_many_predictors_2d(
     :param predictor_names: length-C list of predictor names.
     :param min_colour_temp_kelvins: Minimum value in temperature colour scheme.
     :param max_colour_temp_kelvins: Max value in temperature colour scheme.
-    :return: axes_objects_2d_list: See doc for `_init_figure_panels`.
+    :return: figure_object: See doc for `_init_figure_panels`.
+    :return: axes_objects_2d_list: Same.
     """
 
     u_wind_matrix_m_s01 = predictor_matrix[
@@ -2089,7 +2090,7 @@ def plot_many_predictors_2d(
         p for p in predictor_names if p not in [U_WIND_NAME, V_WIND_NAME]
     ]
 
-    _, axes_objects_2d_list = _init_figure_panels(
+    figure_object, axes_objects_2d_list = _init_figure_panels(
         num_rows=len(non_wind_predictor_names), num_columns=1)
 
     for m in range(len(non_wind_predictor_names)):
@@ -2121,7 +2122,7 @@ def plot_many_predictors_2d(
         axes_objects_2d_list[m][0].set_title(non_wind_predictor_names[m])
 
     pyplot.show()
-    return axes_objects_2d_list
+    return figure_object, axes_objects_2d_list
 
 
 def plot_predictors_example1(validation_image_dict):
@@ -2141,3 +2142,130 @@ def plot_predictors_example1(validation_image_dict):
         min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
         max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
     )
+
+
+def plot_predictors_example2(validation_image_dict):
+    """Plots all predictors for example with greatest future vorticity.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+    temperature_matrix_kelvins = predictor_matrix[
+        ..., predictor_names.index(TEMPERATURE_NAME)]
+
+    plot_many_predictors_2d(
+        predictor_matrix=predictor_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
+        max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
+    )
+
+
+def bwo_example1(validation_image_dict, normalization_dict, model_object):
+    """Optimizes random example (storm object) for positive class.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param model_object: Trained instance of `keras.models.Model`.
+    """
+
+    orig_predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    orig_predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=orig_predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    orig_predictor_matrix_norm = numpy.expand_dims(
+        orig_predictor_matrix_norm, axis=0)
+
+    optimized_predictor_matrix_norm = bwo_for_class(
+        model_object=model_object, target_class=1,
+        init_function_or_matrices=[orig_predictor_matrix_norm]
+    )[0][0, ...]
+
+    optimized_predictor_matrix = denormalize_images(
+        predictor_matrix=optimized_predictor_matrix_norm,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    combined_temp_matrix_kelvins = numpy.concatenate(
+        (orig_predictor_matrix[..., temperature_index],
+         optimized_predictor_matrix[..., temperature_index]),
+        axis=0)
+
+    min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
+    max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
+
+    print('\nReal example (before optimization):\n')
+    plot_many_predictors_2d(
+        predictor_matrix=orig_predictor_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    print('\nSynthetic example (after optimization):\n')
+    plot_many_predictors_2d(
+        predictor_matrix=optimized_predictor_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+
+def bwo_example2(validation_image_dict, normalization_dict, model_object):
+    """Optimizes random example (storm object) for positive class.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param model_object: Trained instance of `keras.models.Model`.
+    """
+
+    orig_predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    orig_predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=orig_predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    orig_predictor_matrix_norm = numpy.expand_dims(
+        orig_predictor_matrix_norm, axis=0)
+
+    optimized_predictor_matrix_norm = bwo_for_class(
+        model_object=model_object, target_class=1,
+        init_function_or_matrices=[orig_predictor_matrix_norm]
+    )[0][0, ...]
+
+    optimized_predictor_matrix = denormalize_images(
+        predictor_matrix=optimized_predictor_matrix_norm,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    combined_temp_matrix_kelvins = numpy.concatenate(
+        (orig_predictor_matrix[..., temperature_index],
+         optimized_predictor_matrix[..., temperature_index]),
+        axis=0)
+
+    min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
+    max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
+
+    print('\nReal example (before optimization):\n')
+    plot_many_predictors_2d(
+        predictor_matrix=orig_predictor_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    print('\nSynthetic example (after optimization):\n')
+    plot_many_predictors_2d(
+        predictor_matrix=optimized_predictor_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)

@@ -17,8 +17,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="611">
-              <caret line="2050" column="0" lean-forward="true" selection-start-line="2050" selection-start-column="0" selection-end-line="2050" selection-end-column="0" />
+            <state relative-caret-position="281">
+              <caret line="2222" column="16" lean-forward="false" selection-start-line="2222" selection-start-column="16" selection-end-line="2222" selection-end-column="16" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -40,7 +40,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>MINOR_SEPARATOR_STRING</find>
       <find>_apply_cnn(</find>
       <find>normalize_images(</find>
       <find>print these</find>
@@ -70,6 +69,7 @@
       <find>REFLECTIVITY_COLOUR_NORM_OBJECT</find>
       <find>PREDICTOR_TO_COLOUR_MAP_DICT</find>
       <find>PREDICTOR_TO_COLOUR_NORM_DICT</find>
+      <find>:param normalization_dict</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -107,8 +107,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="1920" />
+    <option name="y" value="28" />
     <option name="width" value="1920" />
-    <option name="height" value="1080" />
+    <option name="height" value="1138" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -349,7 +351,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="0" y="0" width="1920" height="1080" extended-state="6" />
+    <frame x="1920" y="28" width="1920" height="1138" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
@@ -506,8 +508,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="611">
-          <caret line="2050" column="0" lean-forward="true" selection-start-line="2050" selection-start-column="0" selection-end-line="2050" selection-end-column="0" />
+        <state relative-caret-position="281">
+          <caret line="2222" column="16" lean-forward="false" selection-start-line="2222" selection-start-column="16" selection-end-line="2222" selection-end-column="16" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>
