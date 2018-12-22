@@ -39,6 +39,8 @@ BAR_GRAPH_FACE_COLOUR = numpy.array([166, 206, 227], dtype=float) / 255
 BAR_GRAPH_EDGE_COLOUR = numpy.full(3, 0.)
 BAR_GRAPH_EDGE_WIDTH = 2.
 
+SALIENCY_COLOUR_MAP_OBJECT = pyplot.cm.Greys
+
 FONT_SIZE = 30
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
@@ -2528,3 +2530,157 @@ def saliency_for_class(model_object, target_class, list_of_input_matrices):
     return _do_saliency_calculations(
         model_object=model_object, loss_tensor=loss_tensor,
         list_of_input_matrices=list_of_input_matrices)
+
+
+def plot_saliency_2d(
+        saliency_matrix, axes_object, colour_map_object,
+        max_absolute_contour_level, contour_interval, line_width=2):
+    """Plots saliency map over 2-D grid (for one predictor).
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param saliency_matrix: M-by-N numpy array of saliency values.
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :param colour_map_object: Colour scheme (instance of
+        `matplotlib.pyplot.cm`).
+    :param max_absolute_contour_level: Max saliency to plot.  The minimum
+        saliency plotted will be `-1 * max_absolute_contour_level`.
+    :param max_absolute_contour_level: Max absolute saliency value to plot.  The
+        min and max values, respectively, will be
+        `-1 * max_absolute_contour_level` and `max_absolute_contour_level`.
+    :param contour_interval: Saliency interval between successive contours.
+    :param line_width: Width of contour lines.
+    """
+
+    num_grid_rows = saliency_matrix.shape[0]
+    num_grid_columns = saliency_matrix.shape[1]
+
+    x_coords_unique = numpy.linspace(
+        0, num_grid_columns, num=num_grid_columns + 1, dtype=float)
+    x_coords_unique = x_coords_unique[:-1]
+    x_coords_unique = x_coords_unique + numpy.diff(x_coords_unique[:2]) / 2
+
+    y_coords_unique = numpy.linspace(
+        0, num_grid_rows, num=num_grid_rows + 1, dtype=float)
+    y_coords_unique = y_coords_unique[:-1]
+    y_coords_unique = y_coords_unique + numpy.diff(y_coords_unique[:2]) / 2
+
+    x_coord_matrix, y_coord_matrix = numpy.meshgrid(x_coords_unique,
+                                                    y_coords_unique)
+
+    half_num_contours = int(numpy.round(
+        1 + max_absolute_contour_level / contour_interval
+    ))
+
+    # Plot positive values.
+    these_contour_levels = numpy.linspace(
+        0., max_absolute_contour_level, num=half_num_contours)
+
+    axes_object.contour(
+        x_coord_matrix, y_coord_matrix, saliency_matrix,
+        these_contour_levels, cmap=colour_map_object,
+        vmin=numpy.min(these_contour_levels),
+        vmax=numpy.max(these_contour_levels), linewidths=line_width,
+        linestyles='solid')
+
+    # Plot negative values.
+    these_contour_levels = these_contour_levels[1:]
+
+    axes_object.contour(
+        x_coord_matrix, y_coord_matrix, -saliency_matrix,
+        these_contour_levels, cmap=colour_map_object,
+        vmin=numpy.min(these_contour_levels),
+        vmax=numpy.max(these_contour_levels), linewidths=line_width,
+        linestyles='dashed')
+
+
+def plot_many_saliency_maps(
+        saliency_matrix, axes_objects_2d_list, colour_map_object,
+        max_absolute_contour_level, contour_interval, line_width=2):
+    """Plots 2-D saliency map for each predictor.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    C = number of predictors
+
+    :param saliency_matrix: M-by-N-by-C numpy array of saliency values.
+    :param axes_objects_2d_list: See doc for `_init_figure_panels`.
+    :param colour_map_object: See doc for `plot_saliency_2d`.
+    :param max_absolute_contour_level: Same.
+    :param max_absolute_contour_level: Same.
+    :param contour_interval: Same.
+    :param line_width: Same.
+    """
+
+    num_predictors = saliency_matrix.shape[-1]
+    num_panel_rows = len(axes_objects_2d_list)
+    num_panel_columns = len(axes_objects_2d_list[0])
+
+    for m in range(num_predictors):
+        this_panel_row, this_panel_column = numpy.unravel_index(
+            m, (num_panel_rows, num_panel_columns)
+        )
+
+        plot_saliency_2d(
+            saliency_matrix=saliency_matrix[..., m],
+            axes_object=axes_objects_2d_list[this_panel_row][this_panel_column],
+            colour_map_object=colour_map_object,
+            max_absolute_contour_level=max_absolute_contour_level,
+            contour_interval=contour_interval, line_width=line_width)
+
+    pyplot.show()
+
+
+def saliency_example1(validation_image_dict, normalization_dict, model_object):
+    """Computes saliency map for random example wrt positive-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param model_object: Trained instance of `keras.models.Model`.
+    """
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    saliency_matrix = saliency_for_class(
+        model_object=model_object, target_class=1,
+        list_of_input_matrices=[predictor_matrix_norm]
+    )[0][0, ...]
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    min_colour_temp_kelvins = numpy.percentile(
+        predictor_matrix[..., temperature_index], 1)
+    max_colour_temp_kelvins = numpy.percentile(
+        predictor_matrix[..., temperature_index], 99)
+
+    wind_indices = numpy.array([
+        predictor_names.index(U_WIND_NAME), predictor_names.index(V_WIND_NAME)
+    ], dtype=int)
+
+    max_colour_wind_speed_m_s01 = numpy.percentile(
+        numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+    _, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+        predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins,
+        max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+    max_absolute_contour_level = numpy.percentile(
+        numpy.absolute(saliency_matrix), 99)
+    contour_interval = max_absolute_contour_level / 10
+
+    plot_many_saliency_maps(
+        saliency_matrix=saliency_matrix,
+        axes_objects_2d_list=axes_objects_2d_list,
+        colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+        max_absolute_contour_level=max_absolute_contour_level,
+        contour_interval=contour_interval)
