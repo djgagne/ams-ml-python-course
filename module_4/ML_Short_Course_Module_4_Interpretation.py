@@ -2452,3 +2452,79 @@ def bwo_example4(validation_image_dict, normalization_dict, model_object):
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+
+def _do_saliency_calculations(
+        model_object, loss_tensor, list_of_input_matrices):
+    """Does the nitty-gritty part of computing saliency maps.
+
+    T = number of input tensors to the model
+    E = number of examples (storm objects)
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param loss_tensor: Keras tensor defining the loss function.
+    :param list_of_input_matrices: length-T list of numpy arrays, comprising one
+        or more examples (storm objects).  list_of_input_matrices[i] must have
+        the same dimensions as the [i]th input tensor to the model.
+    :return: list_of_saliency_matrices: length-T list of numpy arrays,
+        comprising the saliency map for each example.
+        list_of_saliency_matrices[i] has the same dimensions as
+        list_of_input_matrices[i] and defines the "saliency" of each value x,
+        which is the gradient of the loss function with respect to x.
+    """
+
+    if isinstance(model_object.input, list):
+        list_of_input_tensors = model_object.input
+    else:
+        list_of_input_tensors = [model_object.input]
+
+    list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
+    num_input_tensors = len(list_of_input_tensors)
+    for i in range(num_input_tensors):
+        list_of_gradient_tensors[i] /= K.maximum(
+            K.std(list_of_gradient_tensors[i]), K.epsilon())
+
+    inputs_to_gradients_function = K.function(
+        list_of_input_tensors + [K.learning_phase()], list_of_gradient_tensors)
+    list_of_saliency_matrices = inputs_to_gradients_function(
+        list_of_input_matrices + [0])
+    for i in range(num_input_tensors):
+        list_of_saliency_matrices[i] *= -1
+
+    return list_of_saliency_matrices
+
+
+def saliency_for_class(model_object, target_class, list_of_input_matrices):
+    """For each input example, creates saliency map for prob of given class.
+
+    :param model_object: Trained instance of `keras.models.Model`.
+    :param target_class: Saliency maps will be created for probability of this
+        class.
+    :param list_of_input_matrices: See doc for `_do_saliency_calculations`.
+    :return: list_of_saliency_matrices: Same.
+    """
+
+    target_class = int(numpy.round(target_class))
+    assert target_class >= 0
+
+    num_output_neurons = (
+        model_object.layers[-1].output.get_shape().as_list()[-1]
+    )
+
+    if num_output_neurons == 1:
+        assert target_class <= 1
+
+        if target_class == 1:
+            loss_tensor = K.mean(
+                (model_object.layers[-1].output[..., 0] - 1) ** 2)
+        else:
+            loss_tensor = K.mean(model_object.layers[-1].output[..., 0] ** 2)
+    else:
+        assert target_class < num_output_neurons
+
+        loss_tensor = K.mean(
+            (model_object.layers[-1].output[..., target_class] - 1) ** 2)
+
+    return _do_saliency_calculations(
+        model_object=model_object, loss_tensor=loss_tensor,
+        list_of_input_matrices=list_of_input_matrices)
