@@ -2911,11 +2911,19 @@ def setup_ucn(num_input_features, first_num_rows, first_num_columns,
         target_shape=(first_num_rows, first_num_columns, current_num_filters)
     )(input_layer_object)
 
-    for this_upsampling_factor in upsampling_factor_by_upconv_layer:
+    num_upconv_layers = len(upsampling_factor_by_upconv_layer)
+
+    for i in range(num_upconv_layers):
+        this_upsampling_factor = upsampling_factor_by_upconv_layer[i]
+
         if this_upsampling_factor > 1:
             this_padding_arg = 'same'
         else:
             this_padding_arg = 'valid'
+            current_num_filters = int(numpy.round(current_num_filters / 2))
+
+        if i == num_upconv_layers - 1:
+            current_num_filters = num_output_channels + 0
 
         layer_object = keras.layers.Conv2DTranspose(
             filters=current_num_filters,
@@ -2927,136 +2935,19 @@ def setup_ucn(num_input_features, first_num_rows, first_num_columns,
             kernel_regularizer=regularizer_object
         )(layer_object)
 
-        layer_object = keras.layers.LeakyReLU(
-            alpha=SLOPE_FOR_RELU
-        )(layer_object)
+        if i < num_upconv_layers - 1 or use_activation_for_out_layer:
+            layer_object = keras.layers.LeakyReLU(
+                alpha=SLOPE_FOR_RELU
+            )(layer_object)
 
-        if USE_BATCH_NORMALIZATION:
+        if not USE_BATCH_NORMALIZATION:
+            continue
+
+        if i < num_upconv_layers - 1 or use_bn_for_out_layer:
             layer_object = keras.layers.BatchNormalization(
                 axis=-1, center=True, scale=True
             )(layer_object)
 
-
-
-def setup_ucn_old(num_input_features, num_output_rows, num_output_columns,
-              num_output_channels):
-    """Sets up (but does not train) UCN (upconvolutional network).
-
-    :param num_input_features: Number of input features.
-    :param num_output_rows: Number of rows in output grid.
-    :param num_output_columns: Number of columns in output grid.
-    :param num_output_channels: Number of channels in output grid.
-    :return: model_object: Untrained instance of `keras.models.Model`.
-    """
-
-    regularizer_object = keras.regularizers.l1_l2(l1=L1_WEIGHT, l2=L2_WEIGHT)
-    input_layer_object = keras.layers.Input(shape=(num_input_features,))
-
-    first_num_rows = 5
-    first_num_columns = 5
-    current_num_filters = int(numpy.round(
-        num_input_features / (first_num_rows * first_num_columns)
-    ))
-
-    layer_object = keras.layers.Reshape(
-        target_shape=(first_num_rows, first_num_columns, current_num_filters)
-    )(input_layer_object)
-
-    layer_object = keras.layers.Conv2DTranspose(
-        filters=current_num_filters,
-        kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
-        strides=(2, 2), padding='same', data_format='channels_last',
-        dilation_rate=(1, 1), activation=None, use_bias=True,
-        kernel_initializer='glorot_uniform', bias_initializer='zeros',
-        kernel_regularizer=regularizer_object
-    )(layer_object)
-
-    layer_object = keras.layers.LeakyReLU(
-        alpha=SLOPE_FOR_RELU
-    )(layer_object)
-
-    if USE_BATCH_NORMALIZATION:
-        layer_object = keras.layers.BatchNormalization(
-            axis=-1, center=True, scale=True
-        )(layer_object)
-
-    for _ in range(2):
-        current_num_filters = int(numpy.round(current_num_filters / 2))
-
-        layer_object = keras.layers.Conv2DTranspose(
-            filters=current_num_filters,
-            kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
-            strides=(1, 1), padding='valid', data_format='channels_last',
-            dilation_rate=(1, 1), activation=None, use_bias=True,
-            kernel_initializer='glorot_uniform', bias_initializer='zeros',
-            kernel_regularizer=regularizer_object
-        )(layer_object)
-
-        layer_object = keras.layers.LeakyReLU(
-            alpha=SLOPE_FOR_RELU
-        )(layer_object)
-
-        if USE_BATCH_NORMALIZATION:
-            layer_object = keras.layers.BatchNormalization(
-                axis=-1, center=True, scale=True
-            )(layer_object)
-
-    layer_object = keras.layers.Conv2DTranspose(
-        filters=current_num_filters,
-        kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
-        strides=(2, 2), padding='same', data_format='channels_last',
-        dilation_rate=(1, 1), activation=None, use_bias=True,
-        kernel_initializer='glorot_uniform', bias_initializer='zeros',
-        kernel_regularizer=regularizer_object
-    )(layer_object)
-
-    layer_object = keras.layers.LeakyReLU(
-        alpha=SLOPE_FOR_RELU
-    )(layer_object)
-
-    if USE_BATCH_NORMALIZATION:
-        layer_object = keras.layers.BatchNormalization(
-            axis=-1, center=True, scale=True
-        )(layer_object)
-
-    current_num_filters = int(numpy.round(current_num_filters / 2))
-
-    layer_object = keras.layers.Conv2DTranspose(
-        filters=current_num_filters,
-        kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
-        strides=(1, 1), padding='valid', data_format='channels_last',
-        dilation_rate=(1, 1), activation=None, use_bias=True,
-        kernel_initializer='glorot_uniform', bias_initializer='zeros',
-        kernel_regularizer=regularizer_object
-    )(layer_object)
-
-    layer_object = keras.layers.LeakyReLU(
-        alpha=SLOPE_FOR_RELU
-    )(layer_object)
-
-    if USE_BATCH_NORMALIZATION:
-        layer_object = keras.layers.BatchNormalization(
-            axis=-1, center=True, scale=True
-        )(layer_object)
-
-    layer_object = keras.layers.Conv2DTranspose(
-        filters=num_output_channels,
-        kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
-        strides=(1, 1), padding='valid', data_format='channels_last',
-        dilation_rate=(1, 1), activation=None, use_bias=True,
-        kernel_initializer='glorot_uniform', bias_initializer='zeros',
-        kernel_regularizer=regularizer_object
-    )(layer_object)
-
-    # TODO(thunderhoser): I don't know what I should do for activation or batch
-    # normalization in the last layer.
-
-    if USE_BATCH_NORMALIZATION:
-        layer_object = keras.layers.BatchNormalization(
-            axis=-1, center=True, scale=True
-        )(layer_object)
-
-    # Put the whole thing together and compile.
     model_object = keras.models.Model(
         inputs=input_layer_object, outputs=layer_object)
     model_object.compile(
@@ -3069,6 +2960,11 @@ def setup_ucn_old(num_input_features, num_output_rows, num_output_columns,
 def setup_ucn_example():
     """Sets up UCN."""
 
+    upsampling_factor_by_upconv_layer = numpy.array(
+        [2, 1, 1, 2, 1, 1], dtype=int)
+
     setup_ucn(
-        num_input_features=6400, num_output_rows=32, num_output_columns=32,
-        num_output_channels=4)
+        num_input_features=6400, first_num_rows=5, first_num_columns=5,
+        upsampling_factor_by_upconv_layer=upsampling_factor_by_upconv_layer,
+        num_output_channels=4, use_activation_for_out_layer=True,
+        use_bn_for_out_layer=True)
