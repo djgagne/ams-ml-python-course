@@ -2125,7 +2125,6 @@ def plot_many_predictors_with_barbs(
 
         axes_objects_2d_list[m][0].set_title(non_wind_predictor_names[m])
 
-    pyplot.show()
     return figure_object, axes_objects_2d_list
 
 
@@ -2192,7 +2191,6 @@ def plot_many_predictors_sans_barbs(
             axes_objects_2d_list[i][j].set_title(
                 predictor_names[this_linear_index])
 
-    pyplot.show()
     return figure_object, axes_objects_2d_list
 
 
@@ -2213,6 +2211,8 @@ def plot_predictors_example1(validation_image_dict):
         min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
         max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
     )
+
+    pyplot.show()
 
 
 def plot_predictors_example2(validation_image_dict):
@@ -2238,6 +2238,8 @@ def plot_predictors_example2(validation_image_dict):
         min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
         max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
     )
+
+    pyplot.show()
 
 
 def bwo_example1(validation_image_dict, normalization_dict, model_object):
@@ -2283,12 +2285,16 @@ def bwo_example1(validation_image_dict, normalization_dict, model_object):
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    pyplot.show()
+
     print('\nSynthetic example (after optimization):\n')
     plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    pyplot.show()
 
 
 def bwo_example2(validation_image_dict, normalization_dict, model_object):
@@ -2334,12 +2340,16 @@ def bwo_example2(validation_image_dict, normalization_dict, model_object):
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    pyplot.show()
+
     print('\nSynthetic example (after optimization):\n')
     plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    pyplot.show()
 
 
 def bwo_example3(validation_image_dict, normalization_dict, model_object):
@@ -2391,12 +2401,16 @@ def bwo_example3(validation_image_dict, normalization_dict, model_object):
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    pyplot.show()
+
     print('\nSynthetic example (after optimization):\n')
     plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    pyplot.show()
 
 
 def bwo_example4(validation_image_dict, normalization_dict, model_object):
@@ -2448,12 +2462,16 @@ def bwo_example4(validation_image_dict, normalization_dict, model_object):
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    pyplot.show()
+
     print('\nSynthetic example (after optimization):\n')
     plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    pyplot.show()
 
 
 def _do_saliency_calculations(
@@ -2583,7 +2601,7 @@ def plot_saliency_2d(
         these_contour_levels, cmap=colour_map_object,
         vmin=numpy.min(these_contour_levels),
         vmax=numpy.max(these_contour_levels), linewidths=line_width,
-        linestyles='solid')
+        linestyles='solid', zorder=1e6)
 
     # Plot negative values.
     these_contour_levels = these_contour_levels[1:]
@@ -2593,7 +2611,7 @@ def plot_saliency_2d(
         these_contour_levels, cmap=colour_map_object,
         vmin=numpy.min(these_contour_levels),
         vmax=numpy.max(these_contour_levels), linewidths=line_width,
-        linestyles='dashed')
+        linestyles='dashed', zorder=1e6)
 
 
 def plot_many_saliency_maps(
@@ -2629,8 +2647,6 @@ def plot_many_saliency_maps(
             colour_map_object=colour_map_object,
             max_absolute_contour_level=max_absolute_contour_level,
             contour_interval=contour_interval, line_width=line_width)
-
-    pyplot.show()
 
 
 def saliency_example1(validation_image_dict, normalization_dict, model_object):
@@ -2684,3 +2700,5 @@ def saliency_example1(validation_image_dict, normalization_dict, model_object):
         colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
         max_absolute_contour_level=max_absolute_contour_level,
         contour_interval=contour_interval)
+
+    pyplot.show()
