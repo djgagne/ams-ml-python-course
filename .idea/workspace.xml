@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -17,8 +16,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="551">
-              <caret line="3426" column="27" lean-forward="false" selection-start-line="3426" selection-start-column="27" selection-end-line="3426" selection-end-column="27" />
+            <state relative-caret-position="342">
+              <caret line="3267" column="49" lean-forward="true" selection-start-line="3267" selection-start-column="49" selection-end-line="3267" selection-end-column="49" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -30,7 +29,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>def get_binarization_threshold</find>
       <find>print(</find>
       <find>_do_gradient_descent</find>
       <find>axes</find>
@@ -60,6 +58,7 @@
       <find>name=</find>
       <find>ucn_model_object.</find>
       <find>_example1(</find>
+      <find>novel_indices</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -79,6 +78,7 @@
       <replace>for_out_layer</replace>
       <replace>image_matrix</replace>
       <replace>svd_dictionary</replace>
+      <replace>svd_errors</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -503,8 +503,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="551">
-          <caret line="3426" column="27" lean-forward="false" selection-start-line="3426" selection-start-column="27" selection-end-line="3426" selection-end-column="27" />
+        <state relative-caret-position="342">
+          <caret line="3267" column="49" lean-forward="true" selection-start-line="3267" selection-start-column="49" selection-end-line="3267" selection-end-column="49" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

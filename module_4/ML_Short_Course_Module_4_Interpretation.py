@@ -115,6 +115,10 @@ EOF_MATRIX_KEY = 'eof_matrix'
 FEATURE_MEANS_KEY = 'feature_means'
 FEATURE_STDEVS_KEY = 'feature_standard_deviations'
 
+NOVEL_IMAGES_ACTUAL_KEY = 'novel_image_matrix_actual'
+NOVEL_IMAGES_RECON_KEY = 'novel_image_matrix_recon'
+NOVEL_IMAGES_RECON_EXPECTED_KEY = 'novel_image_matrix_recon_expected'
+
 # More plotting constants.
 THIS_COLOUR_LIST = [
     numpy.array([4, 233, 231]), numpy.array([1, 159, 244]),
@@ -3250,10 +3254,10 @@ def plot_ucn_example1(
 def _normalize_features(feature_matrix, feature_means=None,
                         feature_standard_deviations=None):
     """Normalizes scalar features to z-scores.
-    
+
     E = number of examples (storm objects)
     Z = number of features
-    
+
     :param feature_matrix: E-by-Z numpy array of features.
     :param feature_means: length-Z numpy array of mean values.  If
         `feature_means is None`, these will be computed on the fly from
@@ -3349,12 +3353,14 @@ def _apply_svd(feature_vector, svd_dictionary):
 def do_novelty_detection(
         baseline_image_matrix, test_image_matrix, image_normalization_dict,
         predictor_names, cnn_model_object, cnn_feature_layer_name,
-        ucn_model_object, num_svd_modes_to_keep):
+        ucn_model_object, num_novel_test_images, num_svd_modes_to_keep=10):
     """Does novelty detection.
 
     Specifically, this method follows the procedure in Wagstaff et al. (2018)
     to determine which images in the test set are most novel with respect to the
     baseline set.
+
+    NOTE: Both input and output images are (assumed to be) denormalized.
 
     B = number of baseline examples (storm objects)
     T = number of test examples (storm objects)
@@ -3375,9 +3381,20 @@ def do_novelty_detection(
     :param ucn_model_object: Trained UCN model (instance of
         `keras.models.Model`).  Will be used to turn scalar features into
         images.
+    :param num_novel_test_images: Number of novel test images to find.
     :param num_svd_modes_to_keep: Number of modes to keep in SVD (singular-value
         decomposition) of scalar features.  See `fit_svd` for more details.
-    :return: Don't know yet.
+
+    :return: novelty_dict: Dictionary with the following keys.  In the following
+        discussion, Q = number of novel test images found.
+    novelty_dict['novel_image_matrix_actual']: Q-by-M-by-N-by-C numpy array of
+        novel test images.
+    novelty_dict['novel_image_matrix_recon']: Same as
+        "novel_image_matrix_actual" but reconstructed by the upconvnet.
+    novelty_dict['novel_image_matrix_recon_expected']: Same as
+        "novel_image_matrix_actual" but reconstructed by SVD (singular-value
+        decomposition) and the upconvnet.
+
     :raises: TypeError: if `image_normalization_dict is None`.
     """
 
@@ -3409,38 +3426,86 @@ def do_novelty_detection(
     test_feature_matrix = intermediate_model_object.predict(
         test_image_matrix_norm, batch_size=num_test_examples)
 
-    svd_dictionary = _fit_svd(
-        feature_matrix=baseline_feature_matrix,
-        num_modes_to_keep=num_svd_modes_to_keep)
+    novel_indices = []
+    novel_image_matrix_recon = None
+    novel_image_matrix_recon_expected = None
 
-    test_svd_errors = numpy.full(num_test_examples, numpy.nan)
+    for k in range(num_novel_test_images):
+        print('Finding {0:d}th of {1:d} novel test images...'.format(
+            k + 1, num_novel_test_images))
 
-    for i in range(num_test_examples):
-        this_expected_feature_vector = _apply_svd(
-            feature_vector=test_feature_matrix[i, ...],
-            svd_dictionary=svd_dictionary)
+        if len(novel_indices) == 0:
+            this_feature_matrix = baseline_feature_matrix
+        else:
+            novel_indices_numpy = numpy.array(novel_indices, dtype=int)
+            this_feature_matrix = numpy.concatenate(
+                (baseline_feature_matrix,
+                 test_feature_matrix[novel_indices_numpy, ...]),
+                axis=0)
 
-        test_svd_errors[i] = numpy.linalg.norm(
-            this_expected_feature_vector - test_feature_matrix[i, ...])
+        svd_dictionary = _fit_svd(
+            feature_matrix=this_feature_matrix,
+            num_modes_to_keep=num_svd_modes_to_keep)
 
-    most_novel_index = numpy.argmax(test_svd_errors)
-    this_recon_actual_matrix = ucn_model_object.predict(
-        test_feature_matrix[[most_novel_index], ...], batch_size=1
-    )[0, ...]
+        svd_errors = numpy.full(num_test_examples, numpy.nan)
+        test_feature_matrix_expected = numpy.full(
+            test_feature_matrix.shape, numpy.nan)
 
-    this_expected_feature_vector = _apply_svd(
-        feature_vector=test_feature_matrix[most_novel_index, ...],
-        svd_dictionary=svd_dictionary)
+        for i in range(num_test_examples):
+            if i in novel_indices:
+                continue
 
-    this_expected_fv_as_matrix = numpy.reshape(
-        this_expected_feature_vector, (1, this_expected_feature_vector.size))
+            test_feature_matrix_expected[i, ...] = _apply_svd(
+                feature_vector=test_feature_matrix[i, ...],
+                svd_dictionary=svd_dictionary)
 
-    this_recon_expected_matrix = ucn_model_object.predict(
-        this_expected_fv_as_matrix, batch_size=1
-    )[0, ...]
+            svd_errors[i] = numpy.linalg.norm(
+                test_feature_matrix_expected[i, ...] -
+                test_feature_matrix[i, ...]
+            )
+
+        new_novel_index = numpy.nanargmax(svd_errors)
+        novel_indices.append(new_novel_index)
+
+        new_reconstructed_matrix = ucn_model_object.predict(
+            test_feature_matrix[[new_novel_index], ...], batch_size=1)
+
+        new_reconstructed_matrix_expected = ucn_model_object.predict(
+            test_feature_matrix_expected[[new_novel_index], ...], batch_size=1)
+
+        if novel_image_matrix_recon is None:
+            novel_image_matrix_recon = new_reconstructed_matrix + 0.
+            novel_image_matrix_recon_expected = (
+                new_reconstructed_matrix_expected + 0.)
+        else:
+            novel_image_matrix_recon = numpy.concatenate(
+                (novel_image_matrix_recon, new_reconstructed_matrix), axis=0)
+            novel_image_matrix_recon_expected = numpy.concatenate(
+                (novel_image_matrix_recon_expected,
+                 new_reconstructed_matrix_expected),
+                axis=0)
+
+    novel_indices = numpy.array(novel_indices, dtype=int)
+
+    novel_image_matrix_recon = denormalize_images(
+        predictor_matrix=novel_image_matrix_recon,
+        predictor_names=predictor_names,
+        normalization_dict=image_normalization_dict)
+
+    novel_image_matrix_recon_expected = denormalize_images(
+        predictor_matrix=novel_image_matrix_recon_expected,
+        predictor_names=predictor_names,
+        normalization_dict=image_normalization_dict)
+
+    return {
+        NOVEL_IMAGES_ACTUAL_KEY: test_image_matrix[novel_indices, ...],
+        NOVEL_IMAGES_RECON_KEY: novel_image_matrix_recon,
+        NOVEL_IMAGES_RECON_EXPECTED_KEY: novel_image_matrix_recon_expected
+    }
 
 
-def do_novelty_detection_example(validation_image_dict, normalization_dict, model_object, ucn_model_object):
+def do_novelty_detection_example(validation_image_dict, normalization_dict,
+                                 model_object, ucn_model_object):
     """Runs example of novelty detection."""
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
