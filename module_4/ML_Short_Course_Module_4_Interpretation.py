@@ -3570,7 +3570,7 @@ def do_novelty_detection_example(
 
     figure_object.suptitle('Reconstruction of test image by upconvnet')
     pyplot.show()
-    
+
     difference_matrix = (
         novelty_dict[NOVEL_IMAGES_RECON_KEY] -
         novelty_dict[NOVEL_IMAGES_RECON_EXPECTED_KEY]
@@ -3580,7 +3580,7 @@ def do_novelty_detection_example(
         difference_matrix[..., temperature_index], 1)
     max_colour_temp_kelvins = numpy.percentile(
         difference_matrix[..., temperature_index], 99)
-    
+
     figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=difference_matrix[0, ...],
         predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
