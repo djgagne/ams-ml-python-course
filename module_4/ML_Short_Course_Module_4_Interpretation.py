@@ -3332,13 +3332,24 @@ def _apply_svd(feature_vector, svd_dictionary):
         numpy.transpose(svd_dictionary[EOF_MATRIX_KEY])
     )
 
-    return numpy.dot(this_matrix, feature_vector)
+    feature_vector_norm = (
+        (feature_vector - svd_dictionary[FEATURE_MEANS_KEY]) /
+        svd_dictionary[FEATURE_STDEVS_KEY]
+    )
+
+    reconstructed_feature_vector_norm = numpy.dot(
+        this_matrix, feature_vector_norm)
+
+    return (
+        svd_dictionary[FEATURE_MEANS_KEY] +
+        reconstructed_feature_vector_norm * svd_dictionary[FEATURE_STDEVS_KEY]
+    )
 
 
 def do_novelty_detection(
         baseline_image_matrix, test_image_matrix, image_normalization_dict,
-        cnn_model_object, cnn_feature_layer_name, ucn_model_object,
-        num_svd_modes_to_keep):
+        predictor_names, cnn_model_object, cnn_feature_layer_name,
+        ucn_model_object, num_svd_modes_to_keep):
     """Does novelty detection.
 
     Specifically, this method follows the procedure in Wagstaff et al. (2018)
@@ -3355,6 +3366,7 @@ def do_novelty_detection(
         images.
     :param test_image_matrix: T-by-M-by-N-by-C numpy array of test images.
     :param image_normalization_dict: See doc for `normalize_images`.
+    :param predictor_names: length-C list of predictor names.
     :param cnn_model_object: Trained CNN model (instance of
         `keras.models.Model`).  Will be used to turn images into scalar
         features.
@@ -3366,6 +3378,63 @@ def do_novelty_detection(
     :param num_svd_modes_to_keep: Number of modes to keep in SVD (singular-value
         decomposition) of scalar features.  See `fit_svd` for more details.
     :return: Don't know yet.
+    :raises: TypeError: if `image_normalization_dict is None`.
     """
 
-    
+    if image_normalization_dict is None:
+        error_string = (
+            'image_normalization_dict cannot be None.  Must be specified.')
+        raise TypeError(error_string)
+
+    num_baseline_examples = baseline_image_matrix.shape[0]
+    num_test_examples = test_image_matrix.shape[0]
+
+    baseline_image_matrix_norm, _ = normalize_images(
+        predictor_matrix=baseline_image_matrix + 0.,
+        predictor_names=predictor_names,
+        normalization_dict=image_normalization_dict)
+
+    test_image_matrix_norm, _ = normalize_images(
+        predictor_matrix=test_image_matrix + 0.,
+        predictor_names=predictor_names,
+        normalization_dict=image_normalization_dict)
+
+    intermediate_model_object = keras.models.Model(
+        inputs=cnn_model_object.input,
+        outputs=cnn_model_object.get_layer(name=cnn_feature_layer_name).output)
+
+    baseline_feature_matrix = intermediate_model_object.predict(
+        baseline_image_matrix_norm, batch_size=num_baseline_examples)
+
+    test_feature_matrix = intermediate_model_object.predict(
+        test_image_matrix_norm, batch_size=num_test_examples)
+
+    svd_dictionary = _fit_svd(
+        feature_matrix=baseline_feature_matrix,
+        num_modes_to_keep=num_svd_modes_to_keep)
+
+    test_svd_errors = numpy.full(num_test_examples, numpy.nan)
+
+    for i in range(num_test_examples):
+        this_expected_feature_vector = _apply_svd(
+            feature_vector=test_feature_matrix[i, ...],
+            svd_dictionary=svd_dictionary)
+
+        test_svd_errors[i] = numpy.linalg.norm(
+            this_expected_feature_vector - test_feature_matrix[i, ...])
+
+    most_novel_index = numpy.argmax(test_svd_errors)
+    this_recon_actual_matrix = ucn_model_object.predict(
+        test_feature_matrix[[most_novel_index], ...], batch_size=1
+    )[0, ...]
+
+    this_expected_feature_vector = _apply_svd(
+        feature_vector=test_feature_matrix[most_novel_index, ...],
+        svd_dictionary=svd_dictionary)
+
+    this_expected_fv_as_matrix = numpy.reshape(
+        this_expected_feature_vector, (1, this_expected_feature_vector.size))
+
+    this_recon_expected_matrix = ucn_model_object.predict(
+        this_expected_fv_as_matrix, batch_size=1
+    )[0, ...]
