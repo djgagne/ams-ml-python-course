@@ -1039,7 +1039,7 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
                             normalization_dict, binarization_threshold):
     """Generates training examples for deep-learning model on the fly.
 
-    E = number of examples (storm objects) in file
+    E = number of examples (storm objects)
     M = number of rows in each storm-centered grid
     N = number of columns in each storm-centered grid
     C = number of channels (predictor variables)
@@ -2968,3 +2968,89 @@ def setup_ucn_example():
         upsampling_factor_by_upconv_layer=upsampling_factor_by_upconv_layer,
         num_output_channels=4, use_activation_for_out_layer=True,
         use_bn_for_out_layer=True)
+
+
+def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
+                  cnn_model_object, cnn_feature_layer_name):
+    """Generates training examples for UCN (upconvolutional network) on the fly.
+
+    E = number of examples (storm objects)
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+    Z = number of scalar features (neurons in layer `cnn_feature_layer_name` of
+        the CNN specified by `cnn_model_object`)
+
+    :param netcdf_file_names: 1-D list of paths to input (NetCDF) files.
+    :param num_examples_per_batch: Number of examples per training batch.
+    :param normalization_dict: See doc for `normalize_images`.  You cannot leave
+        this as None.
+    :param cnn_model_object: Trained CNN model (instance of
+        `keras.models.Model`).  This will be used to turn images stored in
+        `netcdf_file_names` into scalar features.
+    :param cnn_feature_layer_name: The "scalar features" will be the set of
+        activations from this layer.
+    :return: feature_matrix: E-by-Z numpy array of scalar features.  These are
+        the "predictors" for the upconv network.
+    :return: target_matrix: E-by-M-by-N-by-C numpy array of target images.
+        These are the predictors for the CNN and the targets for the upconv
+        network.
+    :raises: TypeError: if `normalization_dict is None`.
+    """
+
+    if normalization_dict is None:
+        error_string = 'normalization_dict cannot be None.  Must be specified.'
+        raise TypeError(error_string)
+
+    intermediate_model_object = keras.models.Model(
+        inputs=cnn_model_object.input,
+        outputs=cnn_model_object.get_layer(name=cnn_feature_layer_name).output)
+
+    random.shuffle(netcdf_file_names)
+    num_files = len(netcdf_file_names)
+    file_index = 0
+
+    num_examples_in_memory = 0
+    full_target_matrix = None
+    predictor_names = None
+
+    while True:
+        while num_examples_in_memory < num_examples_per_batch:
+            print('Reading data from: "{0:s}"...'.format(
+                netcdf_file_names[file_index]))
+
+            this_image_dict = read_image_file(netcdf_file_names[file_index])
+            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
+
+            file_index += 1
+            if file_index >= num_files:
+                file_index = 0
+
+            if full_target_matrix is None or full_target_matrix.size == 0:
+                full_target_matrix = this_image_dict[PREDICTOR_MATRIX_KEY] + 0.
+            else:
+                full_target_matrix = numpy.concatenate(
+                    (full_target_matrix, this_image_dict[PREDICTOR_MATRIX_KEY]),
+                    axis=0)
+
+            num_examples_in_memory = full_target_matrix.shape[0]
+
+        batch_indices = numpy.linspace(
+            0, num_examples_in_memory - 1, num=num_examples_in_memory,
+            dtype=int)
+        batch_indices = numpy.random.choice(
+            batch_indices, size=num_examples_per_batch, replace=False)
+
+        target_matrix, _ = normalize_images(
+            predictor_matrix=full_target_matrix[batch_indices, ...],
+            predictor_names=predictor_names,
+            normalization_dict=normalization_dict)
+        target_matrix = target_matrix.astype('float32')
+
+        feature_matrix = intermediate_model_object.predict(
+            target_matrix, batch_size=num_examples_per_batch)
+
+        num_examples_in_memory = 0
+        full_target_matrix = None
+
+        yield (feature_matrix, target_matrix)
