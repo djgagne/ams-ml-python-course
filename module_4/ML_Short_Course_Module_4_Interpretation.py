@@ -3281,7 +3281,7 @@ def _normalize_features(feature_matrix, feature_means=None,
     return feature_matrix, feature_means, feature_standard_deviations
 
 
-def fit_svd(feature_matrix, num_modes_to_keep):
+def _fit_svd(feature_matrix, num_modes_to_keep):
     """Fits SVD (singular-value decomposition) model.
 
     E = number of examples (storm objects)
@@ -3300,14 +3300,36 @@ def fit_svd(feature_matrix, num_modes_to_keep):
         standard deviation of each feature (before transformation).
     """
 
+    # TODO(thunderhoser): Documentation might be wrong.  I'm not sure if the
+    # EOFs are the rows or columns.
+
     feature_matrix, feature_means, feature_standard_deviations = (
         _normalize_features(feature_matrix)
     )
 
     eof_matrix = numpy.linalg.svd(feature_matrix)[-1]
-    
+
     return {
-        EOF_MATRIX_KEY: numpy.transpose(eof_matrix),
+        EOF_MATRIX_KEY: numpy.transpose(eof_matrix)[..., :num_modes_to_keep],
         FEATURE_MEANS_KEY: feature_means,
         FEATURE_STDEVS_KEY: feature_standard_deviations
     }
+
+
+def _apply_svd(feature_vector, svd_dictionary):
+    """Applies SVD (singular-value decomposition) model to new example.
+
+    Z = number of features
+
+    :param feature_vector: length-Z numpy array with feature values for one
+        example (storm object).
+    :param svd_dictionary: Dictionary created by `_fit_svd`.
+    :return: reconstructed_feature_vector: Reconstructed version of input.
+    """
+
+    this_matrix = numpy.dot(
+        svd_dictionary[EOF_MATRIX_KEY],
+        numpy.transpose(svd_dictionary[EOF_MATRIX_KEY])
+    )
+
+    return numpy.dot(this_matrix, feature_vector)
