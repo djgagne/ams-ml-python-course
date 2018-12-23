@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -16,8 +17,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="733">
-              <caret line="3440" column="0" lean-forward="true" selection-start-line="3440" selection-start-column="0" selection-end-line="3440" selection-end-column="0" />
+            <state relative-caret-position="551">
+              <caret line="3426" column="27" lean-forward="false" selection-start-line="3426" selection-start-column="27" selection-end-line="3426" selection-end-column="27" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -53,12 +54,12 @@
       <find>predictor_names</find>
       <find>def train_cnn</find>
       <find>orig_predictor_matrix</find>
-      <find>_example1(</find>
       <find>svd_dict</find>
       <find>M =</find>
       <find>cnn_feature_layer_name:</find>
       <find>name=</find>
       <find>ucn_model_object.</find>
+      <find>_example1(</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -101,8 +102,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="1920" />
+    <option name="y" value="28" />
     <option name="width" value="1920" />
-    <option name="height" value="1080" />
+    <option name="height" value="1138" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -343,7 +346,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="0" y="0" width="1920" height="1080" extended-state="6" />
+    <frame x="1920" y="28" width="1920" height="1138" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
@@ -500,8 +503,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="733">
-          <caret line="3440" column="0" lean-forward="true" selection-start-line="3440" selection-start-column="0" selection-end-line="3440" selection-end-column="0" />
+        <state relative-caret-position="551">
+          <caret line="3426" column="27" lean-forward="false" selection-start-line="3426" selection-start-column="27" selection-end-line="3426" selection-end-column="27" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

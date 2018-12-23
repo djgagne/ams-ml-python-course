@@ -3438,3 +3438,28 @@ def do_novelty_detection(
     this_recon_expected_matrix = ucn_model_object.predict(
         this_expected_fv_as_matrix, batch_size=1
     )[0, ...]
+
+
+def do_novelty_detection_example(validation_image_dict, normalization_dict, model_object, ucn_model_object):
+    """Runs example of novelty detection."""
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    num_examples = target_matrix_s01.shape[0]
+
+    max_target_by_example_s01 = numpy.array(
+        [numpy.max(target_matrix_s01[i, ...]) for i in range(num_examples)]
+    )
+
+    test_indices = numpy.argsort(-1 * max_target_by_example_s01)[:100]
+    test_indices = test_indices[test_indices >= 100]
+    baseline_indices = numpy.linspace(0, 100, num=100, dtype=int)
+
+    do_novelty_detection(
+        baseline_image_matrix=validation_image_dict[
+            PREDICTOR_MATRIX_KEY][baseline_indices, ...],
+        test_image_matrix=validation_image_dict[
+            PREDICTOR_MATRIX_KEY][test_indices, ...],
+        image_normalization_dict=normalization_dict,
+        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
+        cnn_model_object=model_object, cnn_feature_layer_name='flatten_1',
+        ucn_model_object=ucn_model_object, num_svd_modes_to_keep=10)
