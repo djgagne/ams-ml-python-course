@@ -1975,8 +1975,7 @@ def _add_colour_bar(
 
     colour_bar_object = pyplot.colorbar(
         ax=axes_object, mappable=scalar_mappable_object,
-        orientation=orientation_string, pad=padding, extend=extend_string,
-        shrink=0.8)
+        orientation=orientation_string, pad=padding, extend=extend_string)
 
     colour_bar_object.ax.tick_params(labelsize=FONT_SIZE)
     return colour_bar_object
@@ -1999,8 +1998,8 @@ def plot_predictor_2d(
     :param max_colour_value: Max value in colour scheme.
     :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
         Will plot on these axes.
-    :return: axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot` on
-        which field was plotted.
+    :return: colour_bar_object: Colour bar (instance of
+        `matplotlib.pyplot.colorbar`) created by this method.
     """
 
     if axes_object is None:
@@ -2020,7 +2019,7 @@ def plot_predictor_2d(
     axes_object.set_xticks([])
     axes_object.set_yticks([])
 
-    _add_colour_bar(
+    return _add_colour_bar(
         axes_object=axes_object, colour_map_object=colour_map_object,
         values_to_colour=predictor_matrix, min_colour_value=min_colour_value,
         max_colour_value=max_colour_value)
@@ -2038,8 +2037,6 @@ def plot_wind_2d(u_wind_matrix_m_s01, v_wind_matrix_m_s01, axes_object=None):
         (metres per second).
     :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
         Will plot on these axes.
-    :return: axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot` on
-        which field was plotted.
     """
 
     if axes_object is None:
@@ -2075,7 +2072,6 @@ def plot_wind_2d(u_wind_matrix_m_s01, v_wind_matrix_m_s01, axes_object=None):
 
     axes_object.set_xlim(0, num_grid_columns)
     axes_object.set_ylim(0, num_grid_rows)
-    return axes_object
 
 
 def plot_many_predictors_with_barbs(
@@ -2120,7 +2116,7 @@ def plot_many_predictors_with_barbs(
             this_min_colour_value = min_colour_temp_kelvins + 0.
             this_max_colour_value = max_colour_temp_kelvins + 0.
 
-        plot_predictor_2d(
+        this_colour_bar_object = plot_predictor_2d(
             predictor_matrix=predictor_matrix[..., this_predictor_index],
             colour_map_object=PREDICTOR_TO_COLOUR_MAP_DICT[
                 non_wind_predictor_names[m]],
@@ -2133,7 +2129,7 @@ def plot_many_predictors_with_barbs(
                      v_wind_matrix_m_s01=v_wind_matrix_m_s01,
                      axes_object=axes_objects_2d_list[m][0])
 
-        axes_objects_2d_list[m][0].set_title(non_wind_predictor_names[m])
+        this_colour_bar_object.set_label(non_wind_predictor_names[m])
 
     return figure_object, axes_objects_2d_list
 
@@ -2190,7 +2186,7 @@ def plot_many_predictors_sans_barbs(
                 this_min_colour_value = -1 * max_colour_wind_speed_m_s01
                 this_max_colour_value = max_colour_wind_speed_m_s01 + 0.
 
-            plot_predictor_2d(
+            this_colour_bar_object = plot_predictor_2d(
                 predictor_matrix=predictor_matrix[..., this_linear_index],
                 colour_map_object=this_colour_map_object,
                 colour_norm_object=this_colour_norm_object,
@@ -2198,8 +2194,7 @@ def plot_many_predictors_sans_barbs(
                 max_colour_value=this_max_colour_value,
                 axes_object=axes_objects_2d_list[i][j])
 
-            axes_objects_2d_list[i][j].set_title(
-                predictor_names[this_linear_index])
+            this_colour_bar_object.set_label(predictor_names[this_linear_index])
 
     return figure_object, axes_objects_2d_list
 
@@ -2279,7 +2274,14 @@ def bwo_example1(validation_image_dict, normalization_dict, model_object):
         predictor_matrix=optimized_predictor_matrix_norm,
         predictor_names=predictor_names, normalization_dict=normalization_dict)
 
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    combined_temp_matrix_kelvins = numpy.concatenate(
+        (orig_predictor_matrix[..., temperature_index],
+         optimized_predictor_matrix[..., temperature_index]),
+        axis=0)
 
+    min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
+    max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
     print('\nReal example (before optimization):\n')
     plot_many_predictors_with_barbs(
@@ -3504,9 +3506,23 @@ def do_novelty_detection(
     }
 
 
-def do_novelty_detection_example(validation_image_dict, normalization_dict,
-                                 model_object, ucn_model_object):
-    """Runs example of novelty detection."""
+def do_novelty_detection_example(
+        validation_image_dict, normalization_dict, model_object,
+        ucn_model_object):
+    """Runs novelty detection.
+
+    The baseline images are a random set of 100 from the validation set, and the
+    test images are the 100 storm objects with greatest vorticity in the
+    validation set.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param model_object: Trained instance of `keras.models.Model`,
+        representing the CNN or "encoder".
+    :param ucn_model_object: Trained instance of `keras.models.Model`,
+        representing the UCN or "decoder".
+    """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
     num_examples = target_matrix_s01.shape[0]
@@ -3519,7 +3535,7 @@ def do_novelty_detection_example(validation_image_dict, normalization_dict,
     test_indices = test_indices[test_indices >= 100]
     baseline_indices = numpy.linspace(0, 100, num=100, dtype=int)
 
-    do_novelty_detection(
+    novelty_dict = do_novelty_detection(
         baseline_image_matrix=validation_image_dict[
             PREDICTOR_MATRIX_KEY][baseline_indices, ...],
         test_image_matrix=validation_image_dict[
@@ -3527,4 +3543,49 @@ def do_novelty_detection_example(validation_image_dict, normalization_dict,
         image_normalization_dict=normalization_dict,
         predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
         cnn_model_object=model_object, cnn_feature_layer_name='flatten_1',
-        ucn_model_object=ucn_model_object, num_svd_modes_to_keep=10)
+        ucn_model_object=ucn_model_object,
+        num_novel_test_images=1)
+
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    min_colour_temp_kelvins = numpy.percentile(
+        novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][..., temperature_index], 1)
+    max_colour_temp_kelvins = numpy.percentile(
+        novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][..., temperature_index], 99)
+
+    figure_object, _ = plot_many_predictors_with_barbs(
+        predictor_matrix=novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][0, ...],
+        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    figure_object.suptitle('Actual test image')
+    pyplot.show()
+
+    figure_object, _ = plot_many_predictors_with_barbs(
+        predictor_matrix=novelty_dict[NOVEL_IMAGES_RECON_KEY][0, ...],
+        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    figure_object.suptitle('Reconstruction of test image by upconvnet')
+    pyplot.show()
+    
+    difference_matrix = (
+        novelty_dict[NOVEL_IMAGES_RECON_KEY] -
+        novelty_dict[NOVEL_IMAGES_RECON_EXPECTED_KEY]
+    )
+
+    min_colour_temp_kelvins = numpy.percentile(
+        difference_matrix[..., temperature_index], 1)
+    max_colour_temp_kelvins = numpy.percentile(
+        difference_matrix[..., temperature_index], 99)
+    
+    figure_object, _ = plot_many_predictors_with_barbs(
+        predictor_matrix=difference_matrix[0, ...],
+        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    figure_object.suptitle('Novel part of test image')
+    pyplot.show()

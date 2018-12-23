@@ -2,6 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -16,11 +18,21 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="342">
-              <caret line="3267" column="49" lean-forward="true" selection-start-line="3267" selection-start-column="49" selection-end-line="3267" selection-end-column="49" />
+            <state relative-caret-position="425">
+              <caret line="3569" column="0" lean-forward="true" selection-start-line="3569" selection-start-column="0" selection-end-line="3569" selection-end-column="0" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="performance_diagrams.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/module_4/performance_diagrams.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="291">
+              <caret line="31" column="53" lean-forward="false" selection-start-line="31" selection-start-column="53" selection-end-line="31" selection-end-column="53" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -29,12 +41,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>print(</find>
-      <find>_do_gradient_descent</find>
-      <find>axes</find>
-      <find>.]</find>
-      <find>REFLECTIVITY_COLOUR_NORM_OBJECT</find>
-      <find>PREDICTOR_TO_COLOUR_NORM_DICT</find>
       <find>:param normalization_dict</find>
       <find>0</find>
       <find>PREDICTOR_TO_COLOUR_MAP_DICT</find>
@@ -59,6 +65,12 @@
       <find>ucn_model_object.</find>
       <find>_example1(</find>
       <find>novel_indices</find>
+      <find>validation_image_dict:</find>
+      <find>plot_wind_2d(</find>
+      <find>plot_predictor_2d(</find>
+      <find>Critical su</find>
+      <find>title(</find>
+      <find>_add_colour_bar(</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -79,6 +91,7 @@
       <replace>image_matrix</replace>
       <replace>svd_dictionary</replace>
       <replace>svd_errors</replace>
+      <replace>difference_matrix</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -464,13 +477,6 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/performance_diagram_stuff.py" />
-    <entry file="file://$PROJECT_DIR$/module_4/performance_diagrams.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4446">
-          <caret line="249" column="22" lean-forward="false" selection-start-line="249" selection-start-column="22" selection-end-line="249" selection-end-column="22" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/module_4/roc_curves.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="216">
@@ -501,10 +507,18 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/module_4/performance_diagrams.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="291">
+          <caret line="31" column="53" lean-forward="false" selection-start-line="31" selection-start-column="53" selection-end-line="31" selection-end-column="53" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="342">
-          <caret line="3267" column="49" lean-forward="true" selection-start-line="3267" selection-start-column="49" selection-end-line="3267" selection-end-column="49" />
+        <state relative-caret-position="425">
+          <caret line="3569" column="0" lean-forward="true" selection-start-line="3569" selection-start-column="0" selection-end-line="3569" selection-end-column="0" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>
