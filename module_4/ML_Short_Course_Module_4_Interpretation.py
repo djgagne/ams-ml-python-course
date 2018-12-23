@@ -2920,16 +2920,16 @@ def saliency_example4(validation_image_dict, normalization_dict, model_object):
 
 
 def setup_ucn(num_input_features, first_num_rows, first_num_columns,
-              upsampling_factor_by_upconv_layer, num_output_channels,
+              upsampling_factor_by_deconv_layer, num_output_channels,
               use_activation_for_out_layer, use_bn_for_out_layer):
     """Sets up (but does not train) UCN (upconvolutional network).
 
     :param num_input_features: Number of input features.
-    :param first_num_rows: Number of rows in input to first upconv layer.  The
+    :param first_num_rows: Number of rows in input to first deconv layer.  The
         input features will be reshaped into a grid with this many rows.
     :param first_num_columns: Same but for columns.
-    :param upsampling_factor_by_upconv_layer: length-L numpy array of upsampling
-        factors, where L = number of upconv layers.
+    :param upsampling_factor_by_deconv_layer: length-L numpy array of upsampling
+        factors, where L = number of deconv layers.
     :param num_output_channels: Number of channels in final output.
     :param use_activation_for_out_layer: Boolean flag.  If True, activation
         will be applied to output layer.
@@ -2949,10 +2949,10 @@ def setup_ucn(num_input_features, first_num_rows, first_num_columns,
         target_shape=(first_num_rows, first_num_columns, current_num_filters)
     )(input_layer_object)
 
-    num_upconv_layers = len(upsampling_factor_by_upconv_layer)
+    num_deconv_layers = len(upsampling_factor_by_deconv_layer)
 
-    for i in range(num_upconv_layers):
-        this_upsampling_factor = upsampling_factor_by_upconv_layer[i]
+    for i in range(num_deconv_layers):
+        this_upsampling_factor = upsampling_factor_by_deconv_layer[i]
 
         if this_upsampling_factor > 1:
             this_padding_arg = 'same'
@@ -2960,7 +2960,7 @@ def setup_ucn(num_input_features, first_num_rows, first_num_columns,
             this_padding_arg = 'valid'
             current_num_filters = int(numpy.round(current_num_filters / 2))
 
-        if i == num_upconv_layers - 1:
+        if i == num_deconv_layers - 1:
             current_num_filters = num_output_channels + 0
 
         layer_object = keras.layers.Conv2DTranspose(
@@ -2973,7 +2973,7 @@ def setup_ucn(num_input_features, first_num_rows, first_num_columns,
             kernel_regularizer=regularizer_object
         )(layer_object)
 
-        if i < num_upconv_layers - 1 or use_activation_for_out_layer:
+        if i < num_deconv_layers - 1 or use_activation_for_out_layer:
             layer_object = keras.layers.LeakyReLU(
                 alpha=SLOPE_FOR_RELU
             )(layer_object)
@@ -2981,7 +2981,88 @@ def setup_ucn(num_input_features, first_num_rows, first_num_columns,
         if not USE_BATCH_NORMALIZATION:
             continue
 
-        if i < num_upconv_layers - 1 or use_bn_for_out_layer:
+        if i < num_deconv_layers - 1 or use_bn_for_out_layer:
+            layer_object = keras.layers.BatchNormalization(
+                axis=-1, center=True, scale=True
+            )(layer_object)
+
+    model_object = keras.models.Model(
+        inputs=input_layer_object, outputs=layer_object)
+    model_object.compile(
+        loss=keras.losses.mean_squared_error, optimizer=keras.optimizers.Adam())
+
+    model_object.summary()
+    return model_object
+
+
+def setup_ucn_fancy(num_input_features, first_num_rows, first_num_columns,
+                    upsampling_factor_by_deconv_layer, num_output_channels,
+                    use_activation_for_out_layer, use_bn_for_out_layer):
+    """Sets up "fancy" UCN.
+
+    The "fancy" UCN replaces every deconv layer in the standard UCN with a conv
+    layer and an upsampling layer.
+
+    :param num_input_features: See doc for `setup_ucn`.
+    :param first_num_rows: Same.
+    :param first_num_columns: Same.
+    :param upsampling_factor_by_deconv_layer: Same.
+    :param num_output_channels: Same.
+    :param use_activation_for_out_layer: Same.
+    :param use_bn_for_out_layer: Same.
+    :return: model_object: Same.
+    """
+
+    regularizer_object = keras.regularizers.l1_l2(l1=L1_WEIGHT, l2=L2_WEIGHT)
+    input_layer_object = keras.layers.Input(shape=(num_input_features,))
+
+    current_num_filters = int(numpy.round(
+        num_input_features / (first_num_rows * first_num_columns)
+    ))
+
+    layer_object = keras.layers.Reshape(
+        target_shape=(first_num_rows, first_num_columns, current_num_filters)
+    )(input_layer_object)
+
+    num_deconv_layers = len(upsampling_factor_by_deconv_layer)
+
+    for i in range(num_deconv_layers):
+        this_upsampling_factor = upsampling_factor_by_deconv_layer[i]
+
+        if this_upsampling_factor > 1:
+            layer_object = keras.layers.UpSampling2D(
+                size=(this_upsampling_factor, this_upsampling_factor),
+                data_format='channels_last', interpolation='nearest'
+            )(layer_object)
+        else:
+            current_num_filters = int(numpy.round(current_num_filters / 2))
+
+        if i == num_deconv_layers - 1:
+            current_num_filters = num_output_channels + 0
+
+        layer_object = keras.layers.Conv2D(
+            filters=current_num_filters,
+            kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
+            strides=(1, 1), padding='same', data_format='channels_last',
+            dilation_rate=(1, 1), activation=None, use_bias=True,
+            kernel_initializer='glorot_uniform', bias_initializer='zeros',
+            kernel_regularizer=regularizer_object
+        )(layer_object)
+
+        if this_upsampling_factor == 1:
+            layer_object = keras.layers.ZeroPadding2D(
+                padding=(1, 1), data_format='channels_last'
+            )(layer_object)
+
+        if i < num_deconv_layers - 1 or use_activation_for_out_layer:
+            layer_object = keras.layers.LeakyReLU(
+                alpha=SLOPE_FOR_RELU
+            )(layer_object)
+
+        if not USE_BATCH_NORMALIZATION:
+            continue
+
+        if i < num_deconv_layers - 1 or use_bn_for_out_layer:
             layer_object = keras.layers.BatchNormalization(
                 axis=-1, center=True, scale=True
             )(layer_object)
@@ -2998,12 +3079,25 @@ def setup_ucn(num_input_features, first_num_rows, first_num_columns,
 def setup_ucn_example():
     """Sets up UCN."""
 
-    upsampling_factor_by_upconv_layer = numpy.array(
+    upsampling_factor_by_deconv_layer = numpy.array(
         [2, 1, 1, 2, 1, 1], dtype=int)
 
     ucn_model_object = setup_ucn(
         num_input_features=6400, first_num_rows=5, first_num_columns=5,
-        upsampling_factor_by_upconv_layer=upsampling_factor_by_upconv_layer,
+        upsampling_factor_by_deconv_layer=upsampling_factor_by_deconv_layer,
+        num_output_channels=4, use_activation_for_out_layer=False,
+        use_bn_for_out_layer=True)
+
+
+def setup_ucn_fancy_example():
+    """Sets up fancy UCN."""
+
+    upsampling_factor_by_deconv_layer = numpy.array(
+        [2, 1, 1, 2, 1, 1], dtype=int)
+
+    ucn_model_object = setup_ucn_fancy(
+        num_input_features=6400, first_num_rows=5, first_num_columns=5,
+        upsampling_factor_by_deconv_layer=upsampling_factor_by_deconv_layer,
         num_output_channels=4, use_activation_for_out_layer=False,
         use_bn_for_out_layer=True)
 
