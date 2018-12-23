@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
@@ -17,8 +18,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-324">
-              <caret line="3403" column="24" lean-forward="true" selection-start-line="3403" selection-start-column="24" selection-end-line="3403" selection-end-column="24" />
+            <state relative-caret-position="327">
+              <caret line="3007" column="33" lean-forward="false" selection-start-line="3007" selection-start-column="33" selection-end-line="3007" selection-end-column="33" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -40,10 +41,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>:param normalization_dict</find>
-      <find>0</find>
-      <find>PREDICTOR_TO_COLOUR_MAP_DICT</find>
-      <find>:param target_class:</find>
       <find>list_of_input_matrices:</find>
       <find>num_output_neurons</find>
       <find>colour_map_object:</find>
@@ -70,6 +67,10 @@
       <find>Critical su</find>
       <find>title(</find>
       <find>_add_colour_bar(</find>
+      <find>MIN_XENTROPY_DECREASE_FOR_EARLY_STOP</find>
+      <find>DECREASE_FOR_EARLY_STOP</find>
+      <find>_apply_cnn(</find>
+      <find>.predict(</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -114,10 +115,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="1920" />
+    <option name="x" value="2130" />
     <option name="y" value="28" />
-    <option name="width" value="1920" />
-    <option name="height" value="1138" />
+    <option name="width" value="1910" />
+    <option name="height" value="810" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -516,8 +517,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-324">
-          <caret line="3403" column="24" lean-forward="true" selection-start-line="3403" selection-start-column="24" selection-end-line="3403" selection-end-column="24" />
+        <state relative-caret-position="327">
+          <caret line="3007" column="33" lean-forward="false" selection-start-line="3007" selection-start-column="33" selection-end-line="3007" selection-end-column="33" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

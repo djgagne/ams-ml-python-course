@@ -164,7 +164,8 @@ NUM_POOLING_COLUMNS = 2
 NUM_DENSE_LAYERS = 3
 DENSE_LAYER_DROPOUT_FRACTION = 0.5
 
-MIN_LOSS_DECR_FOR_EARLY_STOPPING = 0.005
+MIN_XENTROPY_DECREASE_FOR_EARLY_STOP = 0.005
+MIN_MSE_DECREASE_FOR_EARLY_STOP = 0.005
 NUM_EPOCHS_FOR_EARLY_STOPPING = 5
 
 LIST_OF_METRIC_FUNCTIONS = [
@@ -1219,7 +1220,7 @@ def train_cnn(
         return model_metadata_dict
 
     early_stopping_object = keras.callbacks.EarlyStopping(
-        monitor='val_loss', min_delta=MIN_LOSS_DECR_FOR_EARLY_STOPPING,
+        monitor='val_loss', min_delta=MIN_XENTROPY_DECREASE_FOR_EARLY_STOP,
         patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
 
     list_of_callback_objects.append(early_stopping_object)
@@ -1288,7 +1289,8 @@ def train_cnn_example(model_object, training_file_names, normalization_dict,
         output_model_file_name=cnn_file_name)
 
 
-def _apply_cnn(model_object, predictor_matrix):
+def _apply_cnn(model_object, predictor_matrix, verbose=True,
+               output_layer_name=None):
     """Applies trained CNN (convolutional neural net) to new data.
 
     E = number of examples (storm objects) in file
@@ -1298,13 +1300,35 @@ def _apply_cnn(model_object, predictor_matrix):
 
     :param model_object: Trained instance of `keras.models.Model`.
     :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :param verbose: Boolean flag.  If True, progress messages will be printed.
+    :param output_layer_name: Name of output layer.  If
+        `output_layer_name is None`, this method will use the actual output
+        layer, so will return predictions.  If `output_layer_name is not None`,
+        will return "features" (outputs from the given layer).
+
+    If `output_layer_name is None`...
+
     :return: forecast_probabilities: length-E numpy array with forecast
         probabilities of positive class (label = 1).
+
+    If `output_layer_name is not None`...
+
+    :return: feature_matrix: numpy array of features (outputs from the given
+        layer).  There is no guarantee on the shape of this array, except that
+        the first axis has length E.
     """
 
     num_examples = predictor_matrix.shape[0]
-    forecast_probabilities = numpy.full(num_examples, numpy.nan)
     num_examples_per_batch = 1000
+
+    if output_layer_name is None:
+        model_object_to_use = model_object
+    else:
+        model_object_to_use = keras.models.Model(
+            inputs=model_object.input,
+            outputs=model_object.get_layer(name=output_layer_name).output)
+
+    output_array = None
 
     for i in range(0, num_examples, num_examples_per_batch):
         this_first_index = i
@@ -1312,19 +1336,28 @@ def _apply_cnn(model_object, predictor_matrix):
             [i + num_examples_per_batch - 1, num_examples - 1]
         )
 
-        print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
-            this_first_index, this_last_index, num_examples))
+        if verbose:
+            print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
+                this_first_index, this_last_index, num_examples))
 
         these_indices = numpy.linspace(
             this_first_index, this_last_index,
             num=this_last_index - this_first_index + 1, dtype=int)
 
-        forecast_probabilities[these_indices] = model_object.predict(
+        this_output_array = model_object_to_use.predict(
             predictor_matrix[these_indices, ...],
-            batch_size=num_examples_per_batch
-        )[:, -1]
+            batch_size=num_examples_per_batch)
 
-    return forecast_probabilities
+        if output_layer_name is None:
+            this_output_array = this_output_array[:, -1]
+
+        if output_array is None:
+            output_array = this_output_array + 0.
+        else:
+            output_array = numpy.concatenate(
+                (output_array, this_output_array), axis=0)
+
+    return output_array
 
 
 def evaluate_cnn(
@@ -2971,7 +3004,7 @@ def setup_ucn_example():
     ucn_model_object = setup_ucn(
         num_input_features=6400, first_num_rows=5, first_num_columns=5,
         upsampling_factor_by_upconv_layer=upsampling_factor_by_upconv_layer,
-        num_output_channels=4, use_activation_for_out_layer=True,
+        num_output_channels=4, use_activation_for_out_layer=False,
         use_bn_for_out_layer=True)
 
 
@@ -3006,10 +3039,6 @@ def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
     if normalization_dict is None:
         error_string = 'normalization_dict cannot be None.  Must be specified.'
         raise TypeError(error_string)
-
-    intermediate_model_object = keras.models.Model(
-        inputs=cnn_model_object.input,
-        outputs=cnn_model_object.get_layer(name=cnn_feature_layer_name).output)
 
     random.shuffle(netcdf_file_names)
     num_files = len(netcdf_file_names)
@@ -3052,8 +3081,9 @@ def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
             normalization_dict=normalization_dict)
         target_matrix = target_matrix.astype('float32')
 
-        feature_matrix = intermediate_model_object.predict(
-            target_matrix, batch_size=num_examples_per_batch)
+        feature_matrix = _apply_cnn(
+            model_object=cnn_model_object, predictor_matrix=target_matrix,
+            verbose=False, output_layer_name=cnn_feature_layer_name)
 
         num_examples_in_memory = 0
         full_target_matrix = None
@@ -3145,6 +3175,12 @@ def train_ucn(
 
         return model_metadata_dict
 
+    early_stopping_object = keras.callbacks.EarlyStopping(
+        monitor='val_loss', min_delta=MIN_MSE_DECREASE_FOR_EARLY_STOP,
+        patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
+
+    list_of_callback_objects.append(early_stopping_object)
+
     validation_generator = ucn_generator(
         netcdf_file_names=validation_file_names,
         num_examples_per_batch=num_examples_per_batch,
@@ -3153,7 +3189,7 @@ def train_ucn(
         cnn_feature_layer_name=cnn_feature_layer_name)
 
     ucn_model_object.fit_generator(
-        generator=validation_generator,
+        generator=training_generator,
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
         verbose=1, callbacks=list_of_callback_objects, workers=workers_arg,
         validation_data=validation_generator,
@@ -3210,12 +3246,9 @@ def plot_ucn_example1(
         predictor_names=predictor_names, normalization_dict=normalization_dict)
     image_matrix_norm = numpy.expand_dims(image_matrix_norm, axis=0)
 
-    intermediate_model_object = keras.models.Model(
-        inputs=model_object.input,
-        outputs=model_object.get_layer(name='flatten_1').output)
-
-    feature_matrix = intermediate_model_object.predict(
-        image_matrix_norm, batch_size=1)
+    feature_matrix = _apply_cnn(
+        model_object=model_object, predictor_matrix=image_matrix_norm,
+        verbose=False, output_layer_name='flatten_1')
 
     reconstructed_image_matrix_norm = ucn_model_object.predict(
         feature_matrix, batch_size=1)
@@ -3418,15 +3451,15 @@ def do_novelty_detection(
         predictor_names=predictor_names,
         normalization_dict=image_normalization_dict)
 
-    intermediate_model_object = keras.models.Model(
-        inputs=cnn_model_object.input,
-        outputs=cnn_model_object.get_layer(name=cnn_feature_layer_name).output)
+    baseline_feature_matrix = _apply_cnn(
+        model_object=cnn_model_object,
+        predictor_matrix=baseline_image_matrix_norm, verbose=False,
+        output_layer_name=cnn_feature_layer_name)
 
-    baseline_feature_matrix = intermediate_model_object.predict(
-        baseline_image_matrix_norm, batch_size=num_baseline_examples)
-
-    test_feature_matrix = intermediate_model_object.predict(
-        test_image_matrix_norm, batch_size=num_test_examples)
+    test_feature_matrix = _apply_cnn(
+        model_object=cnn_model_object,
+        predictor_matrix=test_image_matrix_norm, verbose=False,
+        output_layer_name=cnn_feature_layer_name)
 
     novel_indices = []
     novel_image_matrix_recon = None
