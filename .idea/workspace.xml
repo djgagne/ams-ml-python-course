@@ -17,8 +17,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="234">
-              <caret line="2972" column="0" lean-forward="false" selection-start-line="2972" selection-start-column="0" selection-end-line="3055" selection-end-column="45" />
+            <state relative-caret-position="486">
+              <caret line="3194" column="4" lean-forward="true" selection-start-line="3194" selection-start-column="4" selection-end-line="3242" selection-end-column="17" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -30,8 +30,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>def time_string_to_unix</find>
-      <find>def _remove_future_data</find>
       <find>read_many_image_files</find>
       <find>def get_image_normalization_params</find>
       <find>def _upda</find>
@@ -51,7 +49,6 @@
       <find>num_output_neurons</find>
       <find>M =</find>
       <find>colour_map_object:</find>
-      <find>orig_predictor_matrix</find>
       <find>def plot_many</find>
       <find>pyplot.show</find>
       <find>plot_many_predictors</find>
@@ -60,6 +57,9 @@
       <find />
       <find>def deep_learning_generator</find>
       <find>predictor_names</find>
+      <find>def train_cnn</find>
+      <find>orig_predictor_matrix</find>
+      <find>_example1(</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -77,6 +77,7 @@
       <replace>[m][0]</replace>
       <replace>predictor_matrix</replace>
       <replace>for_out_layer</replace>
+      <replace>image_matrix</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -100,10 +101,8 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="1920" />
-    <option name="y" value="28" />
     <option name="width" value="1920" />
-    <option name="height" value="1138" />
+    <option name="height" value="1080" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -344,7 +343,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="1920" y="28" width="1920" height="1138" extended-state="6" />
+    <frame x="0" y="0" width="1920" height="1080" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
@@ -501,8 +500,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="234">
-          <caret line="2972" column="0" lean-forward="false" selection-start-line="2972" selection-start-column="0" selection-end-line="3055" selection-end-column="45" />
+        <state relative-caret-position="486">
+          <caret line="3194" column="4" lean-forward="true" selection-start-line="3194" selection-start-column="4" selection-end-line="3242" selection-end-column="17" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

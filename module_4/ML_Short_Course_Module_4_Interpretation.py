@@ -103,6 +103,7 @@ NUM_EXAMPLES_PER_BATCH_KEY = 'num_examples_per_batch'
 NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
 VALIDATION_FILES_KEY = 'validation_file_names'
 NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
+CNN_FEATURE_LAYER_KEY = 'cnn_feature_layer_name'
 
 PERMUTED_PREDICTORS_KEY = 'permuted_predictor_name_by_step'
 HIGHEST_COSTS_KEY = 'highest_cost_by_step'
@@ -1152,6 +1153,7 @@ def train_cnn(
     :param num_validation_batches_per_epoch:
         [used only if `validation_file_names is not None`]
         Number of validation batches furnished to model in each epoch.
+
     :return: model_metadata_dict: Dictionary with the following keys.
     model_metadata_dict['training_file_names']: See input doc.
     model_metadata_dict['normalization_dict']: Same.
@@ -2269,14 +2271,7 @@ def bwo_example1(validation_image_dict, normalization_dict, model_object):
         predictor_matrix=optimized_predictor_matrix_norm,
         predictor_names=predictor_names, normalization_dict=normalization_dict)
 
-    temperature_index = predictor_names.index(TEMPERATURE_NAME)
-    combined_temp_matrix_kelvins = numpy.concatenate(
-        (orig_predictor_matrix[..., temperature_index],
-         optimized_predictor_matrix[..., temperature_index]),
-        axis=0)
 
-    min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
-    max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
     print('\nReal example (before optimization):\n')
     plot_many_predictors_with_barbs(
@@ -2963,7 +2958,7 @@ def setup_ucn_example():
     upsampling_factor_by_upconv_layer = numpy.array(
         [2, 1, 1, 2, 1, 1], dtype=int)
 
-    setup_ucn(
+    ucn_model_object = setup_ucn(
         num_input_features=6400, first_num_rows=5, first_num_columns=5,
         upsampling_factor_by_upconv_layer=upsampling_factor_by_upconv_layer,
         num_output_channels=4, use_activation_for_out_layer=True,
@@ -3054,3 +3049,195 @@ def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
         full_target_matrix = None
 
         yield (feature_matrix, target_matrix)
+
+
+def train_ucn(
+        ucn_model_object, training_file_names, normalization_dict,
+        cnn_model_object, cnn_feature_layer_name, num_examples_per_batch,
+        num_epochs, num_training_batches_per_epoch, output_model_file_name,
+        validation_file_names=None, num_validation_batches_per_epoch=None):
+    """Trains UCN (upconvolutional network).
+
+    :param ucn_model_object: Untrained instance of `keras.models.Model` (may be
+        created by `setup_ucn`), representing the upconv network.
+    :param training_file_names: 1-D list of paths to training files (must be
+        readable by `read_image_file`).
+    :param normalization_dict: See doc for `ucn_generator`.
+    :param cnn_model_object: Same.
+    :param cnn_feature_layer_name: Same.
+    :param num_examples_per_batch: Same.
+    :param num_epochs: Number of epochs.
+    :param num_training_batches_per_epoch: Number of training batches furnished
+        to model in each epoch.
+    :param output_model_file_name: Path to output file.  The model will be saved
+        as an HDF5 file (extension should be ".h5", but this is not enforced).
+    :param validation_file_names: 1-D list of paths to training files (must be
+        readable by `read_image_file`).  If `validation_file_names is None`,
+        will omit on-the-fly validation.
+    :param num_validation_batches_per_epoch:
+        [used only if `validation_file_names is not None`]
+        Number of validation batches furnished to model in each epoch.
+
+    :return: model_metadata_dict: Dictionary with the following keys.
+    model_metadata_dict['training_file_names']: See input doc.
+    model_metadata_dict['normalization_dict']: Same.
+    model_metadata_dict['cnn_feature_layer_name']: Same.
+    model_metadata_dict['num_examples_per_batch']: Same.
+    model_metadata_dict['num_training_batches_per_epoch']: Same.
+    model_metadata_dict['validation_file_names']: Same.
+    model_metadata_dict['num_validation_batches_per_epoch']: Same.
+    """
+
+    _create_directory(file_name=output_model_file_name)
+
+    if validation_file_names is None:
+        checkpoint_object = keras.callbacks.ModelCheckpoint(
+            filepath=output_model_file_name, monitor='loss', verbose=1,
+            save_best_only=False, save_weights_only=False, mode='min',
+            period=1)
+    else:
+        checkpoint_object = keras.callbacks.ModelCheckpoint(
+            filepath=output_model_file_name, monitor='val_loss', verbose=1,
+            save_best_only=True, save_weights_only=False, mode='min',
+            period=1)
+
+    list_of_callback_objects = [checkpoint_object]
+
+    model_metadata_dict = {
+        TRAINING_FILES_KEY: training_file_names,
+        NORMALIZATION_DICT_KEY: normalization_dict,
+        CNN_FEATURE_LAYER_KEY: cnn_feature_layer_name,
+        NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
+        NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
+        VALIDATION_FILES_KEY: validation_file_names,
+        NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch
+    }
+
+    training_generator = ucn_generator(
+        netcdf_file_names=training_file_names,
+        num_examples_per_batch=num_examples_per_batch,
+        normalization_dict=normalization_dict,
+        cnn_model_object=cnn_model_object,
+        cnn_feature_layer_name=cnn_feature_layer_name)
+
+    # TODO(thunderhoser): This is a HACK to prevent segmentation faults on
+    # Schooner.
+    if num_examples_per_batch < 500:
+        workers_arg = 0
+    else:
+        workers_arg = 1
+
+    if validation_file_names is None:
+        ucn_model_object.fit_generator(
+            generator=training_generator,
+            steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
+            verbose=1, callbacks=list_of_callback_objects, workers=workers_arg)
+
+        return model_metadata_dict
+
+    validation_generator = ucn_generator(
+        netcdf_file_names=validation_file_names,
+        num_examples_per_batch=num_examples_per_batch,
+        normalization_dict=normalization_dict,
+        cnn_model_object=cnn_model_object,
+        cnn_feature_layer_name=cnn_feature_layer_name)
+
+    ucn_model_object.fit_generator(
+        generator=validation_generator,
+        steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
+        verbose=1, callbacks=list_of_callback_objects, workers=workers_arg,
+        validation_data=validation_generator,
+        validation_steps=num_validation_batches_per_epoch)
+
+    return model_metadata_dict
+
+
+def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
+                      model_object):
+    """Actually trains the UCN (upconvolutional network).
+
+    :param ucn_model_object: See doc for `train_ucn`.
+    :param training_file_names: Same.
+    :param normalization_dict: Same.
+    :param model_object: See doc for `cnn_model_object` in `train_ucn`.
+    """
+
+    validation_file_names = find_many_image_files(
+        first_date_string='20150101', last_date_string='20151231')
+
+    ucn_file_name = '{0:s}/ucn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
+    ucn_metadata_dict = train_ucn(
+        ucn_model_object=ucn_model_object,
+        training_file_names=training_file_names,
+        normalization_dict=normalization_dict,
+        cnn_model_object=model_object,
+        cnn_feature_layer_name='flatten_1',
+        num_examples_per_batch=100, num_epochs=10,
+        num_training_batches_per_epoch=10, output_model_file_name=ucn_file_name,
+        validation_file_names=validation_file_names,
+        num_validation_batches_per_epoch=10)
+
+
+def plot_ucn_example1(
+        validation_image_dict, normalization_dict, model_object,
+        ucn_model_object):
+    """Plots UCN output for random validation example.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param model_object: Trained instance of `keras.models.Model`,
+        representing the CNN or "encoder".
+    :param ucn_model_object: Trained instance of `keras.models.Model`,
+        representing the UCN or "decoder".
+    """
+
+    image_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    image_matrix_norm, _ = normalize_images(
+        predictor_matrix=image_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    image_matrix_norm = numpy.expand_dims(image_matrix_norm, axis=0)
+
+    intermediate_model_object = keras.models.Model(
+        inputs=model_object.input,
+        outputs=model_object.get_layer(name='flatten_1').output)
+
+    feature_matrix = intermediate_model_object.predict(
+        image_matrix_norm, batch_size=1)
+
+    reconstructed_image_matrix_norm = ucn_model_object.predict(
+        feature_matrix, batch_size=1)
+
+    reconstructed_image_matrix = denormalize_images(
+        predictor_matrix=reconstructed_image_matrix_norm,
+        predictor_names=predictor_names, normalization_dict=normalization_dict
+    )[0, ...]
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    combined_temp_matrix_kelvins = numpy.concatenate(
+        (image_matrix[..., temperature_index],
+         reconstructed_image_matrix[..., temperature_index]),
+        axis=0)
+
+    min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
+    max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
+
+    print('\nReal example (input to CNN):\n')
+    plot_many_predictors_with_barbs(
+        predictor_matrix=image_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    pyplot.show()
+
+    print('\nReconstructed example (output of UCN):\n')
+    plot_many_predictors_with_barbs(
+        predictor_matrix=reconstructed_image_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    pyplot.show()
