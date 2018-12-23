@@ -111,6 +111,10 @@ ORIGINAL_COST_KEY = 'original_cost'
 STEP1_PREDICTORS_KEY = 'predictor_names_step1'
 STEP1_COSTS_KEY = 'costs_step1'
 
+EOF_MATRIX_KEY = 'eof_matrix'
+FEATURE_MEANS_KEY = 'feature_means'
+FEATURE_STDEVS_KEY = 'feature_standard_deviations'
+
 # More plotting constants.
 THIS_COLOUR_LIST = [
     numpy.array([4, 233, 231]), numpy.array([1, 159, 244]),
@@ -3241,3 +3245,69 @@ def plot_ucn_example1(
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
     pyplot.show()
+
+
+def _normalize_features(feature_matrix, feature_means=None,
+                        feature_standard_deviations=None):
+    """Normalizes scalar features to z-scores.
+    
+    E = number of examples (storm objects)
+    Z = number of features
+    
+    :param feature_matrix: E-by-Z numpy array of features.
+    :param feature_means: length-Z numpy array of mean values.  If
+        `feature_means is None`, these will be computed on the fly from
+        `feature_matrix`.
+    :param feature_standard_deviations: Same but with standard deviations.
+    :return: feature_matrix: Normalized version of input.
+    :return: feature_means: See input doc.
+    :return: feature_standard_deviations: See input doc.
+    """
+
+    if feature_means is None or feature_standard_deviations is None:
+        feature_means = numpy.mean(feature_matrix, axis=0)
+        feature_standard_deviations = numpy.std(feature_matrix, axis=0, ddof=1)
+
+    num_examples = feature_matrix.shape[0]
+    num_features = feature_matrix.shape[1]
+
+    mean_matrix = numpy.reshape(feature_means, (1, num_features))
+    mean_matrix = numpy.repeat(mean_matrix, repeats=num_examples, axis=0)
+
+    stdev_matrix = numpy.reshape(feature_standard_deviations, (1, num_features))
+    stdev_matrix = numpy.repeat(stdev_matrix, repeats=num_examples, axis=0)
+
+    feature_matrix = (feature_matrix - mean_matrix) / stdev_matrix
+    return feature_matrix, feature_means, feature_standard_deviations
+
+
+def fit_svd(feature_matrix, num_modes_to_keep):
+    """Fits SVD (singular-value decomposition) model.
+
+    E = number of examples (storm objects)
+    Z = number of scalar features (produced by dense layer of a CNN)
+    K = number of modes retained by the SVD model
+
+    :param feature_matrix: E-by-Z numpy array of features.
+    :param num_modes_to_keep: Number of modes to be retained by SVD model (K in
+        the above discussion).
+    :return: svd_dictionary: Dictionary with the following keys.
+    svd_dictionary['eof_matrix']: Z-by-K numpy array, where each row is an EOF
+        (empirical orthogonal function).
+    svd_dictionary['feature_means']: length-Z numpy array with mean value of
+        each feature (before transformation).
+    svd_dictionary['feature_standard_deviations']: length-Z numpy array with
+        standard deviation of each feature (before transformation).
+    """
+
+    feature_matrix, feature_means, feature_standard_deviations = (
+        _normalize_features(feature_matrix)
+    )
+
+    eof_matrix = numpy.linalg.svd(feature_matrix)[-1]
+    
+    return {
+        EOF_MATRIX_KEY: numpy.transpose(eof_matrix),
+        FEATURE_MEANS_KEY: feature_means,
+        FEATURE_STDEVS_KEY: feature_standard_deviations
+    }
