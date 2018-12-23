@@ -3333,3 +3333,39 @@ def _apply_svd(feature_vector, svd_dictionary):
     )
 
     return numpy.dot(this_matrix, feature_vector)
+
+
+def do_novelty_detection(
+        baseline_image_matrix, test_image_matrix, image_normalization_dict,
+        cnn_model_object, cnn_feature_layer_name, ucn_model_object,
+        num_svd_modes_to_keep):
+    """Does novelty detection.
+
+    Specifically, this method follows the procedure in Wagstaff et al. (2018)
+    to determine which images in the test set are most novel with respect to the
+    baseline set.
+
+    B = number of baseline examples (storm objects)
+    T = number of test examples (storm objects)
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param baseline_image_matrix: B-by-M-by-N-by-C numpy array of baseline
+        images.
+    :param test_image_matrix: T-by-M-by-N-by-C numpy array of test images.
+    :param image_normalization_dict: See doc for `normalize_images`.
+    :param cnn_model_object: Trained CNN model (instance of
+        `keras.models.Model`).  Will be used to turn images into scalar
+        features.
+    :param cnn_feature_layer_name: The "scalar features" will be the set of
+        activations from this layer.
+    :param ucn_model_object: Trained UCN model (instance of
+        `keras.models.Model`).  Will be used to turn scalar features into
+        images.
+    :param num_svd_modes_to_keep: Number of modes to keep in SVD (singular-value
+        decomposition) of scalar features.  See `fit_svd` for more details.
+    :return: Don't know yet.
+    """
+
+    
