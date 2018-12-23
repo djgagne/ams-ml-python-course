@@ -33,7 +33,8 @@ NUM_EXAMPLES_PER_BATCH_HELP_STRING = (
     'Number of examples in each training or validation batch.')
 NUM_EPOCHS_HELP_STRING = 'Number of training epochs.'
 NUM_TRAINING_BATCHES_HELP_STRING = 'Number of training batches in each epoch.'
-NUM_VALIDATION_BATCHES_HELP_STRING = 'Number of validation batches in each epoch.'
+NUM_VALIDATION_BATCHES_HELP_STRING = (
+    'Number of validation batches in each epoch.')
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file (HDF5 format).  The trained model will be saved here.')
 
