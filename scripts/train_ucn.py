@@ -16,11 +16,11 @@ LAST_TRAINING_DATE_STRING = '20141231'
 FIRST_VALIDATION_DATE_STRING = '20150101'
 LAST_VALIDATION_DATE_STRING = '20151231'
 
-UPSAMPLING_FACTOR_BY_DECONV_LAYER = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
+UPSAMPLING_FACTORS = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
 
 CNN_FILE_ARG_NAME = 'input_cnn_file_name'
-OUT_LAYER_ACTIVATION_ARG_NAME = 'use_activation_for_out_layer'
-OUT_LAYER_BN_ARG_NAME = 'use_bn_for_out_layer'
+USE_TRANSPOSED_CONV_ARG_NAME = 'use_transposed_conv'
+SMOOTHING_RADIUS_ARG_NAME = 'smoothing_radius_px'
 IMAGE_DIR_ARG_NAME = 'input_image_dir_name'
 NUM_EXAMPLES_PER_BATCH_ARG_NAME = 'num_examples_per_batch'
 NUM_EPOCHS_ARG_NAME = 'num_epochs'
@@ -33,15 +33,15 @@ CNN_FILE_HELP_STRING = (
     'CNN flattening layer, and UCN targets will be CNN predictors (input '
     'images).')
 
-OUT_LAYER_ACTIVATION_HELP_STRING = (
-    'Boolean flag.  If 1, will use activation after last UCN layer.')
+USE_TRANSPOSED_CONV_HELP_STRING = (
+    'Boolean flag.  If 1, upsampling will be done with transposed-convolution '
+    'layers.  If False, each upsampling will be done with an upsampling layer '
+    'followed by a conv layer.')
 
-OUT_LAYER_BN_HELP_STRING = (
-    'Boolean flag.  If 1, will use batch normalization after last UCN layer.  '
-    'Keep in mind that batch norm is always done after activation, so if both '
-    '`{0:s}` and `{1:s}` are 1, the last deconv layer will be followed by '
-    'activation, then batch norm.'
-).format(OUT_LAYER_ACTIVATION_ARG_NAME, OUT_LAYER_BN_ARG_NAME)
+SMOOTHING_RADIUS_HELP_STRING = (
+    'Smoothing radius (pixels).  Gaussian smoothing with this e-folding radius '
+    'will be done after each upsampling.  If you do not want smoothing, leave '
+    'this alone.')
 
 IMAGE_DIR_HELP_STRING = (
     'Name of directory with image (NetCDF) files for input to the CNN.  This '
@@ -61,8 +61,8 @@ OUTPUT_FILE_HELP_STRING = (
     'Path to output file (HDF5 format).  The trained UCN model will be saved '
     'here.')
 
-DEFAULT_OUT_LAYER_ACTIVATION_FLAG = 0
-DEFAULT_OUT_LAYER_BN_FLAG = 1
+DEFAULT_TRANSPOSED_CONV_FLAG = 0
+DEFAULT_SMOOTHING_RADIUS_PX = -1
 DEFAULT_NUM_EXAMPLES_PER_BATCH = 1024
 DEFAULT_NUM_EPOCHS = 100
 DEFAULT_NUM_TRAINING_BATCHES_PER_EPOCH = 32
@@ -77,13 +77,12 @@ INPUT_ARG_PARSER.add_argument(
     help=CNN_FILE_HELP_STRING)
 
 INPUT_ARG_PARSER.add_argument(
-    '--' + OUT_LAYER_ACTIVATION_ARG_NAME, type=int, required=False,
-    default=DEFAULT_OUT_LAYER_ACTIVATION_FLAG,
-    help=OUT_LAYER_ACTIVATION_HELP_STRING)
+    '--' + USE_TRANSPOSED_CONV_ARG_NAME, type=int, required=False,
+    default=DEFAULT_TRANSPOSED_CONV_FLAG, help=USE_TRANSPOSED_CONV_HELP_STRING)
 
 INPUT_ARG_PARSER.add_argument(
-    '--' + OUT_LAYER_BN_ARG_NAME, type=int, required=False,
-    default=DEFAULT_OUT_LAYER_BN_FLAG, help=OUT_LAYER_BN_HELP_STRING)
+    '--' + SMOOTHING_RADIUS_ARG_NAME, type=int, required=False,
+    default=DEFAULT_SMOOTHING_RADIUS_PX, help=SMOOTHING_RADIUS_HELP_STRING)
 
 INPUT_ARG_PARSER.add_argument(
     '--' + IMAGE_DIR_ARG_NAME, type=str, required=False,
@@ -113,17 +112,17 @@ INPUT_ARG_PARSER.add_argument(
     help=OUTPUT_FILE_HELP_STRING)
 
 
-def _run(input_cnn_file_name, use_activation_for_out_layer,
-         use_bn_for_out_layer, input_image_dir_name, num_examples_per_batch,
-         num_epochs, num_training_batches_per_epoch,
-         num_validation_batches_per_epoch, output_model_file_name):
+def _run(input_cnn_file_name, use_transposed_conv, smoothing_radius_px,
+         input_image_dir_name, num_examples_per_batch, num_epochs,
+         num_training_batches_per_epoch, num_validation_batches_per_epoch,
+         output_model_file_name):
     """Trains UCN (upconvnet) for use in short course.
 
     This is effectively the main method.
 
     :param input_cnn_file_name: See documentation at top of file.
-    :param use_activation_for_out_layer: Same.
-    :param use_bn_for_out_layer: Same.
+    :param use_transposed_conv: Same.
+    :param smoothing_radius_px: Same.
     :param input_image_dir_name: Same.
     :param num_examples_per_batch: Same.
     :param num_epochs: Same.
@@ -131,6 +130,9 @@ def _run(input_cnn_file_name, use_activation_for_out_layer,
     :param num_validation_batches_per_epoch: Same.
     :param output_model_file_name: Same.
     """
+
+    if smoothing_radius_px <= 0:
+        smoothing_radius_px = None
 
     print('Reading trained CNN from: "{0:s}"...'.format(input_cnn_file_name))
     cnn_model_object = short_course.read_keras_model(input_cnn_file_name)
@@ -151,15 +153,18 @@ def _run(input_cnn_file_name, use_activation_for_out_layer,
     num_input_features = numpy.prod(cnn_feature_dimensions)
     first_num_rows = cnn_feature_dimensions[0]
     first_num_columns = cnn_feature_dimensions[1]
-    num_output_channels = cnn_model_object.input.shape[-1]
+    num_output_channels = numpy.array(
+        cnn_model_object.input.shape[1:], dtype=int
+    )[-1]
 
-    ucn_model_object = short_course.setup_ucn_fancy(
+    ucn_model_object = short_course.setup_ucn(
         num_input_features=num_input_features, first_num_rows=first_num_rows,
         first_num_columns=first_num_columns,
-        upsampling_factor_by_deconv_layer=UPSAMPLING_FACTOR_BY_DECONV_LAYER,
+        upsampling_factors=UPSAMPLING_FACTORS,
         num_output_channels=num_output_channels,
-        use_activation_for_out_layer=use_activation_for_out_layer,
-        use_bn_for_out_layer=use_bn_for_out_layer)
+        use_activation_for_out_layer=False, use_bn_for_out_layer=True,
+        use_transposed_conv=use_transposed_conv,
+        smoothing_radius_px=smoothing_radius_px)
     print(SEPARATOR_STRING)
 
     training_file_names = short_course.find_many_image_files(
@@ -199,10 +204,10 @@ if __name__ == '__main__':
 
     _run(
         input_cnn_file_name=getattr(INPUT_ARG_OBJECT, CNN_FILE_ARG_NAME),
-        use_activation_for_out_layer=bool(
-            getattr(INPUT_ARG_OBJECT, OUT_LAYER_ACTIVATION_ARG_NAME)),
-        use_bn_for_out_layer=bool(
-            getattr(INPUT_ARG_OBJECT, OUT_LAYER_BN_ARG_NAME)),
+        use_transposed_conv=bool(
+            getattr(INPUT_ARG_OBJECT, USE_TRANSPOSED_CONV_ARG_NAME)),
+        smoothing_radius_px=getattr(
+            INPUT_ARG_OBJECT, SMOOTHING_RADIUS_ARG_NAME),
         input_image_dir_name=getattr(INPUT_ARG_OBJECT, IMAGE_DIR_ARG_NAME),
         num_examples_per_batch=getattr(
             INPUT_ARG_OBJECT, NUM_EXAMPLES_PER_BATCH_ARG_NAME),
