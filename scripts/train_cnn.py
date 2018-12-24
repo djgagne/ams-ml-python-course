@@ -114,17 +114,28 @@ def _run(input_image_dir_name, num_examples_per_batch, num_epochs,
         last_date_string=LAST_VALIDATION_DATE_STRING,
         image_dir_name=input_image_dir_name)
 
-    model_metadata_dict = short_course.train_cnn(
-        cnn_model_object=cnn_model_object,
-        training_file_names=training_file_names,
-        normalization_dict=normalization_dict,
-        binarization_threshold=binarization_threshold,
-        num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,
-        num_training_batches_per_epoch=num_training_batches_per_epoch,
-        output_model_file_name=output_model_file_name,
-        validation_file_names=validation_file_names,
-        num_validation_batches_per_epoch=num_validation_batches_per_epoch)
-    print(SEPARATOR_STRING)
+    model_metadata_dict = {
+        short_course.TRAINING_FILES_KEY: training_file_names,
+        short_course.NORMALIZATION_DICT_KEY: normalization_dict,
+        short_course.BINARIZATION_THRESHOLD_KEY: binarization_threshold,
+        short_course.NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
+        short_course.NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
+        short_course.VALIDATION_FILES_KEY: validation_file_names,
+        short_course.NUM_VALIDATION_BATCHES_KEY:
+            num_validation_batches_per_epoch
+    }
+
+    # model_metadata_dict = short_course.train_cnn(
+    #     cnn_model_object=cnn_model_object,
+    #     training_file_names=training_file_names,
+    #     normalization_dict=normalization_dict,
+    #     binarization_threshold=binarization_threshold,
+    #     num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,
+    #     num_training_batches_per_epoch=num_training_batches_per_epoch,
+    #     output_model_file_name=output_model_file_name,
+    #     validation_file_names=validation_file_names,
+    #     num_validation_batches_per_epoch=num_validation_batches_per_epoch)
+    # print(SEPARATOR_STRING)
 
     model_metafile_name = short_course.find_model_metafile(
         model_file_name=output_model_file_name, raise_error_if_missing=False)
