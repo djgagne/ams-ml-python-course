@@ -16,8 +16,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="506">
-              <caret line="709" column="69" lean-forward="false" selection-start-line="709" selection-start-column="69" selection-end-line="709" selection-end-column="69" />
+            <state relative-caret-position="290">
+              <caret line="709" column="30" lean-forward="true" selection-start-line="709" selection-start-column="30" selection-end-line="709" selection-end-column="30" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -65,7 +65,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>plot_predictor_2d(</find>
       <find>Critical su</find>
       <find>title(</find>
       <find>_add_colour_bar(</find>
@@ -95,6 +94,7 @@
       <find>validn</find>
       <find>TODO</find>
       <find>workers_arg</find>
+      <find>normalize_images(</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -572,8 +572,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="506">
-          <caret line="709" column="69" lean-forward="false" selection-start-line="709" selection-start-column="69" selection-end-line="709" selection-end-column="69" />
+        <state relative-caret-position="290">
+          <caret line="709" column="30" lean-forward="true" selection-start-line="709" selection-start-column="30" selection-end-line="709" selection-end-column="30" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>
