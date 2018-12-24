@@ -3128,7 +3128,7 @@ def setup_ucn(
                 except:
                     layer_object = keras.layers.UpSampling2D(
                         size=(this_upsampling_factor, this_upsampling_factor),
-                        data_format='channels_last', interpolation='nearest'
+                        data_format='channels_last'
                     )(layer_object)
 
             layer_object = keras.layers.Conv2D(
