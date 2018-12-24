@@ -177,19 +177,31 @@ def _run(input_cnn_file_name, use_transposed_conv, smoothing_radius_px,
         last_date_string=LAST_VALIDATION_DATE_STRING,
         image_dir_name=input_image_dir_name)
 
-    ucn_metadata_dict = short_course.train_ucn(
-        ucn_model_object=ucn_model_object,
-        training_file_names=training_file_names,
-        normalization_dict=cnn_metadata_dict[
-            short_course.NORMALIZATION_DICT_KEY],
-        cnn_model_object=cnn_model_object, cnn_file_name=input_cnn_file_name,
-        cnn_feature_layer_name=cnn_feature_layer_name,
-        num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,
-        num_training_batches_per_epoch=num_training_batches_per_epoch,
-        output_model_file_name=output_model_file_name,
-        validation_file_names=validation_file_names,
-        num_validation_batches_per_epoch=num_validation_batches_per_epoch)
-    print(SEPARATOR_STRING)
+    ucn_metadata_dict = {
+        short_course.TRAINING_FILES_KEY: training_file_names,
+        short_course.NORMALIZATION_DICT_KEY:
+            cnn_metadata_dict[short_course.NORMALIZATION_DICT_KEY],
+        short_course.CNN_FILE_KEY: input_cnn_file_name,
+        short_course.CNN_FEATURE_LAYER_KEY: cnn_feature_layer_name,
+        short_course.NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
+        short_course.NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
+        short_course.VALIDATION_FILES_KEY: validation_file_names,
+        short_course.NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch
+    }
+
+    # ucn_metadata_dict = short_course.train_ucn(
+    #     ucn_model_object=ucn_model_object,
+    #     training_file_names=training_file_names,
+    #     normalization_dict=cnn_metadata_dict[
+    #         short_course.NORMALIZATION_DICT_KEY],
+    #     cnn_model_object=cnn_model_object, cnn_file_name=input_cnn_file_name,
+    #     cnn_feature_layer_name=cnn_feature_layer_name,
+    #     num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,
+    #     num_training_batches_per_epoch=num_training_batches_per_epoch,
+    #     output_model_file_name=output_model_file_name,
+    #     validation_file_names=validation_file_names,
+    #     num_validation_batches_per_epoch=num_validation_batches_per_epoch)
+    # print(SEPARATOR_STRING)
 
     ucn_metafile_name = short_course.find_model_metafile(
         model_file_name=output_model_file_name, raise_error_if_missing=False)
