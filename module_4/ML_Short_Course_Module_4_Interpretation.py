@@ -935,7 +935,7 @@ def setup_cnn(num_grid_rows, num_grid_columns):
 
     :param num_grid_rows: Number of rows in each predictor image.
     :param num_grid_columns: Number of columns in each predictor image.
-    :return: model_object: Untrained instance of `keras.models.Model`.
+    :return: cnn_model_object: Untrained instance of `keras.models.Model`.
     """
 
     regularizer_object = keras.regularizers.l1_l2(l1=L1_WEIGHT, l2=L2_WEIGHT)
@@ -1039,15 +1039,15 @@ def setup_cnn(num_grid_rows, num_grid_columns):
         )(current_layer_object)
 
     # Put the whole thing together and compile.
-    model_object = keras.models.Model(
+    cnn_model_object = keras.models.Model(
         inputs=input_layer_object, outputs=current_layer_object)
-    model_object.compile(
+    cnn_model_object.compile(
         loss=keras.losses.binary_crossentropy,
         optimizer=keras.optimizers.Adam(),
         metrics=LIST_OF_METRIC_FUNCTIONS)
 
-    model_object.summary()
-    return model_object
+    cnn_model_object.summary()
+    return cnn_model_object
 
 
 def setup_cnn_example(training_file_names):
@@ -1057,7 +1057,7 @@ def setup_cnn_example(training_file_names):
     """
 
     this_image_dict = read_image_file(training_file_names[0])
-    model_object = setup_cnn(
+    cnn_model_object = setup_cnn(
         num_grid_rows=this_image_dict[PREDICTOR_MATRIX_KEY].shape[1],
         num_grid_columns=this_image_dict[PREDICTOR_MATRIX_KEY].shape[2])
 
@@ -1155,13 +1155,13 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
 
 
 def train_cnn(
-        model_object, training_file_names, normalization_dict,
+        cnn_model_object, training_file_names, normalization_dict,
         binarization_threshold, num_examples_per_batch, num_epochs,
         num_training_batches_per_epoch, output_model_file_name,
         validation_file_names=None, num_validation_batches_per_epoch=None):
     """Trains CNN (convolutional neural net).
 
-    :param model_object: Untrained instance of `keras.models.Model` (may be
+    :param cnn_model_object: Untrained instance of `keras.models.Model` (may be
         created by `setup_cnn`).
     :param training_file_names: 1-D list of paths to training files (must be
         readable by `read_image_file`).
@@ -1222,7 +1222,7 @@ def train_cnn(
         binarization_threshold=binarization_threshold)
 
     if validation_file_names is None:
-        model_object.fit_generator(
+        cnn_model_object.fit_generator(
             generator=training_generator,
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
             verbose=1, callbacks=list_of_callback_objects, workers=0)
@@ -1241,7 +1241,7 @@ def train_cnn(
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold)
 
-    model_object.fit_generator(
+    cnn_model_object.fit_generator(
         generator=training_generator,
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
         verbose=1, callbacks=list_of_callback_objects, workers=0,
@@ -1386,11 +1386,11 @@ def read_model_metadata(json_file_name):
         return _metadata_list_to_numpy(model_metadata_dict)
 
 
-def train_cnn_example(model_object, training_file_names, normalization_dict,
+def train_cnn_example(cnn_model_object, training_file_names, normalization_dict,
                       binarization_threshold):
     """Actually trains the CNN.
 
-    :param model_object: See doc for `train_cnn`.
+    :param cnn_model_object: See doc for `train_cnn`.
     :param training_file_names: Same.
     :param normalization_dict: Same.
     :param binarization_threshold: Same.
@@ -1401,7 +1401,8 @@ def train_cnn_example(model_object, training_file_names, normalization_dict,
 
     cnn_file_name = '{0:s}/cnn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
     model_metadata_dict = train_cnn(
-        model_object=model_object, training_file_names=training_file_names,
+        cnn_model_object=cnn_model_object,
+        training_file_names=training_file_names,
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold,
         num_examples_per_batch=256, num_epochs=10,
@@ -1411,7 +1412,7 @@ def train_cnn_example(model_object, training_file_names, normalization_dict,
         output_model_file_name=cnn_file_name)
 
 
-def _apply_cnn(model_object, predictor_matrix, verbose=True,
+def _apply_cnn(cnn_model_object, predictor_matrix, verbose=True,
                output_layer_name=None):
     """Applies trained CNN (convolutional neural net) to new data.
 
@@ -1420,7 +1421,7 @@ def _apply_cnn(model_object, predictor_matrix, verbose=True,
     N = number of columns in each storm-centered grid
     C = number of channels (predictor variables)
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
     :param verbose: Boolean flag.  If True, progress messages will be printed.
     :param output_layer_name: Name of output layer.  If
@@ -1444,11 +1445,11 @@ def _apply_cnn(model_object, predictor_matrix, verbose=True,
     num_examples_per_batch = 1000
 
     if output_layer_name is None:
-        model_object_to_use = model_object
+        model_object_to_use = cnn_model_object
     else:
         model_object_to_use = keras.models.Model(
-            inputs=model_object.input,
-            outputs=model_object.get_layer(name=output_layer_name).output)
+            inputs=cnn_model_object.input,
+            outputs=cnn_model_object.get_layer(name=output_layer_name).output)
 
     output_array = None
 
@@ -1483,16 +1484,16 @@ def _apply_cnn(model_object, predictor_matrix, verbose=True,
 
 
 def evaluate_cnn(
-        model_object, image_dict, model_metadata_dict, output_dir_name):
+        cnn_model_object, image_dict, model_metadata_dict, output_dir_name):
     """Evaluates trained CNN (convolutional neural net).
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param image_dict: Dictionary created by `read_image_file` or
         `read_many_image_files`.  Should contain validation or testing data (not
         training data), but this is not enforced.
     :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
         ensure that data in `image_dict` are processed the exact same way as the
-        training data for `model_object`.
+        training data for `cnn_model_object`.
     :param output_dir_name: Path to output directory.  Figures will be saved
         here.
     """
@@ -1507,7 +1508,7 @@ def evaluate_cnn(
         target_matrix=image_dict[TARGET_MATRIX_KEY],
         binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
 
-    forecast_probabilities = _apply_cnn(model_object=model_object,
+    forecast_probabilities = _apply_cnn(cnn_model_object=cnn_model_object,
                                         predictor_matrix=predictor_matrix)
     print(MINOR_SEPARATOR_STRING)
 
@@ -1551,12 +1552,12 @@ def evaluate_cnn(
     # pyplot.close()
 
 
-def evaluate_cnn_example(validation_file_names, model_object,
+def evaluate_cnn_example(validation_file_names, cnn_model_object,
                          model_metadata_dict):
     """Evaluates CNN on validation data.
 
     :param validation_file_names: 1-D list of paths to input files.
-    :param model_object: See doc for `evaluate_cnn`.
+    :param cnn_model_object: See doc for `evaluate_cnn`.
     :param model_metadata_dict: Same.
     """
 
@@ -1565,7 +1566,7 @@ def evaluate_cnn_example(validation_file_names, model_object,
 
     validation_dir_name = '{0:s}/validation'.format(DEFAULT_OUTPUT_DIR_NAME)
     evaluate_cnn(
-        model_object=model_object, image_dict=validation_image_dict,
+        cnn_model_object=cnn_model_object, image_dict=validation_image_dict,
         model_metadata_dict=model_metadata_dict,
         output_dir_name=validation_dir_name)
     print(SEPARATOR_STRING)
@@ -1598,20 +1599,20 @@ def _get_binary_xentropy(target_values, forecast_probabilities):
 
 
 def permutation_test_for_cnn(
-        model_object, image_dict, model_metadata_dict, output_pickle_file_name,
-        cost_function=_get_binary_xentropy):
+        cnn_model_object, image_dict, model_metadata_dict,
+        output_pickle_file_name, cost_function=_get_binary_xentropy):
     """Runs permutation test on CNN (convolutional neural net).
 
     E = number of examples (storm objects)
     C = number of channels (predictor variables)
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param image_dict: Dictionary created by `read_image_file` or
         `read_many_image_files`.  Should contain validation data (rather than
         training data), but this is not enforced.
     :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
         ensure that data in `image_dict` are processed the exact same way as the
-        training data for `model_object`.
+        training data for `cnn_model_object`.
     :param output_pickle_file_name: Path to output file.  `result_dict` (the
         output variable) will be saved here.
 
@@ -1652,7 +1653,7 @@ def permutation_test_for_cnn(
         binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
 
     # Get original cost (before permutation).
-    these_probabilities = _apply_cnn(model_object=model_object,
+    these_probabilities = _apply_cnn(cnn_model_object=cnn_model_object,
                                      predictor_matrix=predictor_matrix)
     print(MINOR_SEPARATOR_STRING)
 
@@ -1692,7 +1693,7 @@ def permutation_test_for_cnn(
 
             print(MINOR_SEPARATOR_STRING)
             these_probabilities = _apply_cnn(
-                model_object=model_object,
+                cnn_model_object=cnn_model_object,
                 predictor_matrix=this_predictor_matrix)
             print(MINOR_SEPARATOR_STRING)
 
@@ -1743,11 +1744,11 @@ def permutation_test_for_cnn(
     return result_dict
 
 
-def permutation_test_example(model_object, validation_image_dict,
+def permutation_test_example(cnn_model_object, validation_image_dict,
                              model_metadata_dict):
     """Runs the permutation test on validation data.
 
-    :param model_object: See doc for `permutation_test_for_cnn`.
+    :param cnn_model_object: See doc for `permutation_test_for_cnn`.
     :param validation_image_dict: Same.
     :param model_metadata_dict: Same.
     """
@@ -1758,7 +1759,7 @@ def permutation_test_example(model_object, validation_image_dict,
         permutation_dir_name)
 
     permutation_dict = permutation_test_for_cnn(
-        model_object=model_object, image_dict=validation_image_dict,
+        cnn_model_object=cnn_model_object, image_dict=validation_image_dict,
         model_metadata_dict=model_metadata_dict,
         output_pickle_file_name=main_permutation_file_name)
 
@@ -1914,11 +1915,11 @@ def plot_lakshmanan_results_example(permutation_dir_name, permutation_dict):
 
 
 def _gradient_descent_for_bwo(
-        model_object, loss_tensor, init_function_or_matrices, num_iterations,
-        learning_rate):
+        cnn_model_object, loss_tensor, init_function_or_matrices,
+        num_iterations, learning_rate):
     """Does gradient descent (the nitty-gritty part) for backwards optimization.
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param loss_tensor: Keras tensor, defining the loss function to be
         minimized.
     :param init_function_or_matrices: Either a function or list of numpy arrays.
@@ -1944,10 +1945,10 @@ def _gradient_descent_for_bwo(
         the exact same shape, just with different values.
     """
 
-    if isinstance(model_object.input, list):
-        list_of_input_tensors = model_object.input
+    if isinstance(cnn_model_object.input, list):
+        list_of_input_tensors = cnn_model_object.input
     else:
-        list_of_input_tensors = [model_object.input]
+        list_of_input_tensors = [cnn_model_object.input]
 
     num_input_tensors = len(list_of_input_tensors)
 
@@ -1995,12 +1996,12 @@ def _gradient_descent_for_bwo(
 
 
 def bwo_for_class(
-        model_object, target_class, init_function_or_matrices,
+        cnn_model_object, target_class, init_function_or_matrices,
         num_iterations=DEFAULT_NUM_BWO_ITERATIONS,
         learning_rate=DEFAULT_BWO_LEARNING_RATE):
     """Does backwards optimization to maximize probability of target class.
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param target_class: Synthetic input data will be created to maximize
         probability of this class.
     :param init_function_or_matrices: See doc for `_gradient_descent_for_bwo`.
@@ -2018,7 +2019,7 @@ def bwo_for_class(
     assert  learning_rate < 1.
 
     num_output_neurons = (
-        model_object.layers[-1].output.get_shape().as_list()[-1]
+        cnn_model_object.layers[-1].output.get_shape().as_list()[-1]
     )
 
     if num_output_neurons == 1:
@@ -2026,21 +2027,21 @@ def bwo_for_class(
 
         if target_class == 1:
             loss_tensor = K.mean(
-                (model_object.layers[-1].output[..., 0] - 1) ** 2
+                (cnn_model_object.layers[-1].output[..., 0] - 1) ** 2
             )
         else:
             loss_tensor = K.mean(
-                model_object.layers[-1].output[..., 0] ** 2
+                cnn_model_object.layers[-1].output[..., 0] ** 2
             )
     else:
         assert target_class < num_output_neurons
 
         loss_tensor = K.mean(
-            (model_object.layers[-1].output[..., target_class] - 1) ** 2
+            (cnn_model_object.layers[-1].output[..., target_class] - 1) ** 2
         )
 
     return _gradient_descent_for_bwo(
-        model_object=model_object, loss_tensor=loss_tensor,
+        cnn_model_object=cnn_model_object, loss_tensor=loss_tensor,
         init_function_or_matrices=init_function_or_matrices,
         num_iterations=num_iterations, learning_rate=learning_rate)
 
@@ -2402,13 +2403,13 @@ def plot_predictors_example2(validation_image_dict):
     pyplot.show()
 
 
-def bwo_example1(validation_image_dict, normalization_dict, model_object):
+def bwo_example1(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes random example (storm object) for positive class.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     orig_predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
@@ -2421,7 +2422,7 @@ def bwo_example1(validation_image_dict, normalization_dict, model_object):
         orig_predictor_matrix_norm, axis=0)
 
     optimized_predictor_matrix_norm = bwo_for_class(
-        model_object=model_object, target_class=1,
+        cnn_model_object=cnn_model_object, target_class=1,
         init_function_or_matrices=[orig_predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2457,13 +2458,13 @@ def bwo_example1(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def bwo_example2(validation_image_dict, normalization_dict, model_object):
+def bwo_example2(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes random example (storm object) for negative class.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     orig_predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
@@ -2476,7 +2477,7 @@ def bwo_example2(validation_image_dict, normalization_dict, model_object):
         orig_predictor_matrix_norm, axis=0)
 
     optimized_predictor_matrix_norm = bwo_for_class(
-        model_object=model_object, target_class=0,
+        cnn_model_object=cnn_model_object, target_class=0,
         init_function_or_matrices=[orig_predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2512,13 +2513,13 @@ def bwo_example2(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def bwo_example3(validation_image_dict, normalization_dict, model_object):
+def bwo_example3(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes extreme example (storm object) for positive class.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
@@ -2537,7 +2538,7 @@ def bwo_example3(validation_image_dict, normalization_dict, model_object):
         orig_predictor_matrix_norm, axis=0)
 
     optimized_predictor_matrix_norm = bwo_for_class(
-        model_object=model_object, target_class=1,
+        cnn_model_object=cnn_model_object, target_class=1,
         init_function_or_matrices=[orig_predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2573,13 +2574,13 @@ def bwo_example3(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def bwo_example4(validation_image_dict, normalization_dict, model_object):
+def bwo_example4(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes extreme example (storm object) for negative class.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
@@ -2598,7 +2599,7 @@ def bwo_example4(validation_image_dict, normalization_dict, model_object):
         orig_predictor_matrix_norm, axis=0)
 
     optimized_predictor_matrix_norm = bwo_for_class(
-        model_object=model_object, target_class=0,
+        cnn_model_object=cnn_model_object, target_class=0,
         init_function_or_matrices=[orig_predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2635,13 +2636,13 @@ def bwo_example4(validation_image_dict, normalization_dict, model_object):
 
 
 def _do_saliency_calculations(
-        model_object, loss_tensor, list_of_input_matrices):
+        cnn_model_object, loss_tensor, list_of_input_matrices):
     """Does the nitty-gritty part of computing saliency maps.
 
     T = number of input tensors to the model
     E = number of examples (storm objects)
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param loss_tensor: Keras tensor defining the loss function.
     :param list_of_input_matrices: length-T list of numpy arrays, comprising one
         or more examples (storm objects).  list_of_input_matrices[i] must have
@@ -2653,10 +2654,10 @@ def _do_saliency_calculations(
         which is the gradient of the loss function with respect to x.
     """
 
-    if isinstance(model_object.input, list):
-        list_of_input_tensors = model_object.input
+    if isinstance(cnn_model_object.input, list):
+        list_of_input_tensors = cnn_model_object.input
     else:
-        list_of_input_tensors = [model_object.input]
+        list_of_input_tensors = [cnn_model_object.input]
 
     list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
     num_input_tensors = len(list_of_input_tensors)
@@ -2674,10 +2675,10 @@ def _do_saliency_calculations(
     return list_of_saliency_matrices
 
 
-def saliency_for_class(model_object, target_class, list_of_input_matrices):
+def saliency_for_class(cnn_model_object, target_class, list_of_input_matrices):
     """For each input example, creates saliency map for prob of given class.
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param target_class: Saliency maps will be created for probability of this
         class.
     :param list_of_input_matrices: See doc for `_do_saliency_calculations`.
@@ -2688,7 +2689,7 @@ def saliency_for_class(model_object, target_class, list_of_input_matrices):
     assert target_class >= 0
 
     num_output_neurons = (
-        model_object.layers[-1].output.get_shape().as_list()[-1]
+        cnn_model_object.layers[-1].output.get_shape().as_list()[-1]
     )
 
     if num_output_neurons == 1:
@@ -2696,17 +2697,21 @@ def saliency_for_class(model_object, target_class, list_of_input_matrices):
 
         if target_class == 1:
             loss_tensor = K.mean(
-                (model_object.layers[-1].output[..., 0] - 1) ** 2)
+                (cnn_model_object.layers[-1].output[..., 0] - 1) ** 2
+            )
         else:
-            loss_tensor = K.mean(model_object.layers[-1].output[..., 0] ** 2)
+            loss_tensor = K.mean(
+                cnn_model_object.layers[-1].output[..., 0] ** 2
+            )
     else:
         assert target_class < num_output_neurons
 
         loss_tensor = K.mean(
-            (model_object.layers[-1].output[..., target_class] - 1) ** 2)
+            (cnn_model_object.layers[-1].output[..., target_class] - 1) ** 2
+        )
 
     return _do_saliency_calculations(
-        model_object=model_object, loss_tensor=loss_tensor,
+        cnn_model_object=cnn_model_object, loss_tensor=loss_tensor,
         list_of_input_matrices=list_of_input_matrices)
 
 
@@ -2809,13 +2814,14 @@ def plot_many_saliency_maps(
             contour_interval=contour_interval, line_width=line_width)
 
 
-def saliency_example1(validation_image_dict, normalization_dict, model_object):
+def saliency_example1(validation_image_dict, normalization_dict,
+                      cnn_model_object):
     """Computes saliency map for random example wrt positive-class probability.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
@@ -2827,7 +2833,7 @@ def saliency_example1(validation_image_dict, normalization_dict, model_object):
     predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
 
     saliency_matrix = saliency_for_class(
-        model_object=model_object, target_class=1,
+        cnn_model_object=cnn_model_object, target_class=1,
         list_of_input_matrices=[predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2864,13 +2870,14 @@ def saliency_example1(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def saliency_example2(validation_image_dict, normalization_dict, model_object):
+def saliency_example2(validation_image_dict, normalization_dict,
+                      cnn_model_object):
     """Computes saliency map for random example wrt negative-class probability.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
@@ -2882,7 +2889,7 @@ def saliency_example2(validation_image_dict, normalization_dict, model_object):
     predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
 
     saliency_matrix = saliency_for_class(
-        model_object=model_object, target_class=0,
+        cnn_model_object=cnn_model_object, target_class=0,
         list_of_input_matrices=[predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2919,13 +2926,14 @@ def saliency_example2(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def saliency_example3(validation_image_dict, normalization_dict, model_object):
+def saliency_example3(validation_image_dict, normalization_dict,
+                      cnn_model_object):
     """Computes saliency map for extreme example wrt positive-class probability.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
@@ -2943,7 +2951,7 @@ def saliency_example3(validation_image_dict, normalization_dict, model_object):
     predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
 
     saliency_matrix = saliency_for_class(
-        model_object=model_object, target_class=1,
+        cnn_model_object=cnn_model_object, target_class=1,
         list_of_input_matrices=[predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2980,13 +2988,14 @@ def saliency_example3(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def saliency_example4(validation_image_dict, normalization_dict, model_object):
+def saliency_example4(validation_image_dict, normalization_dict,
+                      cnn_model_object):
     """Computes saliency map for extreme example wrt negative-class probability.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
@@ -3004,7 +3013,7 @@ def saliency_example4(validation_image_dict, normalization_dict, model_object):
     predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
 
     saliency_matrix = saliency_for_class(
-        model_object=model_object, target_class=0,
+        cnn_model_object=cnn_model_object, target_class=0,
         list_of_input_matrices=[predictor_matrix_norm]
     )[0][0, ...]
 
@@ -3116,7 +3125,7 @@ def setup_ucn(
     :param smoothing_radius_px: Smoothing radius (pixels).  Gaussian smoothing
         with this e-folding radius will be done after each upsampling.  If
         `smoothing_radius_px is None`, no smoothing will be done.
-    :return: model_object: Untrained instance of `keras.models.Model`.
+    :return: ucn_model_object: Untrained instance of `keras.models.Model`.
     """
 
     if smoothing_radius_px is not None:
@@ -3221,23 +3230,23 @@ def setup_ucn(
                 axis=-1, center=True, scale=True
             )(layer_object)
 
-    model_object = keras.models.Model(
+    ucn_model_object = keras.models.Model(
         inputs=input_layer_object, outputs=layer_object)
-    model_object.compile(
+    ucn_model_object.compile(
         loss=keras.losses.mean_squared_error, optimizer=keras.optimizers.Adam())
 
-    model_object.summary()
-    return model_object
+    ucn_model_object.summary()
+    return ucn_model_object
 
 
-def setup_ucn_example1(model_object):
+def setup_ucn_example1(cnn_model_object):
     """Example 1 of UCN architecture (yes transposed conv, no smoothing).
 
-    :param model_object: Trained CNN (instance of `keras.models.Model`).
+    :param cnn_model_object: Trained CNN (instance of `keras.models.Model`).
     """
 
-    cnn_feature_layer_name = get_cnn_flatten_layer(model_object)
-    cnn_feature_layer_object = model_object.get_layer(
+    cnn_feature_layer_name = get_cnn_flatten_layer(cnn_model_object)
+    cnn_feature_layer_object = cnn_model_object.get_layer(
         name=cnn_feature_layer_name)
     cnn_feature_dimensions = numpy.array(
         cnn_feature_layer_object.input.shape[1:], dtype=int)
@@ -3246,7 +3255,7 @@ def setup_ucn_example1(model_object):
     first_num_rows = cnn_feature_dimensions[0]
     first_num_columns = cnn_feature_dimensions[1]
     num_output_channels = numpy.array(
-        model_object.input.shape[1:], dtype=int
+        cnn_model_object.input.shape[1:], dtype=int
     )[-1]
 
     upsampling_factors = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
@@ -3259,14 +3268,14 @@ def setup_ucn_example1(model_object):
         use_transposed_conv=True, smoothing_radius_px=None)
 
 
-def setup_ucn_example2(model_object):
+def setup_ucn_example2(cnn_model_object):
     """Example 2 of UCN architecture (no transposed conv, no smoothing).
 
-    :param model_object: Trained CNN (instance of `keras.models.Model`).
+    :param cnn_model_object: Trained CNN (instance of `keras.models.Model`).
     """
 
-    cnn_feature_layer_name = get_cnn_flatten_layer(model_object)
-    cnn_feature_layer_object = model_object.get_layer(
+    cnn_feature_layer_name = get_cnn_flatten_layer(cnn_model_object)
+    cnn_feature_layer_object = cnn_model_object.get_layer(
         name=cnn_feature_layer_name)
     cnn_feature_dimensions = numpy.array(
         cnn_feature_layer_object.input.shape[1:], dtype=int)
@@ -3275,7 +3284,7 @@ def setup_ucn_example2(model_object):
     first_num_rows = cnn_feature_dimensions[0]
     first_num_columns = cnn_feature_dimensions[1]
     num_output_channels = numpy.array(
-        model_object.input.shape[1:], dtype=int
+        cnn_model_object.input.shape[1:], dtype=int
     )[-1]
 
     upsampling_factors = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
@@ -3288,14 +3297,14 @@ def setup_ucn_example2(model_object):
         use_transposed_conv=False, smoothing_radius_px=None)
 
 
-def setup_ucn_example3(model_object):
+def setup_ucn_example3(cnn_model_object):
     """Example 3 of UCN architecture (no transposed conv, yes smoothing).
 
-    :param model_object: Trained CNN (instance of `keras.models.Model`).
+    :param cnn_model_object: Trained CNN (instance of `keras.models.Model`).
     """
 
-    cnn_feature_layer_name = get_cnn_flatten_layer(model_object)
-    cnn_feature_layer_object = model_object.get_layer(
+    cnn_feature_layer_name = get_cnn_flatten_layer(cnn_model_object)
+    cnn_feature_layer_object = cnn_model_object.get_layer(
         name=cnn_feature_layer_name)
     cnn_feature_dimensions = numpy.array(
         cnn_feature_layer_object.input.shape[1:], dtype=int)
@@ -3304,7 +3313,7 @@ def setup_ucn_example3(model_object):
     first_num_rows = cnn_feature_dimensions[0]
     first_num_columns = cnn_feature_dimensions[1]
     num_output_channels = numpy.array(
-        model_object.input.shape[1:], dtype=int
+        cnn_model_object.input.shape[1:], dtype=int
     )[-1]
 
     upsampling_factors = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
@@ -3391,7 +3400,7 @@ def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
         target_matrix = target_matrix.astype('float32')
 
         feature_matrix = _apply_cnn(
-            model_object=cnn_model_object, predictor_matrix=target_matrix,
+            cnn_model_object=cnn_model_object, predictor_matrix=target_matrix,
             verbose=False, output_layer_name=cnn_feature_layer_name)
 
         num_examples_in_memory = 0
@@ -3535,13 +3544,13 @@ def get_cnn_flatten_layer(cnn_model_object):
 
 
 def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
-                      model_object, cnn_file_name):
+                      cnn_model_object, cnn_file_name):
     """Actually trains the UCN (upconvolutional network).
 
     :param ucn_model_object: See doc for `train_ucn`.
     :param training_file_names: Same.
     :param normalization_dict: Same.
-    :param model_object: See doc for `cnn_model_object` in `train_ucn`.
+    :param cnn_model_object: See doc for `cnn_model_object` in `train_ucn`.
     :param cnn_file_name: See doc for `train_ucn`.
     """
 
@@ -3553,8 +3562,8 @@ def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
         ucn_model_object=ucn_model_object,
         training_file_names=training_file_names,
         normalization_dict=normalization_dict,
-        cnn_model_object=model_object, cnn_file_name=cnn_file_name,
-        cnn_feature_layer_name=get_cnn_flatten_layer(model_object),
+        cnn_model_object=cnn_model_object, cnn_file_name=cnn_file_name,
+        cnn_feature_layer_name=get_cnn_flatten_layer(cnn_model_object),
         num_examples_per_batch=100, num_epochs=10,
         num_training_batches_per_epoch=10, output_model_file_name=ucn_file_name,
         validation_file_names=validation_file_names,
@@ -3562,14 +3571,14 @@ def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
 
 
 def plot_ucn_example1(
-        validation_image_dict, normalization_dict, model_object,
+        validation_image_dict, normalization_dict, cnn_model_object,
         ucn_model_object):
     """Plots UCN output for random validation example.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`,
+    :param cnn_model_object: Trained instance of `keras.models.Model`,
         representing the CNN or "encoder".
     :param ucn_model_object: Trained instance of `keras.models.Model`,
         representing the UCN or "decoder".
@@ -3584,8 +3593,9 @@ def plot_ucn_example1(
     image_matrix_norm = numpy.expand_dims(image_matrix_norm, axis=0)
 
     feature_matrix = _apply_cnn(
-        model_object=model_object, predictor_matrix=image_matrix_norm,
-        verbose=False, output_layer_name=get_cnn_flatten_layer(model_object))
+        cnn_model_object=cnn_model_object, predictor_matrix=image_matrix_norm,
+        output_layer_name=get_cnn_flatten_layer(cnn_model_object),
+        verbose=False)
 
     reconstructed_image_matrix_norm = ucn_model_object.predict(
         feature_matrix, batch_size=1)
@@ -3789,12 +3799,12 @@ def do_novelty_detection(
         normalization_dict=image_normalization_dict)
 
     baseline_feature_matrix = _apply_cnn(
-        model_object=cnn_model_object,
+        cnn_model_object=cnn_model_object,
         predictor_matrix=baseline_image_matrix_norm, verbose=False,
         output_layer_name=cnn_feature_layer_name)
 
     test_feature_matrix = _apply_cnn(
-        model_object=cnn_model_object,
+        cnn_model_object=cnn_model_object,
         predictor_matrix=test_image_matrix_norm, verbose=False,
         output_layer_name=cnn_feature_layer_name)
 
@@ -3877,7 +3887,7 @@ def do_novelty_detection(
 
 
 def do_novelty_detection_example(
-        validation_image_dict, normalization_dict, model_object,
+        validation_image_dict, normalization_dict, cnn_model_object,
         ucn_model_object):
     """Runs novelty detection.
 
@@ -3888,7 +3898,7 @@ def do_novelty_detection_example(
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`,
+    :param cnn_model_object: Trained instance of `keras.models.Model`,
         representing the CNN or "encoder".
     :param ucn_model_object: Trained instance of `keras.models.Model`,
         representing the UCN or "decoder".
@@ -3912,8 +3922,8 @@ def do_novelty_detection_example(
             PREDICTOR_MATRIX_KEY][test_indices, ...],
         image_normalization_dict=normalization_dict,
         predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        cnn_model_object=model_object,
-        cnn_feature_layer_name=get_cnn_flatten_layer(model_object),
+        cnn_model_object=cnn_model_object,
+        cnn_feature_layer_name=get_cnn_flatten_layer(cnn_model_object),
         ucn_model_object=ucn_model_object,
         num_novel_test_images=1)
 

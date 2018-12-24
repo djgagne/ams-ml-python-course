@@ -91,7 +91,7 @@ def _run(input_image_dir_name, num_examples_per_batch, num_epochs,
     :param output_model_file_name: Same.
     """
 
-    model_object = short_course.setup_cnn(
+    cnn_model_object = short_course.setup_cnn(
         num_grid_rows=NUM_GRID_ROWS, num_grid_columns=NUM_GRID_COLUMNS)
     print(SEPARATOR_STRING)
 
@@ -115,7 +115,8 @@ def _run(input_image_dir_name, num_examples_per_batch, num_epochs,
         image_dir_name=input_image_dir_name)
 
     model_metadata_dict = short_course.train_cnn(
-        model_object=model_object, training_file_names=training_file_names,
+        cnn_model_object=cnn_model_object,
+        training_file_names=training_file_names,
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold,
         num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,

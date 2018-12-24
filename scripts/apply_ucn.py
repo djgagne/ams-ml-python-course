@@ -154,7 +154,7 @@ def _run(input_ucn_file_name, input_image_dir_name, first_date_string,
 
     print('Applying CNN to create scalar features...')
     feature_matrix = short_course._apply_cnn(
-        model_object=cnn_model_object, predictor_matrix=image_matrix_norm,
+        cnn_model_object=cnn_model_object, predictor_matrix=image_matrix_norm,
         output_layer_name=ucn_metadata_dict[short_course.CNN_FEATURE_LAYER_KEY],
         verbose=True)
 
