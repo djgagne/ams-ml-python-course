@@ -2,7 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/attributes_diagrams.py" afterPath="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/scripts/train_cnn.py" afterPath="$PROJECT_DIR$/scripts/train_cnn.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -16,8 +18,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="893">
-              <caret line="3815" column="0" lean-forward="false" selection-start-line="3815" selection-start-column="0" selection-end-line="3815" selection-end-column="0" />
+            <state relative-caret-position="489">
+              <caret line="1496" column="20" lean-forward="false" selection-start-line="1486" selection-start-column="6" selection-end-line="1496" selection-end-column="20" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -28,11 +30,9 @@
       <file leaf-file-name="train_cnn.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/scripts/train_cnn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="144">
-              <caret line="8" column="27" lean-forward="false" selection-start-line="8" selection-start-column="27" selection-end-line="8" selection-end-column="27" />
-              <folding>
-                <element signature="e#43#58#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="54">
+              <caret line="3" column="19" lean-forward="true" selection-start-line="3" selection-start-column="19" selection-end-line="3" selection-end-column="19" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -40,10 +40,10 @@
       <file leaf-file-name="attributes_diagrams.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/attributes_diagrams.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="252">
-              <caret line="14" column="69" lean-forward="true" selection-start-line="14" selection-start-column="69" selection-end-line="14" selection-end-column="69" />
+            <state relative-caret-position="216">
+              <caret line="12" column="22" lean-forward="true" selection-start-line="12" selection-start-column="22" selection-end-line="12" selection-end-column="22" />
               <folding>
-                <element signature="e#72#84#0" expanded="true" />
+                <element signature="e#48#60#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -65,7 +65,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>novel_indices</find>
       <find>validation_image_dict:</find>
       <find>plot_wind_2d(</find>
       <find>plot_predictor_2d(</find>
@@ -94,6 +93,7 @@
       <find>flatten_</find>
       <find>get_cnn_flatten_layer(</find>
       <find>flattening_layer_input_dims</find>
+      <find>attributes_diagrams.</find>
       <find>validn</find>
     </findStrings>
     <replaceStrings>
@@ -117,8 +117,8 @@
       <replace>svd_errors</replace>
       <replace>difference_matrix</replace>
       <replace>ACTIVATION_</replace>
-      <replace>num_deconv_layers</replace>
       <replace>cnn_feature_dimensions</replace>
+      <replace>num_deconv_layers</replace>
       <replace>NUM_VALIDATION_BATCHES</replace>
     </replaceStrings>
   </component>
@@ -137,8 +137,8 @@
         <option value="$PROJECT_DIR$/setup.py" />
         <option value="$PROJECT_DIR$/module_4/performance_diagrams.py" />
         <option value="$PROJECT_DIR$/module_4/roc_curves.py" />
-        <option value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
         <option value="$PROJECT_DIR$/scripts/train_ucn.py" />
+        <option value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
         <option value="$PROJECT_DIR$/scripts/train_cnn.py" />
         <option value="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
       </list>
@@ -542,16 +542,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="893">
-          <caret line="3815" column="0" lean-forward="false" selection-start-line="3815" selection-start-column="0" selection-end-line="3815" selection-end-column="0" />
-          <folding>
-            <element signature="e#39#50#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="342">
@@ -562,22 +552,30 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="489">
+          <caret line="1496" column="20" lean-forward="false" selection-start-line="1486" selection-start-column="6" selection-end-line="1496" selection-end-column="20" />
+          <folding>
+            <element signature="e#39#50#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/scripts/train_cnn.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="144">
-          <caret line="8" column="27" lean-forward="false" selection-start-line="8" selection-start-column="27" selection-end-line="8" selection-end-column="27" />
-          <folding>
-            <element signature="e#43#58#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="54">
+          <caret line="3" column="19" lean-forward="true" selection-start-line="3" selection-start-column="19" selection-end-line="3" selection-end-column="19" />
+          <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/attributes_diagrams.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="252">
-          <caret line="14" column="69" lean-forward="true" selection-start-line="14" selection-start-column="69" selection-end-line="14" selection-end-column="69" />
+        <state relative-caret-position="216">
+          <caret line="12" column="22" lean-forward="true" selection-start-line="12" selection-start-column="22" selection-end-line="12" selection-end-column="22" />
           <folding>
-            <element signature="e#72#84#0" expanded="true" />
+            <element signature="e#48#60#0" expanded="true" />
           </folding>
         </state>
       </provider>

@@ -2,9 +2,6 @@
 
 import argparse
 import faulthandler
-print('FOO')
-faulthandler.enable()
-
 from keras import backend as K
 from module_4 import ML_Short_Course_Module_4_Interpretation as short_course
 

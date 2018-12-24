@@ -19,7 +19,7 @@ import matplotlib.pyplot as pyplot
 from module_4 import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
-from module_4 import attributes_diagrams
+# from module_4 import attributes_diagrams
 
 # Directories.
 DEFAULT_IMAGE_DIR_NAME = (
@@ -1484,17 +1484,17 @@ def evaluate_cnn(
     pyplot.savefig(perf_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
-    attributes_diagrams.plot_attributes_diagram(
-        observed_labels=target_values,
-        forecast_probabilities=forecast_probabilities, num_bins=20)
-    pyplot.show()
-
-    attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
-        output_dir_name)
-
-    print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
-    pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
-    pyplot.close()
+    # attributes_diagrams.plot_attributes_diagram(
+    #     observed_labels=target_values,
+    #     forecast_probabilities=forecast_probabilities, num_bins=20)
+    # pyplot.show()
+    #
+    # attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
+    #     output_dir_name)
+    #
+    # print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
+    # pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    # pyplot.close()
 
 
 def evaluate_cnn_example(validation_file_names, model_object,
