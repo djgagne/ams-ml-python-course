@@ -1208,7 +1208,7 @@ def train_cnn(
         model_object.fit_generator(
             generator=training_generator,
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-            verbose=1, callbacks=list_of_callback_objects)
+            verbose=1, callbacks=list_of_callback_objects, workers=0)
 
         return model_metadata_dict
 
@@ -1227,7 +1227,7 @@ def train_cnn(
     model_object.fit_generator(
         generator=training_generator,
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-        verbose=1, callbacks=list_of_callback_objects,
+        verbose=1, callbacks=list_of_callback_objects, workers=0,
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
 
@@ -3319,7 +3319,7 @@ def train_ucn(
         ucn_model_object.fit_generator(
             generator=training_generator,
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-            verbose=1, callbacks=list_of_callback_objects)
+            verbose=1, callbacks=list_of_callback_objects, workers=0)
 
         return model_metadata_dict
 
@@ -3339,7 +3339,7 @@ def train_ucn(
     ucn_model_object.fit_generator(
         generator=training_generator,
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-        verbose=1, callbacks=list_of_callback_objects,
+        verbose=1, callbacks=list_of_callback_objects, workers=0,
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
 
