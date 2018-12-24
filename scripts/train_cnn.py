@@ -130,7 +130,7 @@ def _run(input_image_dir_name, num_examples_per_batch, num_epochs,
 
     print('Writing metadata to: "{0:s}"...'.format(model_metafile_name))
     short_course.write_model_metadata(model_metadata_dict=model_metadata_dict,
-                                      pickle_file_name=model_metafile_name)
+                                      json_file_name=model_metafile_name)
 
 
 if __name__ == '__main__':

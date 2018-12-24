@@ -196,7 +196,7 @@ def _run(input_cnn_file_name, use_transposed_conv, smoothing_radius_px,
 
     print('Writing metadata to: "{0:s}"...'.format(ucn_metafile_name))
     short_course.write_model_metadata(model_metadata_dict=ucn_metadata_dict,
-                                      pickle_file_name=ucn_metafile_name)
+                                      json_file_name=ucn_metafile_name)
 
 
 if __name__ == '__main__':

@@ -1299,7 +1299,7 @@ def find_model_metafile(model_file_name, raise_error_if_missing=False):
 
     model_directory_name, pathless_model_file_name = os.path.split(
         model_file_name)
-    model_metafile_name = '{0:s}/{1:s}_metadata.p'.format(
+    model_metafile_name = '{0:s}/{1:s}_metadata.json'.format(
         model_directory_name, os.path.splitext(pathless_model_file_name)[0]
     )
 
@@ -1309,6 +1309,52 @@ def find_model_metafile(model_file_name, raise_error_if_missing=False):
         raise ValueError(error_string)
 
     return model_metafile_name
+
+
+def _metadata_numpy_to_list(model_metadata_dict):
+    """Converts numpy arrays in model metadata to lists.
+
+    This is needed so that the metadata can be written to a JSON file (JSON does
+    not handle numpy arrays).
+
+    This method does not overwrite the original dictionary.
+
+    :param model_metadata_dict: Dictionary created by `train_cnn` or
+        `train_ucn`.
+    :return: new_metadata_dict: Same but with lists instead of numpy arrays.
+    """
+
+    new_metadata_dict = copy.deepcopy(model_metadata_dict)
+
+    if NORMALIZATION_DICT_KEY in new_metadata_dict.keys():
+        this_norm_dict = new_metadata_dict[NORMALIZATION_DICT_KEY]
+
+        for this_key in this_norm_dict.keys():
+            if isinstance(this_norm_dict[this_key], numpy.ndarray):
+                this_norm_dict[this_key] = this_norm_dict[this_key].tolist()
+
+    return new_metadata_dict
+
+
+def _metadata_list_to_numpy(model_metadata_dict):
+    """Converts lists in model metadata to numpy arrays.
+
+    This method is the inverse of `_metadata_numpy_to_list`.
+
+    This method overwrites the original dictionary.
+
+    :param model_metadata_dict: Dictionary created by `train_cnn` or
+        `train_ucn`.
+    :return: model_metadata_dict: Same but numpy arrays instead of lists.
+    """
+
+    if NORMALIZATION_DICT_KEY in model_metadata_dict.keys():
+        this_norm_dict = model_metadata_dict[NORMALIZATION_DICT_KEY]
+
+        for this_key in this_norm_dict.keys():
+            this_norm_dict[this_key] = numpy.array(this_norm_dict[this_key])
+
+    return model_metadata_dict
 
 
 def write_model_metadata(model_metadata_dict, json_file_name):
@@ -1321,23 +1367,9 @@ def write_model_metadata(model_metadata_dict, json_file_name):
 
     _create_directory(file_name=json_file_name)
 
-    # TODO(thunderhoser): Put this bullshit in a separate method.
-    if NORMALIZATION_DICT_KEY in model_metadata_dict.keys():
-        this_norm_dict = model_metadata_dict[NORMALIZATION_DICT_KEY]
-
-        for this_key in this_norm_dict.keys():
-            if isinstance(this_norm_dict[this_key], numpy.ndarray):
-                this_norm_dict[this_key] = this_norm_dict[this_key].tolist()
-
+    new_metadata_dict = _metadata_numpy_to_list(model_metadata_dict)
     with open(json_file_name, 'w') as this_file:
-        json.dump(model_metadata_dict, this_file)
-
-    # TODO(thunderhoser): Put this bullshit in a separate method.
-    if NORMALIZATION_DICT_KEY in model_metadata_dict.keys():
-        this_norm_dict = model_metadata_dict[NORMALIZATION_DICT_KEY]
-
-        for this_key in this_norm_dict.keys():
-            this_norm_dict[this_key] = numpy.array(this_norm_dict[this_key])
+        json.dump(new_metadata_dict, this_file)
 
 
 def read_model_metadata(json_file_name):
@@ -1350,14 +1382,7 @@ def read_model_metadata(json_file_name):
 
     with open(json_file_name) as this_file:
         model_metadata_dict = json.load(this_file)
-
-    if NORMALIZATION_DICT_KEY in model_metadata_dict.keys():
-        this_norm_dict = model_metadata_dict[NORMALIZATION_DICT_KEY]
-
-        for this_key in this_norm_dict.keys():
-            this_norm_dict[this_key] = numpy.array(this_norm_dict[this_key])
-
-    return model_metadata_dict
+        return _metadata_list_to_numpy(model_metadata_dict)
 
 
 def train_cnn_example(model_object, training_file_names, normalization_dict,
