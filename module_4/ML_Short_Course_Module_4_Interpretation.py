@@ -706,6 +706,11 @@ def normalize_images(
         this_mean = normalization_dict[predictor_names[m]][0]
         this_stdev = normalization_dict[predictor_names[m]][1]
 
+        print(this_mean)
+        print(this_stdev)
+        print(predictor_matrix)
+        print(predictor_matrix[..., m])
+
         predictor_matrix[..., m] = (
             (predictor_matrix[..., m] - this_mean) / this_stdev
         )
