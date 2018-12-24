@@ -1,8 +1,8 @@
 """Methods for plotting attributes diagram."""
 
+import shapely.geometry
 import numpy
 from descartes import PolygonPatch
-import shapely.geometry
 import matplotlib.colors
 import matplotlib.pyplot as pyplot
 
