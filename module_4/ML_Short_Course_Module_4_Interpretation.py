@@ -1204,18 +1204,11 @@ def train_cnn(
         normalization_dict=normalization_dict,
         binarization_threshold=binarization_threshold)
 
-    # TODO(thunderhoser): This is a HACK to prevent segmentation faults on
-    # Schooner.
-    if num_examples_per_batch < 500:
-        workers_arg = 0
-    else:
-        workers_arg = 1
-
     if validation_file_names is None:
         model_object.fit_generator(
             generator=training_generator,
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-            verbose=1, callbacks=list_of_callback_objects, workers=workers_arg)
+            verbose=1, callbacks=list_of_callback_objects, workers=0)
 
         return model_metadata_dict
 
@@ -1234,7 +1227,7 @@ def train_cnn(
     model_object.fit_generator(
         generator=training_generator,
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-        verbose=1, callbacks=list_of_callback_objects, workers=workers_arg,
+        verbose=1, callbacks=list_of_callback_objects, workers=0,
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
 
@@ -3322,18 +3315,11 @@ def train_ucn(
         cnn_model_object=cnn_model_object,
         cnn_feature_layer_name=cnn_feature_layer_name)
 
-    # TODO(thunderhoser): This is a HACK to prevent segmentation faults on
-    # Schooner.
-    if num_examples_per_batch < 500:
-        workers_arg = 0
-    else:
-        workers_arg = 1
-
     if validation_file_names is None:
         ucn_model_object.fit_generator(
             generator=training_generator,
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-            verbose=1, callbacks=list_of_callback_objects, workers=workers_arg)
+            verbose=1, callbacks=list_of_callback_objects, workers=0)
 
         return model_metadata_dict
 
@@ -3353,7 +3339,7 @@ def train_ucn(
     ucn_model_object.fit_generator(
         generator=training_generator,
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-        verbose=1, callbacks=list_of_callback_objects, workers=workers_arg,
+        verbose=1, callbacks=list_of_callback_objects, workers=0,
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
 
