@@ -182,7 +182,7 @@ def _run(input_cnn_file_name, use_transposed_conv, smoothing_radius_px,
         training_file_names=training_file_names,
         normalization_dict=cnn_metadata_dict[
             short_course.NORMALIZATION_DICT_KEY],
-        cnn_model_object=cnn_model_object,
+        cnn_model_object=cnn_model_object, cnn_file_name=input_cnn_file_name,
         cnn_feature_layer_name=cnn_feature_layer_name,
         num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,
         num_training_batches_per_epoch=num_training_batches_per_epoch,

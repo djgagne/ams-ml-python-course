@@ -104,6 +104,7 @@ NUM_EXAMPLES_PER_BATCH_KEY = 'num_examples_per_batch'
 NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
 VALIDATION_FILES_KEY = 'validation_file_names'
 NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
+CNN_FILE_KEY = 'cnn_file_name'
 CNN_FEATURE_LAYER_KEY = 'cnn_feature_layer_name'
 
 PERMUTED_PREDICTORS_KEY = 'permuted_predictor_name_by_step'
@@ -3401,9 +3402,10 @@ def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
 
 def train_ucn(
         ucn_model_object, training_file_names, normalization_dict,
-        cnn_model_object, cnn_feature_layer_name, num_examples_per_batch,
-        num_epochs, num_training_batches_per_epoch, output_model_file_name,
-        validation_file_names=None, num_validation_batches_per_epoch=None):
+        cnn_model_object, cnn_file_name, cnn_feature_layer_name,
+        num_examples_per_batch, num_epochs, num_training_batches_per_epoch,
+        output_model_file_name, validation_file_names=None,
+        num_validation_batches_per_epoch=None):
     """Trains UCN (upconvolutional network).
 
     :param ucn_model_object: Untrained instance of `keras.models.Model` (may be
@@ -3412,6 +3414,9 @@ def train_ucn(
         readable by `read_image_file`).
     :param normalization_dict: See doc for `ucn_generator`.
     :param cnn_model_object: Same.
+    :param cnn_file_name: Path to file with trained CNN (represented by
+        `cnn_model_object`).  This is needed only for the output dictionary
+        (metadata).
     :param cnn_feature_layer_name: Same.
     :param num_examples_per_batch: Same.
     :param num_epochs: Number of epochs.
@@ -3429,6 +3434,7 @@ def train_ucn(
     :return: model_metadata_dict: Dictionary with the following keys.
     model_metadata_dict['training_file_names']: See input doc.
     model_metadata_dict['normalization_dict']: Same.
+    model_metadata_dict['cnn_file_name']: Same.
     model_metadata_dict['cnn_feature_layer_name']: Same.
     model_metadata_dict['num_examples_per_batch']: Same.
     model_metadata_dict['num_training_batches_per_epoch']: Same.
@@ -3454,6 +3460,7 @@ def train_ucn(
     model_metadata_dict = {
         TRAINING_FILES_KEY: training_file_names,
         NORMALIZATION_DICT_KEY: normalization_dict,
+        CNN_FILE_KEY: cnn_file_name,
         CNN_FEATURE_LAYER_KEY: cnn_feature_layer_name,
         NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
         NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
@@ -3528,13 +3535,14 @@ def get_cnn_flatten_layer(cnn_model_object):
 
 
 def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
-                      model_object):
+                      model_object, cnn_file_name):
     """Actually trains the UCN (upconvolutional network).
 
     :param ucn_model_object: See doc for `train_ucn`.
     :param training_file_names: Same.
     :param normalization_dict: Same.
     :param model_object: See doc for `cnn_model_object` in `train_ucn`.
+    :param cnn_file_name: See doc for `train_ucn`.
     """
 
     validation_file_names = find_many_image_files(
@@ -3545,7 +3553,7 @@ def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
         ucn_model_object=ucn_model_object,
         training_file_names=training_file_names,
         normalization_dict=normalization_dict,
-        cnn_model_object=model_object,
+        cnn_model_object=model_object, cnn_file_name=cnn_file_name,
         cnn_feature_layer_name=get_cnn_flatten_layer(model_object),
         num_examples_per_batch=100, num_epochs=10,
         num_training_batches_per_epoch=10, output_model_file_name=ucn_file_name,
