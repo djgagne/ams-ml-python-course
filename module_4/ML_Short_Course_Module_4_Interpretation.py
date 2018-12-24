@@ -176,6 +176,18 @@ LIST_OF_METRIC_FUNCTIONS = [
     keras_metrics.binary_focn
 ]
 
+METRIC_FUNCTION_DICT = {
+    'accuracy': keras_metrics.accuracy,
+    'binary_accuracy': keras_metrics.binary_accuracy,
+    'binary_csi': keras_metrics.binary_csi,
+    'binary_frequency_bias': keras_metrics.binary_frequency_bias,
+    'binary_pod': keras_metrics.binary_pod,
+    'binary_pofd': keras_metrics.binary_pofd,
+    'binary_peirce_score': keras_metrics.binary_peirce_score,
+    'binary_success_ratio': keras_metrics.binary_success_ratio,
+    'binary_focn': keras_metrics.binary_focn
+}
+
 DEFAULT_NUM_BWO_ITERATIONS = 200
 DEFAULT_BWO_LEARNING_RATE = 0.01
 
@@ -1265,7 +1277,7 @@ def read_keras_model(hdf5_file_name):
     """
 
     return keras.models.load_model(
-        hdf5_file_name, custom_objects=LIST_OF_METRIC_FUNCTIONS)
+        hdf5_file_name, custom_objects=METRIC_FUNCTION_DICT)
 
 
 def find_model_metafile(model_file_name, raise_error_if_missing=False):
@@ -3114,6 +3126,106 @@ def setup_ucn_fancy(num_input_features, first_num_rows, first_num_columns,
             layer_object = keras.layers.ZeroPadding2D(
                 padding=(1, 1), data_format='channels_last'
             )(layer_object)
+
+        if i < num_deconv_layers - 1 or use_activation_for_out_layer:
+            layer_object = keras.layers.LeakyReLU(
+                alpha=SLOPE_FOR_RELU
+            )(layer_object)
+
+        if not USE_BATCH_NORMALIZATION:
+            continue
+
+        if i < num_deconv_layers - 1 or use_bn_for_out_layer:
+            layer_object = keras.layers.BatchNormalization(
+                axis=-1, center=True, scale=True
+            )(layer_object)
+
+    model_object = keras.models.Model(
+        inputs=input_layer_object, outputs=layer_object)
+    model_object.compile(
+        loss=keras.losses.mean_squared_error, optimizer=keras.optimizers.Adam())
+
+    model_object.summary()
+    return model_object
+
+
+def setup_ucn_smooth(num_input_features, first_num_rows, first_num_columns,
+                     upsampling_factor_by_deconv_layer, num_output_channels,
+                     use_activation_for_out_layer, use_bn_for_out_layer):
+    """Sets up (but does not train) UCN with Gaussian smoothing.
+
+    :param num_input_features: Number of input features.
+    :param first_num_rows: Number of rows in input to first deconv layer.  The
+        input features will be reshaped into a grid with this many rows.
+    :param first_num_columns: Same but for columns.
+    :param upsampling_factor_by_deconv_layer: length-L numpy array of upsampling
+        factors, where L = number of deconv layers.
+    :param num_output_channels: Number of channels in final output.
+    :param use_activation_for_out_layer: Boolean flag.  If True, activation
+        will be applied to output layer.
+    :param use_bn_for_out_layer: Boolean flag.  If True, batch normalization
+        will be applied to output layer.
+    :return: model_object: Untrained instance of `keras.models.Model`.
+    """
+
+    regularizer_object = keras.regularizers.l1_l2(l1=L1_WEIGHT, l2=L2_WEIGHT)
+    input_layer_object = keras.layers.Input(shape=(num_input_features,))
+
+    current_num_filters = int(numpy.round(
+        num_input_features / (first_num_rows * first_num_columns)
+    ))
+
+    layer_object = keras.layers.Reshape(
+        target_shape=(first_num_rows, first_num_columns, current_num_filters)
+    )(input_layer_object)
+
+    num_deconv_layers = len(upsampling_factor_by_deconv_layer)
+
+    for i in range(num_deconv_layers):
+        this_upsampling_factor = upsampling_factor_by_deconv_layer[i]
+
+        if this_upsampling_factor > 1:
+            this_padding_arg = 'same'
+        else:
+            this_padding_arg = 'valid'
+            current_num_filters = int(numpy.round(current_num_filters / 2))
+
+        if i == num_deconv_layers - 1:
+            current_num_filters = num_output_channels + 0
+
+        layer_object = keras.layers.Conv2DTranspose(
+            filters=current_num_filters,
+            kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
+            strides=(this_upsampling_factor, this_upsampling_factor),
+            padding=this_padding_arg, data_format='channels_last',
+            dilation_rate=(1, 1), activation=None, use_bias=True,
+            kernel_initializer='glorot_uniform', bias_initializer='zeros',
+            kernel_regularizer=regularizer_object
+        )(layer_object)
+
+        this_filter_matrix = numpy.array(
+            [[1, 4, 7, 4, 1],
+             [4, 16, 26, 16, 4],
+             [7, 26, 41, 26, 7],
+             [4, 16, 26, 16, 4],
+             [1, 4, 7, 4, 1]], dtype=float
+        ) / 273
+
+        this_weight_matrix = numpy.full(
+            (5, 5, current_num_filters, current_num_filters), 0.)
+        for j in range(current_num_filters):
+            this_weight_matrix[..., j, j] = this_filter_matrix
+
+        this_bias_vector = numpy.zeros(current_num_filters)
+
+        layer_object = keras.layers.Conv2D(
+            filters=current_num_filters, kernel_size=(5, 5),
+            strides=(1, 1), padding='same', data_format='channels_last',
+            dilation_rate=(1, 1), activation=None, use_bias=True,
+            kernel_initializer='glorot_uniform', bias_initializer='zeros',
+            kernel_regularizer=regularizer_object, trainable=False,
+            weights=[this_weight_matrix, this_bias_vector]
+        )(layer_object)
 
         if i < num_deconv_layers - 1 or use_activation_for_out_layer:
             layer_object = keras.layers.LeakyReLU(
