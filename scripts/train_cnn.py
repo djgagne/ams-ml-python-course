@@ -36,11 +36,13 @@ NUM_VALIDATION_BATCHES_HELP_STRING = (
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file (HDF5 format).  The trained model will be saved here.')
 
-DEFAULT_IMAGE_DIR_NAME = ''
 DEFAULT_NUM_EXAMPLES_PER_BATCH = 1024
 DEFAULT_NUM_EPOCHS = 100
 DEFAULT_NUM_TRAINING_BATCHES_PER_EPOCH = 32
 DEFAULT_NUM_VALIDATION_BATCHES_PER_EPOCH = 16
+DEFAULT_IMAGE_DIR_NAME = (
+    '/condo/swatwork/ralager/ams2019_short_course/'
+    'track_data_ncar_ams_3km_nc_small')
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
