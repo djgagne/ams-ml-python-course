@@ -1264,6 +1264,74 @@ def _create_directory(directory_name=None, file_name=None):
             raise
 
 
+def read_keras_model(hdf5_file_name):
+    """Reads Keras model from HDF5 file.
+
+    :param hdf5_file_name: Path to input file.
+    :return: model_object: Instance of `keras.models.Model`.
+    """
+
+    return keras.models.load_model(
+        hdf5_file_name, custom_objects=LIST_OF_METRIC_FUNCTIONS)
+
+
+def find_model_metafile(model_file_name, raise_error_if_missing=False):
+    """Finds metafile for machine-learning model.
+
+    :param model_file_name: Path to file with trained model.
+    :param raise_error_if_missing: Boolean flag.  If True and metafile is not
+        found, this method will error out.
+    :return: model_metafile_name: Path to file with metadata.  If file is not
+        found and `raise_error_if_missing = False`, this will be the expected
+        path.
+    :raises: ValueError: if metafile is not found and
+        `raise_error_if_missing = True`.
+    """
+
+    model_directory_name, pathless_model_file_name = os.path.split(
+        model_file_name)
+    model_metafile_name = '{0:s}/{1:s}_metadata.p'.format(
+        model_directory_name, os.path.splitext(pathless_model_file_name)[0]
+    )
+
+    if not os.path.isfile(model_metafile_name) and raise_error_if_missing:
+        error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
+            model_metafile_name)
+        raise ValueError(error_string)
+
+    return model_metafile_name
+
+
+def write_model_metadata(model_metadata_dict, pickle_file_name):
+    """Writes metadata for machine-learning model to Pickle file.
+
+    :param model_metadata_dict: Dictionary created by `train_cnn` or
+        `train_ucn`.
+    :param pickle_file_name: Path to output file.
+    """
+
+    _create_directory(file_name=pickle_file_name)
+
+    metafile_handle = open(pickle_file_name, 'wb')
+    pickle.dump(model_metadata_dict, metafile_handle)
+    metafile_handle.close()
+
+
+def read_model_metadata(pickle_file_name):
+    """Reads metadata for machine-learning model from Pickle file.
+
+    :param pickle_file_name: Path to output file.
+    :return: model_metadata_dict: Dictionary with keys listed in doc for
+        `train_cnn` or `train_ucn`.
+    """
+
+    pickle_file_handle = open(pickle_file_name, 'rb')
+    model_metadata_dict = pickle.load(pickle_file_handle)
+    pickle_file_handle.close()
+
+    return model_metadata_dict
+
+
 def train_cnn_example(model_object, training_file_names, normalization_dict,
                       binarization_threshold):
     """Actually trains the CNN.
@@ -3292,6 +3360,34 @@ def train_ucn(
     return model_metadata_dict
 
 
+def get_cnn_flatten_layer(cnn_model_object):
+    """Finds flattening layer in CNN.
+
+    This method assumes that there is only one flattening layer.  If there are
+    several, this method will return the first (shallowest).
+
+    :param cnn_model_object: Instance of `keras.models.Model`.
+    :return: layer_name: Name of flattening layer.
+    :raises: TypeError: if flattening layer cannot be found.
+    """
+
+    layer_names = [lyr.name for lyr in cnn_model_object.layers]
+
+    flattening_flags = numpy.array(
+        ['flatten' in n for n in layer_names], dtype=bool)
+    flattening_indices = numpy.where(flattening_flags)[0]
+
+    if len(flattening_indices) == 0:
+        error_string = (
+            'Cannot find flattening layer in model.  Layer names are listed '
+            'below.\n{0:s}'
+        ).format(str(layer_names))
+
+        raise TypeError(error_string)
+
+    return layer_names[flattening_indices[0]]
+
+
 def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
                       model_object):
     """Actually trains the UCN (upconvolutional network).
@@ -3311,7 +3407,7 @@ def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
         training_file_names=training_file_names,
         normalization_dict=normalization_dict,
         cnn_model_object=model_object,
-        cnn_feature_layer_name='flatten_1',
+        cnn_feature_layer_name=get_cnn_flatten_layer(model_object),
         num_examples_per_batch=100, num_epochs=10,
         num_training_batches_per_epoch=10, output_model_file_name=ucn_file_name,
         validation_file_names=validation_file_names,
@@ -3342,7 +3438,7 @@ def plot_ucn_example1(
 
     feature_matrix = _apply_cnn(
         model_object=model_object, predictor_matrix=image_matrix_norm,
-        verbose=False, output_layer_name='flatten_1')
+        verbose=False, output_layer_name=get_cnn_flatten_layer(model_object))
 
     reconstructed_image_matrix_norm = ucn_model_object.predict(
         feature_matrix, batch_size=1)
@@ -3669,7 +3765,8 @@ def do_novelty_detection_example(
             PREDICTOR_MATRIX_KEY][test_indices, ...],
         image_normalization_dict=normalization_dict,
         predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        cnn_model_object=model_object, cnn_feature_layer_name='flatten_1',
+        cnn_model_object=model_object,
+        cnn_feature_layer_name=get_cnn_flatten_layer(model_object),
         ucn_model_object=ucn_model_object,
         num_novel_test_images=1)
 

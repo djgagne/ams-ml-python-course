@@ -1,7 +1,5 @@
 """Trains CNN for use in short course."""
 
-import pickle
-import os.path
 import argparse
 from keras import backend as K
 from module_4 import ML_Short_Course_Module_4_Interpretation as short_course
@@ -120,17 +118,14 @@ def _run(input_image_dir_name, num_examples_per_batch, num_epochs,
         output_model_file_name=output_model_file_name,
         validation_file_names=validation_file_names,
         num_validation_batches_per_epoch=num_validation_batches_per_epoch)
+    print(SEPARATOR_STRING)
 
-    model_dir_name, pathless_model_file_name = os.path.split(
-        output_model_file_name)
-    model_metafile_name = '{0:s}/{1:s}_metadata.p'.format(
-        model_dir_name, os.path.splitext(pathless_model_file_name)[0]
-    )
+    model_metafile_name = short_course.find_model_metafile(
+        model_file_name=output_model_file_name, raise_error_if_missing=False)
 
     print('Writing metadata to: "{0:s}"...'.format(model_metafile_name))
-    metafile_handle = open(model_metafile_name, 'wb')
-    pickle.dump(model_metadata_dict, metafile_handle)
-    metafile_handle.close()
+    short_course.write_model_metadata(model_metadata_dict=model_metadata_dict,
+                                      pickle_file_name=model_metafile_name)
 
 
 if __name__ == '__main__':

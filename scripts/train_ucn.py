@@ -1,11 +1,8 @@
 """Trains UCN (upconvnet) for use in short course."""
 
-import pickle
-import os.path
 import argparse
 import numpy
 from keras import backend as K
-from keras.models import load_model as read_keras_model
 from module_4 import ML_Short_Course_Module_4_Interpretation as short_course
 
 K.set_session(K.tf.Session(config=K.tf.ConfigProto(
@@ -18,6 +15,8 @@ FIRST_TRAINING_DATE_STRING = '20100101'
 LAST_TRAINING_DATE_STRING = '20141231'
 FIRST_VALIDATION_DATE_STRING = '20150101'
 LAST_VALIDATION_DATE_STRING = '20151231'
+
+UPSAMPLING_FACTOR_BY_DECONV_LAYER = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
 
 CNN_FILE_ARG_NAME = 'input_cnn_file_name'
 OUT_LAYER_ACTIVATION_ARG_NAME = 'use_activation_for_out_layer'
@@ -112,34 +111,6 @@ INPUT_ARG_PARSER.add_argument(
     help=OUTPUT_FILE_HELP_STRING)
 
 
-def get_flattening_layer(cnn_model_object):
-    """Finds flattening layer in CNN.
-
-    This method assumes that there is only one flattening layer.  If there are
-    several, this method will return the first (shallowest).
-
-    :param cnn_model_object: Instance of `keras.models.Model`.
-    :return: layer_name: Name of flattening layer.
-    :raises: TypeError: if flattening layer cannot be found.
-    """
-
-    layer_names = [lyr.name for lyr in cnn_model_object.layers]
-
-    flattening_flags = numpy.array(
-        ['flatten' in n for n in layer_names], dtype=bool)
-    flattening_indices = numpy.where(flattening_flags)[0]
-
-    if len(flattening_indices) == 0:
-        error_string = (
-            'Cannot find flattening layer in model.  Layer names are listed '
-            'below.\n{0:s}'
-        ).format(str(layer_names))
-
-        raise TypeError(error_string)
-
-    return layer_names[flattening_indices[0]]
-
-
 def _run(input_cnn_file_name, use_activation_for_out_layer,
          use_bn_for_out_layer, input_image_dir_name, num_examples_per_batch,
          num_epochs, num_training_batches_per_epoch,
@@ -160,33 +131,65 @@ def _run(input_cnn_file_name, use_activation_for_out_layer,
     """
 
     print('Reading trained CNN from: "{0:s}"...'.format(input_cnn_file_name))
-    cnn_model_object = read_keras_model(
-        input_cnn_file_name,
-        custom_objects=short_course.LIST_OF_METRIC_FUNCTIONS)
+    cnn_model_object = short_course.read_keras_model(input_cnn_file_name)
 
-    # TODO(thunderhoser): Write method to find metafile.
-
-    cnn_directory_name, pathless_cnn_file_name = os.path.split(
-        input_cnn_file_name)
-    cnn_metafile_name = '{0:s}/{1:s}_metadata.p'.format(
-        cnn_directory_name, os.path.splitext(pathless_cnn_file_name)[0]
-    )
-
-    # TODO(thunderhoser): Write IO methods for metadata.
+    cnn_metafile_name = short_course.find_model_metafile(
+        model_file_name=input_cnn_file_name, raise_error_if_missing=True)
 
     print('Reading CNN metadata from: "{0:s}"...'.format(cnn_metafile_name))
-    metafile_handle = open(cnn_metafile_name, 'rb')
-    cnn_metadata_dict = pickle.load(metafile_handle)
-    metafile_handle.close()
+    cnn_metadata_dict = short_course.read_model_metadata(cnn_metafile_name)
 
-    # TODO(thunderhoser): Need method to find flattening layer in CNN.
-    flattening_layer_name = get_flattening_layer(cnn_model_object)
+    cnn_feature_layer_name = short_course.get_cnn_flatten_layer(
+        cnn_model_object)
+    cnn_feature_layer_object = cnn_model_object.get_layer(
+        name=cnn_feature_layer_name)
+    cnn_feature_dimensions = numpy.array(
+        cnn_feature_layer_object.input.shape[1:], dtype=int)
 
-    short_course.setup_ucn_fancy(
-        num_input_features, first_num_rows, first_num_columns,
-        upsampling_factor_by_deconv_layer, num_output_channels,
-        use_activation_for_out_layer, use_bn_for_out_layer)
+    num_input_features = numpy.prod(cnn_feature_dimensions)
+    first_num_rows = cnn_feature_dimensions[0]
+    first_num_columns = cnn_feature_dimensions[1]
+    num_output_channels = cnn_model_object.input.shape[-1]
+
+    ucn_model_object = short_course.setup_ucn_fancy(
+        num_input_features=num_input_features, first_num_rows=first_num_rows,
+        first_num_columns=first_num_columns,
+        upsampling_factor_by_deconv_layer=UPSAMPLING_FACTOR_BY_DECONV_LAYER,
+        num_output_channels=num_output_channels,
+        use_activation_for_out_layer=use_activation_for_out_layer,
+        use_bn_for_out_layer=use_bn_for_out_layer)
     print(SEPARATOR_STRING)
+
+    training_file_names = short_course.find_many_image_files(
+        first_date_string=FIRST_TRAINING_DATE_STRING,
+        last_date_string=LAST_TRAINING_DATE_STRING,
+        image_dir_name=input_image_dir_name)
+
+    validation_file_names = short_course.find_many_image_files(
+        first_date_string=FIRST_VALIDATION_DATE_STRING,
+        last_date_string=LAST_VALIDATION_DATE_STRING,
+        image_dir_name=input_image_dir_name)
+
+    ucn_metadata_dict = short_course.train_ucn(
+        ucn_model_object=ucn_model_object,
+        training_file_names=training_file_names,
+        normalization_dict=cnn_metadata_dict[
+            short_course.NORMALIZATION_DICT_KEY],
+        cnn_model_object=cnn_model_object,
+        cnn_feature_layer_name=cnn_feature_layer_name,
+        num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,
+        num_training_batches_per_epoch=num_training_batches_per_epoch,
+        output_model_file_name=output_model_file_name,
+        validation_file_names=validation_file_names,
+        num_validation_batches_per_epoch=num_validation_batches_per_epoch)
+    print(SEPARATOR_STRING)
+
+    ucn_metafile_name = short_course.find_model_metafile(
+        model_file_name=output_model_file_name, raise_error_if_missing=False)
+
+    print('Writing metadata to: "{0:s}"...'.format(ucn_metafile_name))
+    short_course.write_model_metadata(model_metadata_dict=ucn_metadata_dict,
+                                      pickle_file_name=ucn_metafile_name)
 
 
 if __name__ == '__main__':
