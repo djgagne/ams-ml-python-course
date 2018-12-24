@@ -2,11 +2,11 @@
 
 import argparse
 import faulthandler
-from keras import backend as K
-from module_4 import ML_Short_Course_Module_4_Interpretation as short_course
-
 print('FOO')
 faulthandler.enable()
+
+from keras import backend as K
+from module_4 import ML_Short_Course_Module_4_Interpretation as short_course
 
 K.set_session(K.tf.Session(config=K.tf.ConfigProto(
     intra_op_parallelism_threads=7, inter_op_parallelism_threads=7
