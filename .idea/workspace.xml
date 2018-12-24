@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
@@ -18,8 +17,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="781">
-              <caret line="3909" column="0" lean-forward="true" selection-start-line="3909" selection-start-column="0" selection-end-line="3909" selection-end-column="0" />
+            <state relative-caret-position="391">
+              <caret line="1342" column="0" lean-forward="false" selection-start-line="1342" selection-start-column="0" selection-end-line="1359" selection-end-column="30" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -53,8 +52,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>def tr</find>
-      <find>def norma</find>
       <find>def norm</find>
       <find>def get_image_normalization_params</find>
       <find>def get_binarization_threshold</find>
@@ -64,7 +61,6 @@
       <find>upsampling_factor_by_deconv_layer</find>
       <find>def train_u</find>
       <find>def train_cnn</find>
-      <find>pickle.</find>
       <find>flatten_</find>
       <find>get_cnn_flatten_layer(</find>
       <find>attributes_diagrams.</find>
@@ -83,6 +79,9 @@
       <find>def write_model_metadata</find>
       <find>get_image_norm</find>
       <find>def setup_ucn</find>
+      <find>pickle.</find>
+      <find>pickle</find>
+      <find>NORMALIZATION</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -134,8 +133,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="1920" />
+    <option name="y" value="28" />
     <option name="width" value="1920" />
-    <option name="height" value="1080" />
+    <option name="height" value="1138" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -381,7 +382,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="0" y="0" width="1920" height="1080" extended-state="6" />
+    <frame x="1920" y="28" width="1920" height="1138" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
@@ -559,8 +560,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="781">
-          <caret line="3909" column="0" lean-forward="true" selection-start-line="3909" selection-start-column="0" selection-end-line="3909" selection-end-column="0" />
+        <state relative-caret-position="391">
+          <caret line="1342" column="0" lean-forward="false" selection-start-line="1342" selection-start-column="0" selection-end-line="1359" selection-end-column="30" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

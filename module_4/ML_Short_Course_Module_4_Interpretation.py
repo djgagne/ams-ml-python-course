@@ -5,6 +5,7 @@ import glob
 import errno
 import random
 import os.path
+import json
 import pickle
 import time
 import calendar
@@ -1310,32 +1311,51 @@ def find_model_metafile(model_file_name, raise_error_if_missing=False):
     return model_metafile_name
 
 
-def write_model_metadata(model_metadata_dict, pickle_file_name):
-    """Writes metadata for machine-learning model to Pickle file.
+def write_model_metadata(model_metadata_dict, json_file_name):
+    """Writes metadata for machine-learning model to JSON file.
 
     :param model_metadata_dict: Dictionary created by `train_cnn` or
         `train_ucn`.
-    :param pickle_file_name: Path to output file.
+    :param json_file_name: Path to output file.
     """
 
-    _create_directory(file_name=pickle_file_name)
+    _create_directory(file_name=json_file_name)
 
-    metafile_handle = open(pickle_file_name, 'wb')
-    pickle.dump(model_metadata_dict, metafile_handle)
-    metafile_handle.close()
+    # TODO(thunderhoser): Put this bullshit in a separate method.
+    if NORMALIZATION_DICT_KEY in model_metadata_dict.keys():
+        this_norm_dict = model_metadata_dict[NORMALIZATION_DICT_KEY]
+
+        for this_key in this_norm_dict.keys():
+            if isinstance(this_norm_dict[this_key], numpy.ndarray):
+                this_norm_dict[this_key] = this_norm_dict[this_key].tolist()
+
+    with open(json_file_name, 'w') as this_file:
+        json.dump(model_metadata_dict, this_file)
+
+    # TODO(thunderhoser): Put this bullshit in a separate method.
+    if NORMALIZATION_DICT_KEY in model_metadata_dict.keys():
+        this_norm_dict = model_metadata_dict[NORMALIZATION_DICT_KEY]
+
+        for this_key in this_norm_dict.keys():
+            this_norm_dict[this_key] = numpy.array(this_norm_dict[this_key])
 
 
-def read_model_metadata(pickle_file_name):
-    """Reads metadata for machine-learning model from Pickle file.
+def read_model_metadata(json_file_name):
+    """Reads metadata for machine-learning model from JSON file.
 
-    :param pickle_file_name: Path to output file.
+    :param json_file_name: Path to output file.
     :return: model_metadata_dict: Dictionary with keys listed in doc for
         `train_cnn` or `train_ucn`.
     """
 
-    pickle_file_handle = open(pickle_file_name, 'rb')
-    model_metadata_dict = pickle.load(pickle_file_handle)
-    pickle_file_handle.close()
+    with open(json_file_name) as this_file:
+        model_metadata_dict = json.load(this_file)
+
+    if NORMALIZATION_DICT_KEY in model_metadata_dict.keys():
+        this_norm_dict = model_metadata_dict[NORMALIZATION_DICT_KEY]
+
+        for this_key in this_norm_dict.keys():
+            this_norm_dict[this_key] = numpy.array(this_norm_dict[this_key])
 
     return model_metadata_dict
 
