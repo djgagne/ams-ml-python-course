@@ -3944,6 +3944,8 @@ def do_novelty_detection_example(
     test_indices = test_indices[test_indices >= 100]
     baseline_indices = numpy.linspace(0, 100, num=100, dtype=int)
 
+    num_novel_test_images = 4
+
     novelty_dict = do_novelty_detection(
         baseline_image_matrix=validation_image_dict[
             PREDICTOR_MATRIX_KEY][baseline_indices, ...],
@@ -3954,48 +3956,145 @@ def do_novelty_detection_example(
         cnn_model_object=cnn_model_object,
         cnn_feature_layer_name=get_cnn_flatten_layer(cnn_model_object),
         ucn_model_object=ucn_model_object,
-        num_novel_test_images=1)
+        num_novel_test_images=num_novel_test_images)
 
     predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
     temperature_index = predictor_names.index(TEMPERATURE_NAME)
-    min_colour_temp_kelvins = numpy.percentile(
-        novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][..., temperature_index], 1)
-    max_colour_temp_kelvins = numpy.percentile(
-        novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][..., temperature_index], 99)
 
-    figure_object, _ = plot_many_predictors_with_barbs(
-        predictor_matrix=novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][0, ...],
-        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        min_colour_temp_kelvins=min_colour_temp_kelvins,
-        max_colour_temp_kelvins=max_colour_temp_kelvins)
+    for i in range(num_novel_test_images):
+        this_actual_matrix = novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][i, ...]
+        this_reconstructed_matrix = novelty_dict[NOVEL_IMAGES_RECON_KEY][i, ...]
 
-    figure_object.suptitle('Actual test image')
-    pyplot.show()
+        this_combined_matrix_kelvins = numpy.concatenate(
+            (this_actual_matrix[..., temperature_index],
+             this_reconstructed_matrix[..., temperature_index]),
+            axis=0)
 
-    figure_object, _ = plot_many_predictors_with_barbs(
-        predictor_matrix=novelty_dict[NOVEL_IMAGES_RECON_KEY][0, ...],
-        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        min_colour_temp_kelvins=min_colour_temp_kelvins,
-        max_colour_temp_kelvins=max_colour_temp_kelvins)
+        this_min_temp_kelvins = numpy.percentile(
+            this_combined_matrix_kelvins, 1)
+        this_max_temp_kelvins = numpy.percentile(
+            this_combined_matrix_kelvins, 99)
 
-    figure_object.suptitle('Reconstruction of test image by upconvnet')
-    pyplot.show()
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_actual_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
 
-    difference_matrix = (
-        novelty_dict[NOVEL_IMAGES_RECON_KEY] -
-        novelty_dict[NOVEL_IMAGES_RECON_EXPECTED_KEY]
-    )
+        this_title_string = '{0:d}th-most novel example: actual'.format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
 
-    min_colour_temp_kelvins = numpy.percentile(
-        difference_matrix[..., temperature_index], 1)
-    max_colour_temp_kelvins = numpy.percentile(
-        difference_matrix[..., temperature_index], 99)
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_reconstructed_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
 
-    figure_object, _ = plot_many_predictors_with_barbs(
-        predictor_matrix=difference_matrix[0, ...],
-        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        min_colour_temp_kelvins=min_colour_temp_kelvins,
-        max_colour_temp_kelvins=max_colour_temp_kelvins)
+        this_title_string = (
+            '{0:d}th-most novel example: upconvnet reconstruction (X)'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
 
-    figure_object.suptitle('Novel part of test image')
-    pyplot.show()
+        this_difference_matrix = (
+            this_reconstructed_matrix -
+            novelty_dict[NOVEL_IMAGES_RECON_EXPECTED_KEY][i, ...]
+        )
+
+        this_min_temp_kelvins = numpy.percentile(
+            this_difference_matrix[..., temperature_index], 1)
+        this_max_temp_kelvins = numpy.percentile(
+            this_difference_matrix[..., temperature_index], 99)
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_difference_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = (
+            '{0:d}th-most novel example: novelty (X - X'')'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
+
+
+def foo(validation_image_dict, novelty_dict):
+    """Debugging."""
+
+    num_novel_test_images = 4
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+
+    for i in range(num_novel_test_images):
+        this_actual_matrix = novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][i, ...]
+        this_reconstructed_matrix = novelty_dict[NOVEL_IMAGES_RECON_KEY][i, ...]
+        this_reconstructed_svd_matrix = novelty_dict[
+            NOVEL_IMAGES_RECON_EXPECTED_KEY][i, ...]
+
+        this_combined_matrix_kelvins = numpy.concatenate(
+            (this_actual_matrix[..., temperature_index],
+             this_reconstructed_matrix[..., temperature_index]),
+            axis=0)
+
+        this_min_temp_kelvins = numpy.percentile(
+            this_combined_matrix_kelvins, 1)
+        this_max_temp_kelvins = numpy.percentile(
+            this_combined_matrix_kelvins, 99)
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_actual_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = '{0:d}th-most novel example: actual'.format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_reconstructed_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = (
+            '{0:d}th-most novel example: upconvnet reconstruction (X)'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_reconstructed_svd_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = (
+            '{0:d}th-most novel example: upconvnet reconstruction of SVD '
+            'reconstruction'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
+
+        this_difference_matrix = (
+            this_reconstructed_matrix - this_reconstructed_svd_matrix
+        )
+
+        this_min_temp_kelvins = numpy.percentile(
+            this_difference_matrix[..., temperature_index], 1)
+        this_max_temp_kelvins = numpy.percentile(
+            this_difference_matrix[..., temperature_index], 99)
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_difference_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = (
+            '{0:d}th-most novel example: novelty (X - X'')'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
