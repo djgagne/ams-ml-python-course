@@ -1878,10 +1878,12 @@ def evaluate_cnn(
     pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
         observed_labels=target_values,
         forecast_probabilities=forecast_probabilities)
-    pyplot.show()
 
     area_under_roc_curve = scikit_learn_auc(pofd_by_threshold, pod_by_threshold)
-    print('Area under ROC curve: {0:.4f}'.format(area_under_roc_curve))
+    title_string = 'Area under ROC curve: {0:.4f}'.format(area_under_roc_curve)
+
+    pyplot.title(title_string)
+    pyplot.show()
 
     _create_directory(directory_name=output_dir_name)
     roc_curve_file_name = '{0:s}/roc_curve.jpg'.format(output_dir_name)
@@ -2668,14 +2670,19 @@ def _do_saliency_calculations(
 
     list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
     num_input_tensors = len(list_of_input_tensors)
+
     for i in range(num_input_tensors):
         list_of_gradient_tensors[i] /= K.maximum(
-            K.std(list_of_gradient_tensors[i]), K.epsilon())
+            K.std(list_of_gradient_tensors[i]), K.epsilon()
+        )
 
     inputs_to_gradients_function = K.function(
-        list_of_input_tensors + [K.learning_phase()], list_of_gradient_tensors)
+        list_of_input_tensors + [K.learning_phase()],
+        list_of_gradient_tensors)
+
     list_of_saliency_matrices = inputs_to_gradients_function(
         list_of_input_matrices + [0])
+
     for i in range(num_input_tensors):
         list_of_saliency_matrices[i] *= -1
 
