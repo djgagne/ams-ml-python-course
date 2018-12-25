@@ -3526,19 +3526,23 @@ def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
         num_validation_batches_per_epoch=10)
 
 
-def plot_ucn_example1(
-        validation_image_dict, normalization_dict, cnn_model_object,
-        ucn_model_object):
-    """Plots UCN output for random validation example.
+def apply_ucn_example1(
+        validation_image_dict, normalization_dict, cnn_model_object):
+    """Uses upconvnet to reconstruct random validation example.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
     :param cnn_model_object: Trained instance of `keras.models.Model`,
-        representing the CNN or "encoder".
-    :param ucn_model_object: Trained instance of `keras.models.Model`,
-        representing the UCN or "decoder".
+        representing the CNN that goes with the upconvnet.
     """
+
+    ucn_file_name = '{0:s}/pretrained_cnn/pretrained_ucn.h5'.format(
+        DEFAULT_OUTPUT_DIR_NAME)
+    ucn_metafile_name = find_model_metafile(model_file_name=ucn_file_name)
+
+    ucn_model_object = read_keras_model(ucn_file_name)
+    ucn_metadata_dict = read_model_metadata(ucn_metafile_name)
 
     image_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
     predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
@@ -3570,22 +3574,91 @@ def plot_ucn_example1(
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (input to CNN):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=image_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Original image (CNN input)')
     pyplot.show()
 
-    print('\nReconstructed example (output of UCN):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=reconstructed_image_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Reconstructed image (upconvnet output)')
+    pyplot.show()
+
+
+def apply_ucn_example2(
+        validation_image_dict, normalization_dict, ucn_model_object,
+        cnn_model_object):
+    """Uses upconvnet to reconstruct extreme validation example.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param ucn_model_object: Trained instance of `keras.models.Model`,
+        representing the upconvnet.
+    :param cnn_model_object: Trained instance of `keras.models.Model`,
+        representing the CNN that goes with the upconvnet.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    image_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    image_matrix_norm, _ = normalize_images(
+        predictor_matrix=image_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    image_matrix_norm = numpy.expand_dims(image_matrix_norm, axis=0)
+
+    feature_matrix = _apply_cnn(
+        cnn_model_object=cnn_model_object, predictor_matrix=image_matrix_norm,
+        output_layer_name=get_cnn_flatten_layer(cnn_model_object),
+        verbose=False)
+
+    reconstructed_image_matrix_norm = ucn_model_object.predict(
+        feature_matrix, batch_size=1)
+
+    reconstructed_image_matrix = denormalize_images(
+        predictor_matrix=reconstructed_image_matrix_norm,
+        predictor_names=predictor_names, normalization_dict=normalization_dict
+    )[0, ...]
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    combined_temp_matrix_kelvins = numpy.concatenate(
+        (image_matrix[..., temperature_index],
+         reconstructed_image_matrix[..., temperature_index]),
+        axis=0)
+
+    min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
+    max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
+
+    figure_object, _ = plot_many_predictors_with_barbs(
+        predictor_matrix=image_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    figure_object.suptitle('Original image (CNN input)')
+    pyplot.show()
+
+    figure_object, _ = plot_many_predictors_with_barbs(
+        predictor_matrix=reconstructed_image_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    figure_object.suptitle('Reconstructed image (upconvnet output)')
     pyplot.show()
 
 

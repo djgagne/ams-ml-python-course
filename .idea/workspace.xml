@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
@@ -17,8 +18,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="763">
-              <caret line="3309" column="59" lean-forward="true" selection-start-line="3289" selection-start-column="4" selection-end-line="3309" selection-end-column="59" />
+            <state relative-caret-position="-6280">
+              <caret line="3608" column="0" lean-forward="true" selection-start-line="3608" selection-start-column="0" selection-end-line="3608" selection-end-column="0" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -54,8 +55,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>evaluate_cnn(</find>
-      <find>def write_model_metadata</find>
       <find>get_image_norm</find>
       <find>def setup_ucn</find>
       <find>pickle.</find>
@@ -84,6 +83,8 @@
       <find>validation_file_names =</find>
       <find>validation_image_dict:</find>
       <find>print(</find>
+      <find>validation_image_dict</find>
+      <find>0</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -579,8 +580,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="763">
-          <caret line="3309" column="59" lean-forward="true" selection-start-line="3289" selection-start-column="4" selection-end-line="3309" selection-end-column="59" />
+        <state relative-caret-position="-6280">
+          <caret line="3608" column="0" lean-forward="true" selection-start-line="3608" selection-start-column="0" selection-end-line="3608" selection-end-column="0" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>
