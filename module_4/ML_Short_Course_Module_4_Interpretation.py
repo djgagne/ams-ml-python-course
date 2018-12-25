@@ -20,7 +20,7 @@ import matplotlib.pyplot as pyplot
 from module_4 import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
-# from module_4 import attributes_diagrams
+from module_4 import attributes_diagrams
 
 # Directories.
 DEFAULT_IMAGE_DIR_NAME = (
@@ -264,6 +264,7 @@ def _feature_file_name_to_date(csv_file_name):
     # Verify.
     time_string_to_unix(time_string=date_string, time_format=DATE_FORMAT)
     return date_string
+
 
 def find_many_feature_files(first_date_string, last_date_string,
                             feature_dir_name=DEFAULT_FEATURE_DIR_NAME):
@@ -573,6 +574,369 @@ def find_training_files_example():
 
     training_file_names = find_many_image_files(
         first_date_string='20100101', last_date_string='20141231')
+
+    validation_file_names = find_many_image_files(
+        first_date_string='20150101', last_date_string='20151231')
+
+
+def _init_figure_panels(num_rows, num_columns, horizontal_space_fraction=0.1,
+                        vertical_space_fraction=0.1):
+    """Initializes paneled figure.
+
+    :param num_rows: Number of panel rows.
+    :param num_columns: Number of panel columns.
+    :param horizontal_space_fraction: Horizontal space between panels (as
+        fraction of panel size).
+    :param vertical_space_fraction: Vertical space between panels (as fraction
+        of panel size).
+    :return: figure_object: Instance of `matplotlib.figure.Figure`.
+    :return: axes_objects_2d_list: 2-D list, where axes_objects_2d_list[i][j] is
+        the handle (instance of `matplotlib.axes._subplots.AxesSubplot`) for the
+        [i]th row and [j]th column.
+    """
+
+    figure_object, axes_objects_2d_list = pyplot.subplots(
+        num_rows, num_columns, sharex=False, sharey=False,
+        figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    if num_rows == num_columns == 1:
+        axes_objects_2d_list = [[axes_objects_2d_list]]
+    elif num_columns == 1:
+        axes_objects_2d_list = [[a] for a in axes_objects_2d_list]
+    elif num_rows == 1:
+        axes_objects_2d_list = [axes_objects_2d_list]
+
+    pyplot.subplots_adjust(
+        left=0.02, bottom=0.02, right=0.98, top=0.95,
+        hspace=vertical_space_fraction, wspace=horizontal_space_fraction)
+
+    return figure_object, axes_objects_2d_list
+
+
+def _add_colour_bar(
+        axes_object, colour_map_object, values_to_colour, min_colour_value,
+        max_colour_value, colour_norm_object=None,
+        orientation_string='vertical', extend_min=True, extend_max=True):
+    """Adds colour bar to existing axes.
+
+    :param axes_object: Existing axes (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).
+    :param colour_map_object: Colour scheme (instance of
+        `matplotlib.pyplot.cm`).
+    :param values_to_colour: numpy array of values to colour.
+    :param min_colour_value: Minimum value in colour map.
+    :param max_colour_value: Max value in colour map.
+    :param colour_norm_object: Instance of `matplotlib.colors.BoundaryNorm`,
+        defining the scale of the colour map.  If `colour_norm_object is None`,
+        will assume that scale is linear.
+    :param orientation_string: Orientation of colour bar ("vertical" or
+        "horizontal").
+    :param extend_min: Boolean flag.  If True, the bottom of the colour bar will
+        have an arrow.  If False, it will be a flat line, suggesting that lower
+        values are not possible.
+    :param extend_max: Same but for top of colour bar.
+    :return: colour_bar_object: Colour bar (instance of
+        `matplotlib.pyplot.colorbar`) created by this method.
+    """
+
+    if colour_norm_object is None:
+        colour_norm_object = matplotlib.colors.Normalize(
+            vmin=min_colour_value, vmax=max_colour_value, clip=False)
+
+    scalar_mappable_object = pyplot.cm.ScalarMappable(
+        cmap=colour_map_object, norm=colour_norm_object)
+    scalar_mappable_object.set_array(values_to_colour)
+
+    if extend_min and extend_max:
+        extend_string = 'both'
+    elif extend_min:
+        extend_string = 'min'
+    elif extend_max:
+        extend_string = 'max'
+    else:
+        extend_string = 'neither'
+
+    if orientation_string == 'horizontal':
+        padding = 0.075
+    else:
+        padding = 0.05
+
+    colour_bar_object = pyplot.colorbar(
+        ax=axes_object, mappable=scalar_mappable_object,
+        orientation=orientation_string, pad=padding, extend=extend_string)
+
+    colour_bar_object.ax.tick_params(labelsize=FONT_SIZE)
+    return colour_bar_object
+
+
+def plot_predictor_2d(
+        predictor_matrix, colour_map_object, colour_norm_object=None,
+        min_colour_value=None, max_colour_value=None, axes_object=None):
+    """Plots predictor variable on 2-D grid.
+
+    If `colour_norm_object is None`, both `min_colour_value` and
+    `max_colour_value` must be specified.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param predictor_matrix: M-by-N numpy array of predictor values.
+    :param colour_map_object: Instance of `matplotlib.pyplot.cm`.
+    :param min_colour_value: Minimum value in colour scheme.
+    :param max_colour_value: Max value in colour scheme.
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :return: colour_bar_object: Colour bar (instance of
+        `matplotlib.pyplot.colorbar`) created by this method.
+    """
+
+    if axes_object is None:
+        _, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
+
+    if colour_norm_object is not None:
+        min_colour_value = colour_norm_object.boundaries[0]
+        max_colour_value = colour_norm_object.boundaries[-1]
+
+    axes_object.pcolormesh(
+        predictor_matrix, cmap=colour_map_object, norm=colour_norm_object,
+        vmin=min_colour_value, vmax=max_colour_value, shading='flat',
+        edgecolors='None')
+
+    axes_object.set_xticks([])
+    axes_object.set_yticks([])
+
+    return _add_colour_bar(
+        axes_object=axes_object, colour_map_object=colour_map_object,
+        values_to_colour=predictor_matrix, min_colour_value=min_colour_value,
+        max_colour_value=max_colour_value)
+
+
+def plot_wind_2d(u_wind_matrix_m_s01, v_wind_matrix_m_s01, axes_object=None):
+    """Plots wind velocity on 2-D grid.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param u_wind_matrix_m_s01: M-by-N numpy array of eastward components
+        (metres per second).
+    :param v_wind_matrix_m_s01: M-by-N numpy array of northward components
+        (metres per second).
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    """
+
+    if axes_object is None:
+        _, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
+
+    num_grid_rows = u_wind_matrix_m_s01.shape[0]
+    num_grid_columns = u_wind_matrix_m_s01.shape[1]
+
+    x_coords_unique = numpy.linspace(
+        0, num_grid_columns, num=num_grid_columns + 1, dtype=float)
+    x_coords_unique = x_coords_unique[:-1]
+    x_coords_unique = x_coords_unique + numpy.diff(x_coords_unique[:2]) / 2
+
+    y_coords_unique = numpy.linspace(
+        0, num_grid_rows, num=num_grid_rows + 1, dtype=float)
+    y_coords_unique = y_coords_unique[:-1]
+    y_coords_unique = y_coords_unique + numpy.diff(y_coords_unique[:2]) / 2
+
+    x_coord_matrix, y_coord_matrix = numpy.meshgrid(x_coords_unique,
+                                                    y_coords_unique)
+
+    speed_matrix_m_s01 = numpy.sqrt(u_wind_matrix_m_s01 ** 2
+                                    + v_wind_matrix_m_s01 ** 2)
+
+    axes_object.barbs(
+        x_coord_matrix, y_coord_matrix,
+        u_wind_matrix_m_s01 * METRES_PER_SECOND_TO_KT,
+        v_wind_matrix_m_s01 * METRES_PER_SECOND_TO_KT,
+        speed_matrix_m_s01 * METRES_PER_SECOND_TO_KT, color='k', length=6,
+        sizes={'emptybarb': 0.1}, fill_empty=True, rounding=False)
+
+    axes_object.set_xlim(0, num_grid_columns)
+    axes_object.set_ylim(0, num_grid_rows)
+
+
+def plot_many_predictors_with_barbs(
+        predictor_matrix, predictor_names, min_colour_temp_kelvins,
+        max_colour_temp_kelvins):
+    """Plots many predictor variables on 2-D grid with wind barbs overlain.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    C = number of predictors
+
+    :param predictor_matrix: M-by-N-by-C numpy array of predictor values.
+    :param predictor_names: length-C list of predictor names.
+    :param min_colour_temp_kelvins: Minimum value in temperature colour scheme.
+    :param max_colour_temp_kelvins: Max value in temperature colour scheme.
+    :return: figure_object: See doc for `_init_figure_panels`.
+    :return: axes_objects_2d_list: Same.
+    """
+
+    u_wind_matrix_m_s01 = predictor_matrix[
+        ..., predictor_names.index(U_WIND_NAME)]
+    v_wind_matrix_m_s01 = predictor_matrix[
+        ..., predictor_names.index(V_WIND_NAME)]
+
+    non_wind_predictor_names = [
+        p for p in predictor_names if p not in [U_WIND_NAME, V_WIND_NAME]
+    ]
+
+    figure_object, axes_objects_2d_list = _init_figure_panels(
+        num_rows=len(non_wind_predictor_names), num_columns=1)
+
+    for m in range(len(non_wind_predictor_names)):
+        this_predictor_index = predictor_names.index(
+            non_wind_predictor_names[m])
+
+        if non_wind_predictor_names[m] == REFLECTIVITY_NAME:
+            this_colour_norm_object = REFL_COLOUR_NORM_OBJECT
+            this_min_colour_value = None
+            this_max_colour_value = None
+        else:
+            this_colour_norm_object = None
+            this_min_colour_value = min_colour_temp_kelvins + 0.
+            this_max_colour_value = max_colour_temp_kelvins + 0.
+
+        this_colour_bar_object = plot_predictor_2d(
+            predictor_matrix=predictor_matrix[..., this_predictor_index],
+            colour_map_object=PREDICTOR_TO_COLOUR_MAP_DICT[
+                non_wind_predictor_names[m]],
+            colour_norm_object=this_colour_norm_object,
+            min_colour_value=this_min_colour_value,
+            max_colour_value=this_max_colour_value,
+            axes_object=axes_objects_2d_list[m][0])
+
+        plot_wind_2d(u_wind_matrix_m_s01=u_wind_matrix_m_s01,
+                     v_wind_matrix_m_s01=v_wind_matrix_m_s01,
+                     axes_object=axes_objects_2d_list[m][0])
+
+        this_colour_bar_object.set_label(non_wind_predictor_names[m])
+
+    return figure_object, axes_objects_2d_list
+
+
+def plot_many_predictors_sans_barbs(
+        predictor_matrix, predictor_names, min_colour_temp_kelvins,
+        max_colour_temp_kelvins, max_colour_wind_speed_m_s01):
+    """Plots many predictor variables on 2-D grid; no wind barbs overlain.
+
+    In this case, both u-wind and v-wind are plotted as separate maps.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    C = number of predictors
+
+    :param predictor_matrix: M-by-N-by-C numpy array of predictor values.
+    :param predictor_names: length-C list of predictor names.
+    :param min_colour_temp_kelvins: Minimum value in temperature colour scheme.
+    :param max_colour_temp_kelvins: Max value in temperature colour scheme.
+    :param max_colour_wind_speed_m_s01: Max wind speed (metres per second) in
+        colour maps for both u- and v-components.  The minimum wind speed be
+        `-1 * max_colour_wind_speed_m_s01`, so the diverging colour scheme will
+        be zero-centered.
+    :return: figure_object: See doc for `_init_figure_panels`.
+    :return: axes_objects_2d_list: Same.
+    """
+
+    num_predictors = len(predictor_names)
+    num_panel_rows = int(numpy.floor(numpy.sqrt(num_predictors)))
+    num_panel_columns = int(numpy.ceil(float(num_predictors) / num_panel_rows))
+
+    figure_object, axes_objects_2d_list = _init_figure_panels(
+        num_rows=num_panel_rows, num_columns=num_panel_columns)
+
+    for i in range(num_panel_rows):
+        for j in range(num_panel_columns):
+            this_linear_index = i * num_panel_columns + j
+            if this_linear_index >= num_predictors:
+                break
+
+            this_colour_map_object = PREDICTOR_TO_COLOUR_MAP_DICT[
+                predictor_names[this_linear_index]]
+
+            if predictor_names[this_linear_index] == REFLECTIVITY_NAME:
+                this_colour_norm_object = REFL_COLOUR_NORM_OBJECT
+                this_min_colour_value = None
+                this_max_colour_value = None
+            elif predictor_names[this_linear_index] == TEMPERATURE_NAME:
+                this_colour_norm_object = None
+                this_min_colour_value = min_colour_temp_kelvins + 0.
+                this_max_colour_value = max_colour_temp_kelvins + 0.
+            else:
+                this_colour_norm_object = None
+                this_min_colour_value = -1 * max_colour_wind_speed_m_s01
+                this_max_colour_value = max_colour_wind_speed_m_s01 + 0.
+
+            this_colour_bar_object = plot_predictor_2d(
+                predictor_matrix=predictor_matrix[..., this_linear_index],
+                colour_map_object=this_colour_map_object,
+                colour_norm_object=this_colour_norm_object,
+                min_colour_value=this_min_colour_value,
+                max_colour_value=this_max_colour_value,
+                axes_object=axes_objects_2d_list[i][j])
+
+            this_colour_bar_object.set_label(predictor_names[this_linear_index])
+
+    return figure_object, axes_objects_2d_list
+
+
+def plot_predictors_example1(validation_file_names):
+    """Plots all predictors for random example (storm object).
+
+    :param validation_file_names: 1-D list of paths to input files.
+    """
+
+    validation_image_dict = read_many_image_files(validation_file_names)
+    print(SEPARATOR_STRING)
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+    temperature_matrix_kelvins = predictor_matrix[
+        ..., predictor_names.index(TEMPERATURE_NAME)]
+
+    plot_many_predictors_with_barbs(
+        predictor_matrix=predictor_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
+        max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
+    )
+
+    pyplot.show()
+
+
+def plot_predictors_example2(validation_image_dict):
+    """Plots all predictors for example with greatest future vorticity.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+    temperature_matrix_kelvins = predictor_matrix[
+        ..., predictor_names.index(TEMPERATURE_NAME)]
+
+    plot_many_predictors_with_barbs(
+        predictor_matrix=predictor_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
+        max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
+    )
+
+    pyplot.show()
 
 
 def _update_normalization_params(intermediate_normalization_dict, new_values):
@@ -1083,7 +1447,7 @@ def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
     :raises: TypeError: if `normalization_dict is None`.
     """
 
-    # TODO(thunderhoser): Probably need downsampling or upsampling.
+    # TODO(thunderhoser): Maybe add upsampling or downsampling.
 
     if normalization_dict is None:
         error_string = 'normalization_dict cannot be None.  Must be specified.'
@@ -1180,14 +1544,14 @@ def train_cnn(
         [used only if `validation_file_names is not None`]
         Number of validation batches furnished to model in each epoch.
 
-    :return: model_metadata_dict: Dictionary with the following keys.
-    model_metadata_dict['training_file_names']: See input doc.
-    model_metadata_dict['normalization_dict']: Same.
-    model_metadata_dict['binarization_threshold']: Same.
-    model_metadata_dict['num_examples_per_batch']: Same.
-    model_metadata_dict['num_training_batches_per_epoch']: Same.
-    model_metadata_dict['validation_file_names']: Same.
-    model_metadata_dict['num_validation_batches_per_epoch']: Same.
+    :return: cnn_metadata_dict: Dictionary with the following keys.
+    cnn_metadata_dict['training_file_names']: See input doc.
+    cnn_metadata_dict['normalization_dict']: Same.
+    cnn_metadata_dict['binarization_threshold']: Same.
+    cnn_metadata_dict['num_examples_per_batch']: Same.
+    cnn_metadata_dict['num_training_batches_per_epoch']: Same.
+    cnn_metadata_dict['validation_file_names']: Same.
+    cnn_metadata_dict['num_validation_batches_per_epoch']: Same.
     """
 
     _create_directory(file_name=output_model_file_name)
@@ -1205,7 +1569,7 @@ def train_cnn(
 
     list_of_callback_objects = [checkpoint_object]
 
-    model_metadata_dict = {
+    cnn_metadata_dict = {
         TRAINING_FILES_KEY: training_file_names,
         NORMALIZATION_DICT_KEY: normalization_dict,
         BINARIZATION_THRESHOLD_KEY: binarization_threshold,
@@ -1227,7 +1591,7 @@ def train_cnn(
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
             verbose=1, callbacks=list_of_callback_objects, workers=0)
 
-        return model_metadata_dict
+        return cnn_metadata_dict
 
     early_stopping_object = keras.callbacks.EarlyStopping(
         monitor='val_loss', min_delta=MIN_XENTROPY_DECREASE_FOR_EARLY_STOP,
@@ -1248,7 +1612,7 @@ def train_cnn(
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
 
-    return model_metadata_dict
+    return cnn_metadata_dict
 
 
 def _create_directory(directory_name=None, file_name=None):
@@ -1386,21 +1750,20 @@ def read_model_metadata(json_file_name):
         return _metadata_list_to_numpy(model_metadata_dict)
 
 
-def train_cnn_example(cnn_model_object, training_file_names, normalization_dict,
-                      binarization_threshold):
+def train_cnn_example(
+        cnn_model_object, training_file_names, validation_file_names,
+        normalization_dict, binarization_threshold):
     """Actually trains the CNN.
 
     :param cnn_model_object: See doc for `train_cnn`.
     :param training_file_names: Same.
+    :param validation_file_names: Same.
     :param normalization_dict: Same.
     :param binarization_threshold: Same.
     """
 
-    validation_file_names = find_many_image_files(
-        first_date_string='20150101', last_date_string='20151231')
-
     cnn_file_name = '{0:s}/cnn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
-    model_metadata_dict = train_cnn(
+    cnn_metadata_dict = train_cnn(
         cnn_model_object=cnn_model_object,
         training_file_names=training_file_names,
         normalization_dict=normalization_dict,
@@ -1484,14 +1847,14 @@ def _apply_cnn(cnn_model_object, predictor_matrix, verbose=True,
 
 
 def evaluate_cnn(
-        cnn_model_object, image_dict, model_metadata_dict, output_dir_name):
+        cnn_model_object, image_dict, cnn_metadata_dict, output_dir_name):
     """Evaluates trained CNN (convolutional neural net).
 
     :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param image_dict: Dictionary created by `read_image_file` or
         `read_many_image_files`.  Should contain validation or testing data (not
         training data), but this is not enforced.
-    :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
+    :param cnn_metadata_dict: Dictionary created by `train_cnn`.  This will
         ensure that data in `image_dict` are processed the exact same way as the
         training data for `cnn_model_object`.
     :param output_dir_name: Path to output directory.  Figures will be saved
@@ -1501,12 +1864,12 @@ def evaluate_cnn(
     predictor_matrix, _ = normalize_images(
         predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
         predictor_names=image_dict[PREDICTOR_NAMES_KEY],
-        normalization_dict=model_metadata_dict[NORMALIZATION_DICT_KEY])
+        normalization_dict=cnn_metadata_dict[NORMALIZATION_DICT_KEY])
     predictor_matrix = predictor_matrix.astype('float32')
 
     target_values = binarize_target_images(
         target_matrix=image_dict[TARGET_MATRIX_KEY],
-        binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
+        binarization_threshold=cnn_metadata_dict[BINARIZATION_THRESHOLD_KEY])
 
     forecast_probabilities = _apply_cnn(cnn_model_object=cnn_model_object,
                                         predictor_matrix=predictor_matrix)
@@ -1539,35 +1902,36 @@ def evaluate_cnn(
     pyplot.savefig(perf_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
-    # attributes_diagrams.plot_attributes_diagram(
-    #     observed_labels=target_values,
-    #     forecast_probabilities=forecast_probabilities, num_bins=20)
-    # pyplot.show()
-    #
-    # attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
-    #     output_dir_name)
-    #
-    # print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
-    # pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
-    # pyplot.close()
+    attributes_diagrams.plot_attributes_diagram(
+        observed_labels=target_values,
+        forecast_probabilities=forecast_probabilities, num_bins=20)
+    pyplot.show()
+
+    attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
+        output_dir_name)
+
+    print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
+    pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
 
 
-def evaluate_cnn_example(validation_file_names, cnn_model_object,
-                         model_metadata_dict):
+def evaluate_cnn_example(validation_image_dict):
     """Evaluates CNN on validation data.
 
-    :param validation_file_names: 1-D list of paths to input files.
-    :param cnn_model_object: See doc for `evaluate_cnn`.
-    :param model_metadata_dict: Same.
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
     """
 
-    validation_image_dict = read_many_image_files(validation_file_names)
-    print(SEPARATOR_STRING)
+    cnn_file_name = '{0:s}/pretrained_cnn/pretrained_cnn.h5'.format(
+        DEFAULT_OUTPUT_DIR_NAME)
+    cnn_metafile_name = find_model_metafile(model_file_name=cnn_file_name)
 
+    cnn_model_object = read_keras_model(cnn_file_name)
+    cnn_metadata_dict = read_model_metadata(cnn_metafile_name)
     validation_dir_name = '{0:s}/validation'.format(DEFAULT_OUTPUT_DIR_NAME)
+
     evaluate_cnn(
         cnn_model_object=cnn_model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict,
+        cnn_metadata_dict=cnn_metadata_dict,
         output_dir_name=validation_dir_name)
     print(SEPARATOR_STRING)
 
@@ -1592,14 +1956,14 @@ def _get_binary_xentropy(target_values, forecast_probabilities):
     forecast_probabilities[
         forecast_probabilities > MAX_PROBABILITY] = MAX_PROBABILITY
 
-    return -1 * numpy.mean(
+    return -1 * numpy.nanmean(
         target_values * numpy.log2(forecast_probabilities) +
         (1 - target_values) * numpy.log2(1 - forecast_probabilities)
     )
 
 
 def permutation_test_for_cnn(
-        cnn_model_object, image_dict, model_metadata_dict,
+        cnn_model_object, image_dict, cnn_metadata_dict,
         output_pickle_file_name, cost_function=_get_binary_xentropy):
     """Runs permutation test on CNN (convolutional neural net).
 
@@ -1610,7 +1974,7 @@ def permutation_test_for_cnn(
     :param image_dict: Dictionary created by `read_image_file` or
         `read_many_image_files`.  Should contain validation data (rather than
         training data), but this is not enforced.
-    :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
+    :param cnn_metadata_dict: Dictionary created by `train_cnn`.  This will
         ensure that data in `image_dict` are processed the exact same way as the
         training data for `cnn_model_object`.
     :param output_pickle_file_name: Path to output file.  `result_dict` (the
@@ -1645,12 +2009,12 @@ def permutation_test_for_cnn(
     predictor_matrix, _ = normalize_images(
         predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
         predictor_names=image_dict[PREDICTOR_NAMES_KEY],
-        normalization_dict=model_metadata_dict[NORMALIZATION_DICT_KEY])
+        normalization_dict=cnn_metadata_dict[NORMALIZATION_DICT_KEY])
     predictor_matrix = predictor_matrix.astype('float32')
 
     target_values = binarize_target_images(
         target_matrix=image_dict[TARGET_MATRIX_KEY],
-        binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
+        binarization_threshold=cnn_metadata_dict[BINARIZATION_THRESHOLD_KEY])
 
     # Get original cost (before permutation).
     these_probabilities = _apply_cnn(cnn_model_object=cnn_model_object,
@@ -1745,12 +2109,12 @@ def permutation_test_for_cnn(
 
 
 def permutation_test_example(cnn_model_object, validation_image_dict,
-                             model_metadata_dict):
+                             cnn_metadata_dict):
     """Runs the permutation test on validation data.
 
     :param cnn_model_object: See doc for `permutation_test_for_cnn`.
     :param validation_image_dict: Same.
-    :param model_metadata_dict: Same.
+    :param cnn_metadata_dict: Same.
     """
 
     permutation_dir_name = '{0:s}/permutation_test'.format(
@@ -1760,7 +2124,7 @@ def permutation_test_example(cnn_model_object, validation_image_dict,
 
     permutation_dict = permutation_test_for_cnn(
         cnn_model_object=cnn_model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict,
+        cnn_metadata_dict=cnn_metadata_dict,
         output_pickle_file_name=main_permutation_file_name)
 
 
@@ -1951,8 +2315,8 @@ def _gradient_descent_for_bwo(
         list_of_input_tensors = [cnn_model_object.input]
 
     num_input_tensors = len(list_of_input_tensors)
-
     list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
+
     for i in range(num_input_tensors):
         list_of_gradient_tensors[i] /= K.maximum(
             K.sqrt(K.mean(list_of_gradient_tensors[i] ** 2)),
@@ -2046,363 +2410,6 @@ def bwo_for_class(
         num_iterations=num_iterations, learning_rate=learning_rate)
 
 
-def _init_figure_panels(num_rows, num_columns, horizontal_space_fraction=0.1,
-                        vertical_space_fraction=0.1):
-    """Initializes paneled figure.
-
-    :param num_rows: Number of panel rows.
-    :param num_columns: Number of panel columns.
-    :param horizontal_space_fraction: Horizontal space between panels (as
-        fraction of panel size).
-    :param vertical_space_fraction: Vertical space between panels (as fraction
-        of panel size).
-    :return: figure_object: Instance of `matplotlib.figure.Figure`.
-    :return: axes_objects_2d_list: 2-D list, where axes_objects_2d_list[i][j] is
-        the handle (instance of `matplotlib.axes._subplots.AxesSubplot`) for the
-        [i]th row and [j]th column.
-    """
-
-    figure_object, axes_objects_2d_list = pyplot.subplots(
-        num_rows, num_columns, sharex=False, sharey=False,
-        figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-    )
-
-    if num_rows == num_columns == 1:
-        axes_objects_2d_list = [[axes_objects_2d_list]]
-    elif num_columns == 1:
-        axes_objects_2d_list = [[a] for a in axes_objects_2d_list]
-    elif num_rows == 1:
-        axes_objects_2d_list = [axes_objects_2d_list]
-
-    pyplot.subplots_adjust(
-        left=0.02, bottom=0.02, right=0.98, top=0.95,
-        hspace=vertical_space_fraction, wspace=horizontal_space_fraction)
-
-    return figure_object, axes_objects_2d_list
-
-
-def _add_colour_bar(
-        axes_object, colour_map_object, values_to_colour, min_colour_value,
-        max_colour_value, colour_norm_object=None,
-        orientation_string='vertical', extend_min=True, extend_max=True):
-    """Adds colour bar to existing axes.
-
-    :param axes_object: Existing axes (instance of
-        `matplotlib.axes._subplots.AxesSubplot`).
-    :param colour_map_object: Colour scheme (instance of
-        `matplotlib.pyplot.cm`).
-    :param values_to_colour: numpy array of values to colour.
-    :param min_colour_value: Minimum value in colour map.
-    :param max_colour_value: Max value in colour map.
-    :param colour_norm_object: Instance of `matplotlib.colors.BoundaryNorm`,
-        defining the scale of the colour map.  If `colour_norm_object is None`,
-        will assume that scale is linear.
-    :param orientation_string: Orientation of colour bar ("vertical" or
-        "horizontal").
-    :param extend_min: Boolean flag.  If True, the bottom of the colour bar will
-        have an arrow.  If False, it will be a flat line, suggesting that lower
-        values are not possible.
-    :param extend_max: Same but for top of colour bar.
-    :return: colour_bar_object: Colour bar (instance of
-        `matplotlib.pyplot.colorbar`) created by this method.
-    """
-
-    if colour_norm_object is None:
-        colour_norm_object = matplotlib.colors.Normalize(
-            vmin=min_colour_value, vmax=max_colour_value, clip=False)
-
-    scalar_mappable_object = pyplot.cm.ScalarMappable(
-        cmap=colour_map_object, norm=colour_norm_object)
-    scalar_mappable_object.set_array(values_to_colour)
-
-    if extend_min and extend_max:
-        extend_string = 'both'
-    elif extend_min:
-        extend_string = 'min'
-    elif extend_max:
-        extend_string = 'max'
-    else:
-        extend_string = 'neither'
-
-    if orientation_string == 'horizontal':
-        padding = 0.075
-    else:
-        padding = 0.05
-
-    colour_bar_object = pyplot.colorbar(
-        ax=axes_object, mappable=scalar_mappable_object,
-        orientation=orientation_string, pad=padding, extend=extend_string)
-
-    colour_bar_object.ax.tick_params(labelsize=FONT_SIZE)
-    return colour_bar_object
-
-
-def plot_predictor_2d(
-        predictor_matrix, colour_map_object, colour_norm_object=None,
-        min_colour_value=None, max_colour_value=None, axes_object=None):
-    """Plots predictor variable on 2-D grid.
-
-    If `colour_norm_object is None`, both `min_colour_value` and
-    `max_colour_value` must be specified.
-
-    M = number of rows in grid
-    N = number of columns in grid
-
-    :param predictor_matrix: M-by-N numpy array of predictor values.
-    :param colour_map_object: Instance of `matplotlib.pyplot.cm`.
-    :param min_colour_value: Minimum value in colour scheme.
-    :param max_colour_value: Max value in colour scheme.
-    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
-        Will plot on these axes.
-    :return: colour_bar_object: Colour bar (instance of
-        `matplotlib.pyplot.colorbar`) created by this method.
-    """
-
-    if axes_object is None:
-        _, axes_object = pyplot.subplots(
-            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-        )
-
-    if colour_norm_object is not None:
-        min_colour_value = colour_norm_object.boundaries[0]
-        max_colour_value = colour_norm_object.boundaries[-1]
-
-    axes_object.pcolormesh(
-        predictor_matrix, cmap=colour_map_object, norm=colour_norm_object,
-        vmin=min_colour_value, vmax=max_colour_value, shading='flat',
-        edgecolors='None')
-
-    axes_object.set_xticks([])
-    axes_object.set_yticks([])
-
-    return _add_colour_bar(
-        axes_object=axes_object, colour_map_object=colour_map_object,
-        values_to_colour=predictor_matrix, min_colour_value=min_colour_value,
-        max_colour_value=max_colour_value)
-
-
-def plot_wind_2d(u_wind_matrix_m_s01, v_wind_matrix_m_s01, axes_object=None):
-    """Plots wind velocity on 2-D grid.
-
-    M = number of rows in grid
-    N = number of columns in grid
-
-    :param u_wind_matrix_m_s01: M-by-N numpy array of eastward components
-        (metres per second).
-    :param v_wind_matrix_m_s01: M-by-N numpy array of northward components
-        (metres per second).
-    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
-        Will plot on these axes.
-    """
-
-    if axes_object is None:
-        _, axes_object = pyplot.subplots(
-            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-        )
-
-    num_grid_rows = u_wind_matrix_m_s01.shape[0]
-    num_grid_columns = u_wind_matrix_m_s01.shape[1]
-
-    x_coords_unique = numpy.linspace(
-        0, num_grid_columns, num=num_grid_columns + 1, dtype=float)
-    x_coords_unique = x_coords_unique[:-1]
-    x_coords_unique = x_coords_unique + numpy.diff(x_coords_unique[:2]) / 2
-
-    y_coords_unique = numpy.linspace(
-        0, num_grid_rows, num=num_grid_rows + 1, dtype=float)
-    y_coords_unique = y_coords_unique[:-1]
-    y_coords_unique = y_coords_unique + numpy.diff(y_coords_unique[:2]) / 2
-
-    x_coord_matrix, y_coord_matrix = numpy.meshgrid(x_coords_unique,
-                                                    y_coords_unique)
-
-    speed_matrix_m_s01 = numpy.sqrt(u_wind_matrix_m_s01 ** 2
-                                    + v_wind_matrix_m_s01 ** 2)
-
-    axes_object.barbs(
-        x_coord_matrix, y_coord_matrix,
-        u_wind_matrix_m_s01 * METRES_PER_SECOND_TO_KT,
-        v_wind_matrix_m_s01 * METRES_PER_SECOND_TO_KT,
-        speed_matrix_m_s01 * METRES_PER_SECOND_TO_KT, color='k', length=6,
-        sizes={'emptybarb': 0.1}, fill_empty=True, rounding=False)
-
-    axes_object.set_xlim(0, num_grid_columns)
-    axes_object.set_ylim(0, num_grid_rows)
-
-
-def plot_many_predictors_with_barbs(
-        predictor_matrix, predictor_names, min_colour_temp_kelvins,
-        max_colour_temp_kelvins):
-    """Plots many predictor variables on 2-D grid with wind barbs overlain.
-
-    M = number of rows in grid
-    N = number of columns in grid
-    C = number of predictors
-
-    :param predictor_matrix: M-by-N-by-C numpy array of predictor values.
-    :param predictor_names: length-C list of predictor names.
-    :param min_colour_temp_kelvins: Minimum value in temperature colour scheme.
-    :param max_colour_temp_kelvins: Max value in temperature colour scheme.
-    :return: figure_object: See doc for `_init_figure_panels`.
-    :return: axes_objects_2d_list: Same.
-    """
-
-    u_wind_matrix_m_s01 = predictor_matrix[
-        ..., predictor_names.index(U_WIND_NAME)]
-    v_wind_matrix_m_s01 = predictor_matrix[
-        ..., predictor_names.index(V_WIND_NAME)]
-
-    non_wind_predictor_names = [
-        p for p in predictor_names if p not in [U_WIND_NAME, V_WIND_NAME]
-    ]
-
-    figure_object, axes_objects_2d_list = _init_figure_panels(
-        num_rows=len(non_wind_predictor_names), num_columns=1)
-
-    for m in range(len(non_wind_predictor_names)):
-        this_predictor_index = predictor_names.index(
-            non_wind_predictor_names[m])
-
-        if non_wind_predictor_names[m] == REFLECTIVITY_NAME:
-            this_colour_norm_object = REFL_COLOUR_NORM_OBJECT
-            this_min_colour_value = None
-            this_max_colour_value = None
-        else:
-            this_colour_norm_object = None
-            this_min_colour_value = min_colour_temp_kelvins + 0.
-            this_max_colour_value = max_colour_temp_kelvins + 0.
-
-        this_colour_bar_object = plot_predictor_2d(
-            predictor_matrix=predictor_matrix[..., this_predictor_index],
-            colour_map_object=PREDICTOR_TO_COLOUR_MAP_DICT[
-                non_wind_predictor_names[m]],
-            colour_norm_object=this_colour_norm_object,
-            min_colour_value=this_min_colour_value,
-            max_colour_value=this_max_colour_value,
-            axes_object=axes_objects_2d_list[m][0])
-
-        plot_wind_2d(u_wind_matrix_m_s01=u_wind_matrix_m_s01,
-                     v_wind_matrix_m_s01=v_wind_matrix_m_s01,
-                     axes_object=axes_objects_2d_list[m][0])
-
-        this_colour_bar_object.set_label(non_wind_predictor_names[m])
-
-    return figure_object, axes_objects_2d_list
-
-
-def plot_many_predictors_sans_barbs(
-        predictor_matrix, predictor_names, min_colour_temp_kelvins,
-        max_colour_temp_kelvins, max_colour_wind_speed_m_s01):
-    """Plots many predictor variables on 2-D grid; no wind barbs overlain.
-
-    In this case, both u-wind and v-wind are plotted as separate maps.
-
-    M = number of rows in grid
-    N = number of columns in grid
-    C = number of predictors
-
-    :param predictor_matrix: M-by-N-by-C numpy array of predictor values.
-    :param predictor_names: length-C list of predictor names.
-    :param min_colour_temp_kelvins: Minimum value in temperature colour scheme.
-    :param max_colour_temp_kelvins: Max value in temperature colour scheme.
-    :param max_colour_wind_speed_m_s01: Max wind speed (metres per second) in
-        colour maps for both u- and v-components.  The minimum wind speed be
-        `-1 * max_colour_wind_speed_m_s01`, so the diverging colour scheme will
-        be zero-centered.
-    :return: figure_object: See doc for `_init_figure_panels`.
-    :return: axes_objects_2d_list: Same.
-    """
-
-    num_predictors = len(predictor_names)
-    num_panel_rows = int(numpy.floor(numpy.sqrt(num_predictors)))
-    num_panel_columns = int(numpy.ceil(float(num_predictors) / num_panel_rows))
-
-    figure_object, axes_objects_2d_list = _init_figure_panels(
-        num_rows=num_panel_rows, num_columns=num_panel_columns)
-
-    for i in range(num_panel_rows):
-        for j in range(num_panel_columns):
-            this_linear_index = i * num_panel_columns + j
-            if this_linear_index >= num_predictors:
-                break
-
-            this_colour_map_object = PREDICTOR_TO_COLOUR_MAP_DICT[
-                predictor_names[this_linear_index]]
-
-            if predictor_names[this_linear_index] == REFLECTIVITY_NAME:
-                this_colour_norm_object = REFL_COLOUR_NORM_OBJECT
-                this_min_colour_value = None
-                this_max_colour_value = None
-            elif predictor_names[this_linear_index] == TEMPERATURE_NAME:
-                this_colour_norm_object = None
-                this_min_colour_value = min_colour_temp_kelvins + 0.
-                this_max_colour_value = max_colour_temp_kelvins + 0.
-            else:
-                this_colour_norm_object = None
-                this_min_colour_value = -1 * max_colour_wind_speed_m_s01
-                this_max_colour_value = max_colour_wind_speed_m_s01 + 0.
-
-            this_colour_bar_object = plot_predictor_2d(
-                predictor_matrix=predictor_matrix[..., this_linear_index],
-                colour_map_object=this_colour_map_object,
-                colour_norm_object=this_colour_norm_object,
-                min_colour_value=this_min_colour_value,
-                max_colour_value=this_max_colour_value,
-                axes_object=axes_objects_2d_list[i][j])
-
-            this_colour_bar_object.set_label(predictor_names[this_linear_index])
-
-    return figure_object, axes_objects_2d_list
-
-
-def plot_predictors_example1(validation_image_dict):
-    """Plots all predictors for random example (storm object).
-
-    :param validation_image_dict: Dictionary created by `read_many_image_files`.
-    """
-
-    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
-    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
-    temperature_matrix_kelvins = predictor_matrix[
-        ..., predictor_names.index(TEMPERATURE_NAME)]
-
-    plot_many_predictors_with_barbs(
-        predictor_matrix=predictor_matrix,
-        predictor_names=predictor_names,
-        min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
-        max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
-    )
-
-    pyplot.show()
-
-
-def plot_predictors_example2(validation_image_dict):
-    """Plots all predictors for example with greatest future vorticity.
-
-    :param validation_image_dict: Dictionary created by `read_many_image_files`.
-    """
-
-    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
-    example_index = numpy.unravel_index(
-        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
-    )[0]
-
-    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
-        example_index, ...]
-    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
-    temperature_matrix_kelvins = predictor_matrix[
-        ..., predictor_names.index(TEMPERATURE_NAME)]
-
-    plot_many_predictors_with_barbs(
-        predictor_matrix=predictor_matrix,
-        predictor_names=predictor_names,
-        min_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 1),
-        max_colour_temp_kelvins=numpy.percentile(temperature_matrix_kelvins, 99)
-    )
-
-    pyplot.show()
-
-
 def bwo_example1(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes random example (storm object) for positive class.
 
@@ -2439,22 +2446,22 @@ def bwo_example1(validation_image_dict, normalization_dict, cnn_model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (before optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Real example (before optimization)')
     pyplot.show()
 
-    print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Synthetic example (after optimization)')
     pyplot.show()
 
 
@@ -2494,22 +2501,22 @@ def bwo_example2(validation_image_dict, normalization_dict, cnn_model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (before optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Real example (before optimization)')
     pyplot.show()
 
-    print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Synthetic example (after optimization)')
     pyplot.show()
 
 
@@ -2555,22 +2562,22 @@ def bwo_example3(validation_image_dict, normalization_dict, cnn_model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (before optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Real example (before optimization)')
     pyplot.show()
 
-    print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Synthetic example (after optimization)')
     pyplot.show()
 
 
@@ -2616,22 +2623,22 @@ def bwo_example4(validation_image_dict, normalization_dict, cnn_model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (before optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Real example (before optimization)')
     pyplot.show()
 
-    print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Synthetic example (after optimization)')
     pyplot.show()
 
 
@@ -3440,15 +3447,15 @@ def train_ucn(
         [used only if `validation_file_names is not None`]
         Number of validation batches furnished to model in each epoch.
 
-    :return: model_metadata_dict: Dictionary with the following keys.
-    model_metadata_dict['training_file_names']: See input doc.
-    model_metadata_dict['normalization_dict']: Same.
-    model_metadata_dict['cnn_file_name']: Same.
-    model_metadata_dict['cnn_feature_layer_name']: Same.
-    model_metadata_dict['num_examples_per_batch']: Same.
-    model_metadata_dict['num_training_batches_per_epoch']: Same.
-    model_metadata_dict['validation_file_names']: Same.
-    model_metadata_dict['num_validation_batches_per_epoch']: Same.
+    :return: ucn_metadata_dict: Dictionary with the following keys.
+    ucn_metadata_dict['training_file_names']: See input doc.
+    ucn_metadata_dict['normalization_dict']: Same.
+    ucn_metadata_dict['cnn_file_name']: Same.
+    ucn_metadata_dict['cnn_feature_layer_name']: Same.
+    ucn_metadata_dict['num_examples_per_batch']: Same.
+    ucn_metadata_dict['num_training_batches_per_epoch']: Same.
+    ucn_metadata_dict['validation_file_names']: Same.
+    ucn_metadata_dict['num_validation_batches_per_epoch']: Same.
     """
 
     _create_directory(file_name=output_model_file_name)
@@ -3466,7 +3473,7 @@ def train_ucn(
 
     list_of_callback_objects = [checkpoint_object]
 
-    model_metadata_dict = {
+    ucn_metadata_dict = {
         TRAINING_FILES_KEY: training_file_names,
         NORMALIZATION_DICT_KEY: normalization_dict,
         CNN_FILE_KEY: cnn_file_name,
@@ -3490,7 +3497,7 @@ def train_ucn(
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
             verbose=1, callbacks=list_of_callback_objects, workers=0)
 
-        return model_metadata_dict
+        return ucn_metadata_dict
 
     early_stopping_object = keras.callbacks.EarlyStopping(
         monitor='val_loss', min_delta=MIN_MSE_DECREASE_FOR_EARLY_STOP,
@@ -3512,7 +3519,7 @@ def train_ucn(
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
 
-    return model_metadata_dict
+    return ucn_metadata_dict
 
 
 def get_cnn_flatten_layer(cnn_model_object):

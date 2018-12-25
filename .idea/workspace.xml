@@ -2,8 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/scripts/apply_ucn.py" afterPath="$PROJECT_DIR$/scripts/apply_ucn.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/scripts/train_ucn.py" afterPath="$PROJECT_DIR$/scripts/train_ucn.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -14,11 +15,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="795">
-              <caret line="3477" column="5" lean-forward="true" selection-start-line="3468" selection-start-column="4" selection-end-line="3477" selection-end-column="5" />
+            <state relative-caret-position="396">
+              <caret line="2609" column="62" lean-forward="true" selection-start-line="2609" selection-start-column="62" selection-end-line="2609" selection-end-column="62" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -26,11 +27,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="train_ucn.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="train_ucn.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="137">
-              <caret line="195" column="41" lean-forward="false" selection-start-line="195" selection-start-column="41" selection-end-line="195" selection-end-column="41" />
+            <state relative-caret-position="324">
+              <caret line="21" column="55" lean-forward="false" selection-start-line="21" selection-start-column="27" selection-end-line="21" selection-end-column="55" />
               <folding>
                 <element signature="e#55#70#0" expanded="true" />
               </folding>
@@ -41,8 +42,8 @@
       <file leaf-file-name="apply_ucn.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/scripts/apply_ucn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="558">
-              <caret line="31" column="0" lean-forward="true" selection-start-line="31" selection-start-column="0" selection-end-line="31" selection-end-column="0" />
+            <state relative-caret-position="1356">
+              <caret line="158" column="22" lean-forward="true" selection-start-line="158" selection-start-column="22" selection-end-line="158" selection-end-column="22" />
               <folding>
                 <element signature="e#56#69#0" expanded="true" />
               </folding>
@@ -54,12 +55,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>LIST_OF_METRIC_FUNCTIONS</find>
-      <find>flattening_layer_input_dims</find>
-      <find>def setup_uc</find>
-      <find>use</find>
-      <find>def</find>
-      <find>validation_image_dict:</find>
       <find>evaluate_cnn(</find>
       <find>def write_model_metadata</find>
       <find>get_image_norm</find>
@@ -84,6 +79,12 @@
       <find>def train_cnn(</find>
       <find>def train_ucn(</find>
       <find>use_transposed_conv</find>
+      <find>TODO(thun</find>
+      <find>def evalua</find>
+      <find>model_metadata_dict</find>
+      <find>validation_file_names =</find>
+      <find>validation_image_dict:</find>
+      <find>print(</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -114,6 +115,8 @@
       <replace>cnn_model_object</replace>
       <replace>predictor_names</replace>
       <replace>UPSAMPLING_FACTORS</replace>
+      <replace>cnn_metadata_dict</replace>
+      <replace>ucn_metadata_dict</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -132,18 +135,16 @@
         <option value="$PROJECT_DIR$/module_4/performance_diagrams.py" />
         <option value="$PROJECT_DIR$/module_4/roc_curves.py" />
         <option value="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
-        <option value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
         <option value="$PROJECT_DIR$/scripts/train_cnn.py" />
         <option value="$PROJECT_DIR$/scripts/apply_ucn.py" />
         <option value="$PROJECT_DIR$/scripts/train_ucn.py" />
+        <option value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="1920" />
-    <option name="y" value="28" />
     <option name="width" value="1920" />
-    <option name="height" value="1138" />
+    <option name="height" value="1080" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -389,7 +390,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="1920" y="28" width="1920" height="1138" extended-state="6" />
+    <frame x="0" y="0" width="1920" height="1080" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
@@ -557,20 +558,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="795">
-          <caret line="3477" column="5" lean-forward="true" selection-start-line="3468" selection-start-column="4" selection-end-line="3477" selection-end-column="5" />
-          <folding>
-            <element signature="e#39#50#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/scripts/apply_ucn.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="558">
-          <caret line="31" column="0" lean-forward="true" selection-start-line="31" selection-start-column="0" selection-end-line="31" selection-end-column="0" />
+        <state relative-caret-position="1356">
+          <caret line="158" column="22" lean-forward="true" selection-start-line="158" selection-start-column="22" selection-end-line="158" selection-end-column="22" />
           <folding>
             <element signature="e#56#69#0" expanded="true" />
           </folding>
@@ -579,10 +570,20 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="137">
-          <caret line="195" column="41" lean-forward="false" selection-start-line="195" selection-start-column="41" selection-end-line="195" selection-end-column="41" />
+        <state relative-caret-position="324">
+          <caret line="21" column="55" lean-forward="false" selection-start-line="21" selection-start-column="27" selection-end-line="21" selection-end-column="55" />
           <folding>
             <element signature="e#55#70#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="396">
+          <caret line="2609" column="62" lean-forward="true" selection-start-line="2609" selection-start-column="62" selection-end-line="2609" selection-end-column="62" />
+          <folding>
+            <element signature="e#39#50#0" expanded="true" />
           </folding>
         </state>
       </provider>
