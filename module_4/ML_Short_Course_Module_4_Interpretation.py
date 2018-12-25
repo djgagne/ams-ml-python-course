@@ -3253,8 +3253,36 @@ def setup_ucn(
     return ucn_model_object
 
 
-def setup_ucn_example1(cnn_model_object):
-    """Example 1 of UCN architecture (yes transposed conv, no smoothing).
+def get_cnn_flatten_layer(cnn_model_object):
+    """Finds flattening layer in CNN.
+
+    This method assumes that there is only one flattening layer.  If there are
+    several, this method will return the first (shallowest).
+
+    :param cnn_model_object: Instance of `keras.models.Model`.
+    :return: layer_name: Name of flattening layer.
+    :raises: TypeError: if flattening layer cannot be found.
+    """
+
+    layer_names = [lyr.name for lyr in cnn_model_object.layers]
+
+    flattening_flags = numpy.array(
+        ['flatten' in n for n in layer_names], dtype=bool)
+    flattening_indices = numpy.where(flattening_flags)[0]
+
+    if len(flattening_indices) == 0:
+        error_string = (
+            'Cannot find flattening layer in model.  Layer names are listed '
+            'below.\n{0:s}'
+        ).format(str(layer_names))
+
+        raise TypeError(error_string)
+
+    return layer_names[flattening_indices[0]]
+
+
+def setup_ucn_example(cnn_model_object):
+    """Example of UCN architecture (with transposed conv, no smoothing).
 
     :param cnn_model_object: Trained CNN (instance of `keras.models.Model`).
     """
@@ -3280,64 +3308,6 @@ def setup_ucn_example1(cnn_model_object):
         upsampling_factors=upsampling_factors,
         num_output_channels=num_output_channels,
         use_transposed_conv=True, smoothing_radius_px=None)
-
-
-def setup_ucn_example2(cnn_model_object):
-    """Example 2 of UCN architecture (no transposed conv, no smoothing).
-
-    :param cnn_model_object: Trained CNN (instance of `keras.models.Model`).
-    """
-
-    cnn_feature_layer_name = get_cnn_flatten_layer(cnn_model_object)
-    cnn_feature_layer_object = cnn_model_object.get_layer(
-        name=cnn_feature_layer_name)
-    cnn_feature_dimensions = numpy.array(
-        cnn_feature_layer_object.input.shape[1:], dtype=int)
-
-    num_input_features = numpy.prod(cnn_feature_dimensions)
-    first_num_rows = cnn_feature_dimensions[0]
-    first_num_columns = cnn_feature_dimensions[1]
-    num_output_channels = numpy.array(
-        cnn_model_object.input.shape[1:], dtype=int
-    )[-1]
-
-    upsampling_factors = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
-
-    ucn_model_object = setup_ucn(
-        num_input_features=num_input_features, first_num_rows=first_num_rows,
-        first_num_columns=first_num_columns,
-        upsampling_factors=upsampling_factors,
-        num_output_channels=num_output_channels,
-        use_transposed_conv=False, smoothing_radius_px=None)
-
-
-def setup_ucn_example3(cnn_model_object):
-    """Example 3 of UCN architecture (no transposed conv, yes smoothing).
-
-    :param cnn_model_object: Trained CNN (instance of `keras.models.Model`).
-    """
-
-    cnn_feature_layer_name = get_cnn_flatten_layer(cnn_model_object)
-    cnn_feature_layer_object = cnn_model_object.get_layer(
-        name=cnn_feature_layer_name)
-    cnn_feature_dimensions = numpy.array(
-        cnn_feature_layer_object.input.shape[1:], dtype=int)
-
-    num_input_features = numpy.prod(cnn_feature_dimensions)
-    first_num_rows = cnn_feature_dimensions[0]
-    first_num_columns = cnn_feature_dimensions[1]
-    num_output_channels = numpy.array(
-        cnn_model_object.input.shape[1:], dtype=int
-    )[-1]
-
-    upsampling_factors = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
-
-    ucn_model_object = setup_ucn(
-        num_input_features=num_input_features, first_num_rows=first_num_rows,
-        first_num_columns=first_num_columns,
-        upsampling_factors=upsampling_factors,
-        num_output_channels=num_output_channels,
-        use_transposed_conv=False, smoothing_radius_px=1)
 
 
 def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
@@ -3527,34 +3497,6 @@ def train_ucn(
         validation_steps=num_validation_batches_per_epoch)
 
     return ucn_metadata_dict
-
-
-def get_cnn_flatten_layer(cnn_model_object):
-    """Finds flattening layer in CNN.
-
-    This method assumes that there is only one flattening layer.  If there are
-    several, this method will return the first (shallowest).
-
-    :param cnn_model_object: Instance of `keras.models.Model`.
-    :return: layer_name: Name of flattening layer.
-    :raises: TypeError: if flattening layer cannot be found.
-    """
-
-    layer_names = [lyr.name for lyr in cnn_model_object.layers]
-
-    flattening_flags = numpy.array(
-        ['flatten' in n for n in layer_names], dtype=bool)
-    flattening_indices = numpy.where(flattening_flags)[0]
-
-    if len(flattening_indices) == 0:
-        error_string = (
-            'Cannot find flattening layer in model.  Layer names are listed '
-            'below.\n{0:s}'
-        ).format(str(layer_names))
-
-        raise TypeError(error_string)
-
-    return layer_names[flattening_indices[0]]
 
 
 def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
