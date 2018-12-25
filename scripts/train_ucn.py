@@ -19,6 +19,7 @@ LAST_VALIDATION_DATE_STRING = '20151231'
 UPSAMPLING_FACTORS = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
 
 CNN_FILE_ARG_NAME = 'input_cnn_file_name'
+USE_BATCH_NORM_ARG_NAME = 'use_batch_norm_for_out_layer'
 USE_TRANSPOSED_CONV_ARG_NAME = 'use_transposed_conv'
 SMOOTHING_RADIUS_ARG_NAME = 'smoothing_radius_px'
 IMAGE_DIR_ARG_NAME = 'input_image_dir_name'
@@ -32,6 +33,9 @@ CNN_FILE_HELP_STRING = (
     'Path to file with trained CNN.  UCN predictors will be outputs from the '
     'CNN flattening layer, and UCN targets will be CNN predictors (input '
     'images).')
+
+USE_BATCH_NORM_HELP_STRING = (
+    'Boolean flag.  If 1, will use batch normalization after output layer.')
 
 USE_TRANSPOSED_CONV_HELP_STRING = (
     'Boolean flag.  If 1, upsampling will be done with transposed-convolution '
@@ -61,6 +65,7 @@ OUTPUT_FILE_HELP_STRING = (
     'Path to output file (HDF5 format).  The trained UCN model will be saved '
     'here.')
 
+DEFAULT_USE_BATCH_NORM_FLAG = 1
 DEFAULT_TRANSPOSED_CONV_FLAG = 0
 DEFAULT_SMOOTHING_RADIUS_PX = -1
 DEFAULT_NUM_EXAMPLES_PER_BATCH = 1024
@@ -75,6 +80,10 @@ INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
     '--' + CNN_FILE_ARG_NAME, type=str, required=True,
     help=CNN_FILE_HELP_STRING)
+
+INPUT_ARG_PARSER.add_argument(
+    '--' + USE_BATCH_NORM_ARG_NAME, type=int, required=False,
+    default=DEFAULT_USE_BATCH_NORM_FLAG, help=USE_BATCH_NORM_HELP_STRING)
 
 INPUT_ARG_PARSER.add_argument(
     '--' + USE_TRANSPOSED_CONV_ARG_NAME, type=int, required=False,
@@ -112,15 +121,16 @@ INPUT_ARG_PARSER.add_argument(
     help=OUTPUT_FILE_HELP_STRING)
 
 
-def _run(input_cnn_file_name, use_transposed_conv, smoothing_radius_px,
-         input_image_dir_name, num_examples_per_batch, num_epochs,
-         num_training_batches_per_epoch, num_validation_batches_per_epoch,
-         output_model_file_name):
+def _run(input_cnn_file_name, use_batch_norm_for_out_layer, use_transposed_conv,
+         smoothing_radius_px, input_image_dir_name, num_examples_per_batch,
+         num_epochs, num_training_batches_per_epoch,
+         num_validation_batches_per_epoch, output_model_file_name):
     """Trains UCN (upconvnet) for use in short course.
 
     This is effectively the main method.
 
     :param input_cnn_file_name: See documentation at top of file.
+    :param use_batch_norm_for_out_layer: Same.
     :param use_transposed_conv: Same.
     :param smoothing_radius_px: Same.
     :param input_image_dir_name: Same.
@@ -162,7 +172,8 @@ def _run(input_cnn_file_name, use_transposed_conv, smoothing_radius_px,
         first_num_columns=first_num_columns,
         upsampling_factors=UPSAMPLING_FACTORS,
         num_output_channels=num_output_channels,
-        use_activation_for_out_layer=False, use_bn_for_out_layer=True,
+        use_activation_for_out_layer=False,
+        use_bn_for_out_layer=use_batch_norm_for_out_layer,
         use_transposed_conv=use_transposed_conv,
         smoothing_radius_px=smoothing_radius_px)
     print(SEPARATOR_STRING)
@@ -177,31 +188,19 @@ def _run(input_cnn_file_name, use_transposed_conv, smoothing_radius_px,
         last_date_string=LAST_VALIDATION_DATE_STRING,
         image_dir_name=input_image_dir_name)
 
-    ucn_metadata_dict = {
-        short_course.TRAINING_FILES_KEY: training_file_names,
-        short_course.NORMALIZATION_DICT_KEY:
-            cnn_metadata_dict[short_course.NORMALIZATION_DICT_KEY],
-        short_course.CNN_FILE_KEY: input_cnn_file_name,
-        short_course.CNN_FEATURE_LAYER_KEY: cnn_feature_layer_name,
-        short_course.NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
-        short_course.NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
-        short_course.VALIDATION_FILES_KEY: validation_file_names,
-        short_course.NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch
-    }
-
-    # ucn_metadata_dict = short_course.train_ucn(
-    #     ucn_model_object=ucn_model_object,
-    #     training_file_names=training_file_names,
-    #     normalization_dict=cnn_metadata_dict[
-    #         short_course.NORMALIZATION_DICT_KEY],
-    #     cnn_model_object=cnn_model_object, cnn_file_name=input_cnn_file_name,
-    #     cnn_feature_layer_name=cnn_feature_layer_name,
-    #     num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,
-    #     num_training_batches_per_epoch=num_training_batches_per_epoch,
-    #     output_model_file_name=output_model_file_name,
-    #     validation_file_names=validation_file_names,
-    #     num_validation_batches_per_epoch=num_validation_batches_per_epoch)
-    # print(SEPARATOR_STRING)
+    ucn_metadata_dict = short_course.train_ucn(
+        ucn_model_object=ucn_model_object,
+        training_file_names=training_file_names,
+        normalization_dict=cnn_metadata_dict[
+            short_course.NORMALIZATION_DICT_KEY],
+        cnn_model_object=cnn_model_object, cnn_file_name=input_cnn_file_name,
+        cnn_feature_layer_name=cnn_feature_layer_name,
+        num_examples_per_batch=num_examples_per_batch, num_epochs=num_epochs,
+        num_training_batches_per_epoch=num_training_batches_per_epoch,
+        output_model_file_name=output_model_file_name,
+        validation_file_names=validation_file_names,
+        num_validation_batches_per_epoch=num_validation_batches_per_epoch)
+    print(SEPARATOR_STRING)
 
     ucn_metafile_name = short_course.find_model_metafile(
         model_file_name=output_model_file_name, raise_error_if_missing=False)
@@ -216,6 +215,8 @@ if __name__ == '__main__':
 
     _run(
         input_cnn_file_name=getattr(INPUT_ARG_OBJECT, CNN_FILE_ARG_NAME),
+        use_batch_norm_for_out_layer=bool(
+            getattr(INPUT_ARG_OBJECT, USE_BATCH_NORM_ARG_NAME)),
         use_transposed_conv=bool(
             getattr(INPUT_ARG_OBJECT, USE_TRANSPOSED_CONV_ARG_NAME)),
         smoothing_radius_px=getattr(

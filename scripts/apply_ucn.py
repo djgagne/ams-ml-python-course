@@ -156,7 +156,7 @@ def _run(input_ucn_file_name, input_image_dir_name, first_date_string,
     feature_matrix = short_course._apply_cnn(
         cnn_model_object=cnn_model_object, predictor_matrix=image_matrix_norm,
         output_layer_name=ucn_metadata_dict[short_course.CNN_FEATURE_LAYER_KEY],
-        verbose=True)
+        verbose=False)
 
     print('Applying upconvnet to reconstruct images from scalar features...')
     reconstructed_image_matrix_norm = ucn_model_object.predict(
