@@ -18,8 +18,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="327">
-              <caret line="3007" column="33" lean-forward="false" selection-start-line="3007" selection-start-column="33" selection-end-line="3007" selection-end-column="33" />
+            <state relative-caret-position="615">
+              <caret line="3996" column="54" lean-forward="true" selection-start-line="3996" selection-start-column="54" selection-end-line="3996" selection-end-column="54" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -27,12 +27,26 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="performance_diagrams.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/module_4/performance_diagrams.py">
+      <file leaf-file-name="train_ucn.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="291">
-              <caret line="31" column="53" lean-forward="false" selection-start-line="31" selection-start-column="53" selection-end-line="31" selection-end-column="53" />
-              <folding />
+            <state relative-caret-position="324">
+              <caret line="21" column="55" lean-forward="false" selection-start-line="21" selection-start-column="27" selection-end-line="21" selection-end-column="55" />
+              <folding>
+                <element signature="e#55#70#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="apply_ucn.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/scripts/apply_ucn.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1356">
+              <caret line="158" column="22" lean-forward="false" selection-start-line="158" selection-start-column="22" selection-end-line="158" selection-end-column="22" />
+              <folding>
+                <element signature="e#56#69#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -41,36 +55,36 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>list_of_input_matrices:</find>
-      <find>num_output_neurons</find>
-      <find>colour_map_object:</find>
-      <find>def plot_many</find>
-      <find>pyplot.show</find>
-      <find>plot_many_predictors</find>
-      <find>example_index</find>
-      <find>def setup_</find>
-      <find />
-      <find>def deep_learning_generator</find>
-      <find>predictor_names</find>
-      <find>def train_cnn</find>
-      <find>orig_predictor_matrix</find>
-      <find>svd_dict</find>
-      <find>M =</find>
-      <find>cnn_feature_layer_name:</find>
-      <find>name=</find>
-      <find>ucn_model_object.</find>
-      <find>_example1(</find>
-      <find>novel_indices</find>
+      <find>def setup_ucn</find>
+      <find>pickle.</find>
+      <find>pickle</find>
+      <find>NORMALIZATION</find>
+      <find>def train_ucn</find>
+      <find>def write</find>
+      <find>def write_</find>
+      <find>.p</find>
+      <find>.p'</find>
+      <find>def write_mod</find>
+      <find>CNN_FEATURE_LAYER_KEY</find>
+      <find>CNN_FILE_KEY</find>
+      <find>train_ucn(</find>
+      <find>train_cnn(</find>
+      <find>def train_uc</find>
+      <find>num_examples</find>
+      <find>predictor_matrix</find>
+      <find>model_object</find>
+      <find>def train_cnn(</find>
+      <find>def train_ucn(</find>
+      <find>use_transposed_conv</find>
+      <find>TODO(thun</find>
+      <find>def evalua</find>
+      <find>model_metadata_dict</find>
+      <find>validation_file_names =</find>
       <find>validation_image_dict:</find>
-      <find>plot_wind_2d(</find>
-      <find>plot_predictor_2d(</find>
-      <find>Critical su</find>
-      <find>title(</find>
-      <find>_add_colour_bar(</find>
-      <find>MIN_XENTROPY_DECREASE_FOR_EARLY_STOP</find>
-      <find>DECREASE_FOR_EARLY_STOP</find>
-      <find>_apply_cnn(</find>
-      <find>.predict(</find>
+      <find>print(</find>
+      <find>validation_image_dict</find>
+      <find>0</find>
+      <find>_apply_svd</find>
     </findStrings>
     <replaceStrings>
       <replace>current_layer_object</replace>
@@ -88,10 +102,21 @@
       <replace>[m][0]</replace>
       <replace>predictor_matrix</replace>
       <replace>for_out_layer</replace>
-      <replace>image_matrix</replace>
       <replace>svd_dictionary</replace>
       <replace>svd_errors</replace>
       <replace>difference_matrix</replace>
+      <replace>ACTIVATION_</replace>
+      <replace>NUM_VALIDATION_BATCHES</replace>
+      <replace>cnn_feature_dimensions</replace>
+      <replace>num_deconv_layers</replace>
+      <replace>num_examples_</replace>
+      <replace>image_matrix</replace>
+      <replace>ucn_model_object</replace>
+      <replace>cnn_model_object</replace>
+      <replace>predictor_names</replace>
+      <replace>UPSAMPLING_FACTORS</replace>
+      <replace>cnn_metadata_dict</replace>
+      <replace>ucn_metadata_dict</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -110,15 +135,18 @@
         <option value="$PROJECT_DIR$/module_4/performance_diagrams.py" />
         <option value="$PROJECT_DIR$/module_4/roc_curves.py" />
         <option value="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
+        <option value="$PROJECT_DIR$/scripts/train_cnn.py" />
+        <option value="$PROJECT_DIR$/scripts/apply_ucn.py" />
+        <option value="$PROJECT_DIR$/scripts/train_ucn.py" />
         <option value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="2130" />
+    <option name="x" value="1920" />
     <option name="y" value="28" />
-    <option name="width" value="1910" />
-    <option name="height" value="810" />
+    <option name="width" value="1920" />
+    <option name="height" value="1138" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -155,6 +183,11 @@
               <item name="ams-ml-python-course" type="b2602c69:ProjectViewProjectNode" />
               <item name="ams-ml-python-course" type="462c0819:PsiDirectoryNode" />
               <item name="module_4" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="ams-ml-python-course" type="b2602c69:ProjectViewProjectNode" />
+              <item name="ams-ml-python-course" type="462c0819:PsiDirectoryNode" />
+              <item name="scripts" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -491,14 +524,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/module_4/attributes_diagrams.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="399">
-          <caret line="150" column="4" lean-forward="false" selection-start-line="150" selection-start-column="4" selection-end-line="151" selection-end-column="32" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/setup.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="270">
@@ -515,10 +540,50 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/module_4/attributes_diagrams.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="414">
+          <caret line="23" column="0" lean-forward="true" selection-start-line="23" selection-start-column="0" selection-end-line="23" selection-end-column="0" />
+          <folding>
+            <element signature="e#48#60#0" expanded="false" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/scripts/train_cnn.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="348">
+          <caret line="112" column="55" lean-forward="true" selection-start-line="112" selection-start-column="55" selection-end-line="130" selection-end-column="0" />
+          <folding>
+            <marker date="1545690547935" expanded="true" signature="4298:4897" ph="..." />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/scripts/apply_ucn.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1356">
+          <caret line="158" column="22" lean-forward="false" selection-start-line="158" selection-start-column="22" selection-end-line="158" selection-end-column="22" />
+          <folding>
+            <element signature="e#56#69#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="324">
+          <caret line="21" column="55" lean-forward="false" selection-start-line="21" selection-start-column="27" selection-end-line="21" selection-end-column="55" />
+          <folding>
+            <element signature="e#55#70#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="327">
-          <caret line="3007" column="33" lean-forward="false" selection-start-line="3007" selection-start-column="33" selection-end-line="3007" selection-end-column="33" />
+        <state relative-caret-position="615">
+          <caret line="3996" column="54" lean-forward="true" selection-start-line="3996" selection-start-column="54" selection-end-line="3996" selection-end-column="54" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>

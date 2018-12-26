@@ -5,6 +5,7 @@ import glob
 import errno
 import random
 import os.path
+import json
 import pickle
 import time
 import calendar
@@ -103,6 +104,7 @@ NUM_EXAMPLES_PER_BATCH_KEY = 'num_examples_per_batch'
 NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
 VALIDATION_FILES_KEY = 'validation_file_names'
 NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
+CNN_FILE_KEY = 'cnn_file_name'
 CNN_FEATURE_LAYER_KEY = 'cnn_feature_layer_name'
 
 PERMUTED_PREDICTORS_KEY = 'permuted_predictor_name_by_step'
@@ -164,6 +166,9 @@ NUM_POOLING_COLUMNS = 2
 NUM_DENSE_LAYERS = 3
 DENSE_LAYER_DROPOUT_FRACTION = 0.5
 
+NUM_SMOOTHING_FILTER_ROWS = 5
+NUM_SMOOTHING_FILTER_COLUMNS = 5
+
 MIN_XENTROPY_DECREASE_FOR_EARLY_STOP = 0.005
 MIN_MSE_DECREASE_FOR_EARLY_STOP = 0.005
 NUM_EPOCHS_FOR_EARLY_STOPPING = 5
@@ -175,6 +180,18 @@ LIST_OF_METRIC_FUNCTIONS = [
     keras_metrics.binary_peirce_score, keras_metrics.binary_success_ratio,
     keras_metrics.binary_focn
 ]
+
+METRIC_FUNCTION_DICT = {
+    'accuracy': keras_metrics.accuracy,
+    'binary_accuracy': keras_metrics.binary_accuracy,
+    'binary_csi': keras_metrics.binary_csi,
+    'binary_frequency_bias': keras_metrics.binary_frequency_bias,
+    'binary_pod': keras_metrics.binary_pod,
+    'binary_pofd': keras_metrics.binary_pofd,
+    'binary_peirce_score': keras_metrics.binary_peirce_score,
+    'binary_success_ratio': keras_metrics.binary_success_ratio,
+    'binary_focn': keras_metrics.binary_focn
+}
 
 DEFAULT_NUM_BWO_ITERATIONS = 200
 DEFAULT_BWO_LEARNING_RATE = 0.01
@@ -247,6 +264,7 @@ def _feature_file_name_to_date(csv_file_name):
     # Verify.
     time_string_to_unix(time_string=date_string, time_format=DATE_FORMAT)
     return date_string
+
 
 def find_many_feature_files(first_date_string, last_date_string,
                             feature_dir_name=DEFAULT_FEATURE_DIR_NAME):
@@ -557,1370 +575,8 @@ def find_training_files_example():
     training_file_names = find_many_image_files(
         first_date_string='20100101', last_date_string='20141231')
 
-
-def _update_normalization_params(intermediate_normalization_dict, new_values):
-    """Updates normalization params for one predictor.
-
-    :param intermediate_normalization_dict: Dictionary with the following keys.
-    intermediate_normalization_dict['num_values']: Number of values on which
-        current estimates are based.
-    intermediate_normalization_dict['mean_value']: Current estimate for mean.
-    intermediate_normalization_dict['mean_of_squares']: Current mean of squared
-        values.
-
-    :param new_values: numpy array of new values (will be used to update
-        `intermediate_normalization_dict`).
-    :return: intermediate_normalization_dict: Same as input but with updated
-        values.
-    """
-
-    if MEAN_VALUE_KEY not in intermediate_normalization_dict:
-        intermediate_normalization_dict = {
-            NUM_VALUES_KEY: 0,
-            MEAN_VALUE_KEY: 0.,
-            MEAN_OF_SQUARES_KEY: 0.
-        }
-
-    these_means = numpy.array([
-        intermediate_normalization_dict[MEAN_VALUE_KEY], numpy.mean(new_values)
-    ])
-    these_weights = numpy.array([
-        intermediate_normalization_dict[NUM_VALUES_KEY], new_values.size
-    ])
-
-    intermediate_normalization_dict[MEAN_VALUE_KEY] = numpy.average(
-        these_means, weights=these_weights)
-
-    these_means = numpy.array([
-        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY],
-        numpy.mean(new_values ** 2)
-    ])
-
-    intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] = numpy.average(
-        these_means, weights=these_weights)
-
-    intermediate_normalization_dict[NUM_VALUES_KEY] += new_values.size
-    return intermediate_normalization_dict
-
-
-def _get_standard_deviation(intermediate_normalization_dict):
-    """Computes stdev from intermediate normalization params.
-
-    :param intermediate_normalization_dict: See doc for
-        `_update_normalization_params`.
-    :return: standard_deviation: Standard deviation.
-    """
-
-    num_values = float(intermediate_normalization_dict[NUM_VALUES_KEY])
-    multiplier = num_values / (num_values - 1)
-
-    return numpy.sqrt(multiplier * (
-        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] -
-        intermediate_normalization_dict[MEAN_VALUE_KEY] ** 2
-    ))
-
-
-def get_image_normalization_params(netcdf_file_names):
-    """Computes normalization params (mean and stdev) for each predictor.
-
-    :param netcdf_file_names: 1-D list of paths to input files.
-    :return: normalization_dict: See input doc for `normalize_images`.
-    """
-
-    predictor_names = None
-    norm_dict_by_predictor = None
-
-    for this_file_name in netcdf_file_names:
-        print('Reading data from: "{0:s}"...'.format(this_file_name))
-        this_image_dict = read_image_file(this_file_name)
-
-        if predictor_names is None:
-            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
-            norm_dict_by_predictor = [{}] * len(predictor_names)
-
-        for m in range(len(predictor_names)):
-            norm_dict_by_predictor[m] = _update_normalization_params(
-                intermediate_normalization_dict=norm_dict_by_predictor[m],
-                new_values=this_image_dict[PREDICTOR_MATRIX_KEY][..., m])
-
-    print('\n')
-    normalization_dict = {}
-
-    for m in range(len(predictor_names)):
-        this_mean = norm_dict_by_predictor[m][MEAN_VALUE_KEY]
-        this_stdev = _get_standard_deviation(norm_dict_by_predictor[m])
-        normalization_dict[predictor_names[m]] = numpy.array(
-            [this_mean, this_stdev])
-
-        print(
-            ('Mean and standard deviation for "{0:s}" = {1:.4f}, {2:.4f}'
-             ).format(predictor_names[m], this_mean, this_stdev)
-        )
-
-    return normalization_dict
-
-
-def get_norm_params_example(training_file_names):
-    """Gets normalization parameters.
-
-    :param training_file_names: 1-D list of paths to input files.
-    """
-
-    normalization_dict = get_image_normalization_params(training_file_names)
-
-
-def normalize_images(
-        predictor_matrix, predictor_names, normalization_dict=None):
-    """Normalizes images to z-scores.
-
-    E = number of examples (storm objects) in file
-    M = number of rows in each storm-centered grid
-    N = number of columns in each storm-centered grid
-    C = number of channels (predictor variables)
-
-    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
-    :param predictor_names: length-C list of predictor names.
-    :param normalization_dict: Dictionary.  Each key is the name of a predictor
-        value, and the corresponding value is a length-2 numpy array with
-        [mean, standard deviation].  If `normalization_dict is None`, mean and
-        standard deviation will be computed for each predictor.
-    :return: predictor_matrix: Normalized version of input.
-    :return: normalization_dict: See doc for input variable.  If input was None,
-        this will be a newly created dictionary.  Otherwise, this will be the
-        same dictionary passed as input.
-    """
-
-    num_predictors = len(predictor_names)
-
-    if normalization_dict is None:
-        normalization_dict = {}
-
-        for m in range(num_predictors):
-            this_mean = numpy.mean(predictor_matrix[..., m])
-            this_stdev = numpy.std(predictor_matrix[..., m], ddof=1)
-
-            normalization_dict[predictor_names[m]] = numpy.array(
-                [this_mean, this_stdev])
-
-    for m in range(num_predictors):
-        this_mean = normalization_dict[predictor_names[m]][0]
-        this_stdev = normalization_dict[predictor_names[m]][1]
-
-        predictor_matrix[..., m] = (
-            (predictor_matrix[..., m] - this_mean) / this_stdev
-        )
-
-    return predictor_matrix, normalization_dict
-
-
-def denormalize_images(predictor_matrix, predictor_names, normalization_dict):
-    """Denormalizes images from z-scores back to original scales.
-
-    :param predictor_matrix: See doc for `normalize_images`.
-    :param predictor_names: Same.
-    :param normalization_dict: Same.
-    :return: predictor_matrix: Denormalized version of input.
-    """
-
-    num_predictors = len(predictor_names)
-    for m in range(num_predictors):
-        this_mean = normalization_dict[predictor_names[m]][0]
-        this_stdev = normalization_dict[predictor_names[m]][1]
-
-        predictor_matrix[..., m] = (
-            this_mean + this_stdev * predictor_matrix[..., m]
-        )
-
-    return predictor_matrix
-
-
-def norm_denorm_example(training_file_names, normalization_dict):
-    """Normalizes and denormalizes images.
-
-    :param training_file_names: 1-D list of paths to input files.
-    :param normalization_dict: Dictionary created by
-        `get_image_normalization_params`.
-    """
-
-    image_dict = read_image_file(training_file_names[0])
-
-    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
-    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
-
-    print('\nOriginal values of "{0:s}" for first storm object:\n{1:s}'.format(
-        predictor_names[0], str(these_predictor_values)
-    ))
-
-    image_dict[PREDICTOR_MATRIX_KEY], _ = normalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
-        predictor_names=predictor_names, normalization_dict=normalization_dict)
-
-    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
-    print(
-        '\nNormalized values of "{0:s}" for first storm object:\n{1:s}'.format(
-            predictor_names[0], str(these_predictor_values))
-    )
-
-    image_dict[PREDICTOR_MATRIX_KEY] = denormalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
-        predictor_names=predictor_names, normalization_dict=normalization_dict)
-
-    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
-    print(
-        ('\nDenormalized values of "{0:s}" for first storm object:\n{1:s}'
-         ).format(predictor_names[0], str(these_predictor_values))
-    )
-
-
-def get_binarization_threshold(netcdf_file_names, percentile_level):
-    """Computes binarization threshold for target variable.
-
-    Binarization threshold will be [q]th percentile of all image maxima, where
-    q = `percentile_level`.
-
-    :param netcdf_file_names: 1-D list of paths to input files.
-    :param percentile_level: q in the above discussion.
-    :return: binarization_threshold: Binarization threshold (used to turn each
-        target image into a yes-or-no label).
-    """
-
-    max_target_values = numpy.array([])
-
-    for this_file_name in netcdf_file_names:
-        print('Reading data from: "{0:s}"...'.format(this_file_name))
-        this_image_dict = read_image_file(this_file_name)
-
-        this_target_matrix = this_image_dict[TARGET_MATRIX_KEY]
-        this_num_examples = this_target_matrix.shape[0]
-        these_max_target_values = numpy.full(this_num_examples, numpy.nan)
-
-        for i in range(this_num_examples):
-            these_max_target_values[i] = numpy.max(this_target_matrix[i, ...])
-
-        max_target_values = numpy.concatenate((
-            max_target_values, these_max_target_values))
-
-    binarization_threshold = numpy.percentile(
-        max_target_values, percentile_level)
-
-    print('\nBinarization threshold for "{0:s}" = {1:.4e}'.format(
-        TARGET_NAME, binarization_threshold))
-
-    return binarization_threshold
-
-
-def find_binarization_threshold_example(training_file_names):
-    """Finds binarization threshold for target variable.
-
-    :param training_file_names: 1-D list of paths to input files.
-    """
-
-    binarization_threshold = get_binarization_threshold(
-        netcdf_file_names=training_file_names, percentile_level=90.)
-
-
-def binarize_target_images(target_matrix, binarization_threshold):
-    """Binarizes target images.
-
-    Specifically, this method turns each target image into a binary label,
-    depending on whether or not (max value in image) >= binarization_threshold.
-
-    E = number of examples (storm objects) in file
-    M = number of rows in each storm-centered grid
-    N = number of columns in each storm-centered grid
-
-    :param target_matrix: E-by-M-by-N numpy array of floats.
-    :param binarization_threshold: Binarization threshold.
-    :return: target_values: length-E numpy array of target values (integers in
-        0...1).
-    """
-
-    num_examples = target_matrix.shape[0]
-    target_values = numpy.full(num_examples, -1, dtype=int)
-
-    for i in range(num_examples):
-        target_values[i] = (
-            numpy.max(target_matrix[i, ...]) >= binarization_threshold
-        )
-
-    return target_values
-
-
-def binarization_example(training_file_names, binarization_threshold):
-    """Binarizes target images.
-
-    :param training_file_names: 1-D list of paths to input files.
-    :param binarization_threshold: Binarization threshold.
-    """
-
-    image_dict = read_image_file(training_file_names[0])
-    these_max_target_values = numpy.array(
-        [numpy.max(image_dict[TARGET_MATRIX_KEY][i, ...]) for i in range(10)]
-    )
-
-    print(
-        ('\nSpatial maxima of "{0:s}" for the first few storm objects:\n{1:s}'
-         ).format(image_dict[TARGET_NAME_KEY], str(these_max_target_values))
-    )
-
-    target_values = binarize_target_images(
-        target_matrix=image_dict[TARGET_MATRIX_KEY],
-        binarization_threshold=binarization_threshold)
-
-    print(
-        ('\nBinarized target values for the first few storm objects:\n{0:s}'
-         ).format(str(target_values[:10]))
-    )
-
-
-def _get_dense_layer_dimensions(num_input_units, num_classes, num_dense_layers):
-    """Returns dimensions (number of input and output units) for each dense lyr.
-
-    D = number of dense layers
-
-    :param num_input_units: Number of input units (features created by
-        flattening layer).
-    :param num_classes: Number of output classes (possible values of target
-        variable).
-    :param num_dense_layers: Number of dense layers.
-    :return: num_inputs_by_layer: length-D numpy array with number of input
-        units by dense layer.
-    :return: num_outputs_by_layer: length-D numpy array with number of output
-        units by dense layer.
-    """
-
-    if num_classes == 2:
-        num_output_units = 1
-    else:
-        num_output_units = num_classes + 0
-
-    e_folding_param = (
-        float(-1 * num_dense_layers) /
-        numpy.log(float(num_output_units) / num_input_units)
-    )
-
-    dense_layer_indices = numpy.linspace(
-        0, num_dense_layers - 1, num=num_dense_layers, dtype=float)
-    num_inputs_by_layer = num_input_units * numpy.exp(
-        -1 * dense_layer_indices / e_folding_param)
-    num_inputs_by_layer = numpy.round(num_inputs_by_layer).astype(int)
-
-    num_outputs_by_layer = numpy.concatenate((
-        num_inputs_by_layer[1:],
-        numpy.array([num_output_units], dtype=int)
-    ))
-
-    return num_inputs_by_layer, num_outputs_by_layer
-
-
-def setup_cnn(num_grid_rows, num_grid_columns):
-    """Sets up (but does not train) CNN (convolutional neural net).
-
-    :param num_grid_rows: Number of rows in each predictor image.
-    :param num_grid_columns: Number of columns in each predictor image.
-    :return: model_object: Untrained instance of `keras.models.Model`.
-    """
-
-    regularizer_object = keras.regularizers.l1_l2(l1=L1_WEIGHT, l2=L2_WEIGHT)
-
-    num_predictors = len(NETCDF_PREDICTOR_NAMES)
-    input_layer_object = keras.layers.Input(
-        shape=(num_grid_rows, num_grid_columns, num_predictors)
-    )
-
-    current_num_filters = None
-    current_layer_object = None
-
-    # Add convolutional layers.
-    for _ in range(NUM_CONV_LAYER_SETS):
-        for _ in range(NUM_CONV_LAYERS_PER_SET):
-
-            if current_num_filters is None:
-                current_num_filters = (
-                    num_predictors * NUM_PREDICTORS_TO_FIRST_NUM_FILTERS)
-                this_input_layer_object = input_layer_object
-
-            else:
-                current_num_filters *= 2
-                this_input_layer_object = current_layer_object
-
-            current_layer_object = keras.layers.Conv2D(
-                filters=current_num_filters,
-                kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
-                strides=(1, 1), padding='valid', data_format='channels_last',
-                dilation_rate=(1, 1), activation=None, use_bias=True,
-                kernel_initializer='glorot_uniform', bias_initializer='zeros',
-                kernel_regularizer=regularizer_object
-            )(this_input_layer_object)
-
-            current_layer_object = keras.layers.LeakyReLU(
-                alpha=SLOPE_FOR_RELU
-            )(current_layer_object)
-
-            if CONV_LAYER_DROPOUT_FRACTION is not None:
-                current_layer_object = keras.layers.Dropout(
-                    rate=CONV_LAYER_DROPOUT_FRACTION
-                )(current_layer_object)
-
-            if USE_BATCH_NORMALIZATION:
-                current_layer_object = keras.layers.BatchNormalization(
-                    axis=-1, center=True, scale=True
-                )(current_layer_object)
-
-        current_layer_object = keras.layers.MaxPooling2D(
-            pool_size=(NUM_POOLING_ROWS, NUM_POOLING_COLUMNS),
-            strides=(NUM_POOLING_ROWS, NUM_POOLING_COLUMNS),
-            padding='valid', data_format='channels_last'
-        )(current_layer_object)
-
-    these_dimensions = numpy.array(
-        current_layer_object.get_shape().as_list()[1:], dtype=int)
-    num_features = numpy.prod(these_dimensions)
-
-    current_layer_object = keras.layers.Flatten()(current_layer_object)
-
-    # Add intermediate dense layers.
-    _, num_outputs_by_dense_layer = _get_dense_layer_dimensions(
-        num_input_units=num_features, num_classes=2,
-        num_dense_layers=NUM_DENSE_LAYERS)
-
-    for k in range(NUM_DENSE_LAYERS - 1):
-        current_layer_object = keras.layers.Dense(
-            num_outputs_by_dense_layer[k], activation=None, use_bias=True,
-            kernel_initializer='glorot_uniform', bias_initializer='zeros',
-            kernel_regularizer=regularizer_object
-        )(current_layer_object)
-
-        current_layer_object = keras.layers.LeakyReLU(
-            alpha=SLOPE_FOR_RELU
-        )(current_layer_object)
-
-        if DENSE_LAYER_DROPOUT_FRACTION is not None:
-            current_layer_object = keras.layers.Dropout(
-                rate=DENSE_LAYER_DROPOUT_FRACTION
-            )(current_layer_object)
-
-        if USE_BATCH_NORMALIZATION:
-            current_layer_object = keras.layers.BatchNormalization(
-                axis=-1, center=True, scale=True
-            )(current_layer_object)
-
-    # Add output layer (also dense).
-    current_layer_object = keras.layers.Dense(
-        1, activation=None, use_bias=True,
-        kernel_initializer='glorot_uniform', bias_initializer='zeros',
-        kernel_regularizer=regularizer_object
-    )(current_layer_object)
-
-    current_layer_object = keras.layers.Activation(
-        'sigmoid'
-    )(current_layer_object)
-
-    if DENSE_LAYER_DROPOUT_FRACTION is not None and NUM_DENSE_LAYERS == 1:
-        current_layer_object = keras.layers.Dropout(
-            rate=DENSE_LAYER_DROPOUT_FRACTION
-        )(current_layer_object)
-
-    # Put the whole thing together and compile.
-    model_object = keras.models.Model(
-        inputs=input_layer_object, outputs=current_layer_object)
-    model_object.compile(
-        loss=keras.losses.binary_crossentropy,
-        optimizer=keras.optimizers.Adam(),
-        metrics=LIST_OF_METRIC_FUNCTIONS)
-
-    model_object.summary()
-    return model_object
-
-
-def setup_cnn_example(training_file_names):
-    """Sets up CNN.
-
-    :param training_file_names: 1-D list of paths to input files.
-    """
-
-    this_image_dict = read_image_file(training_file_names[0])
-    model_object = setup_cnn(
-        num_grid_rows=this_image_dict[PREDICTOR_MATRIX_KEY].shape[1],
-        num_grid_columns=this_image_dict[PREDICTOR_MATRIX_KEY].shape[2])
-
-
-def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
-                            normalization_dict, binarization_threshold):
-    """Generates training examples for deep-learning model on the fly.
-
-    E = number of examples (storm objects)
-    M = number of rows in each storm-centered grid
-    N = number of columns in each storm-centered grid
-    C = number of channels (predictor variables)
-
-    :param netcdf_file_names: 1-D list of paths to input (NetCDF) files.
-    :param num_examples_per_batch: Number of examples per training batch.
-    :param normalization_dict: See doc for `normalize_images`.  You cannot leave
-        this as None.
-    :param binarization_threshold: Binarization threshold for target variable.
-        See `binarize_target_images` for details on what this does.
-    :return: predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
-    :return: target_values: length-E numpy array of target values (integers in
-        0...1).
-    :raises: TypeError: if `normalization_dict is None`.
-    """
-
-    # TODO(thunderhoser): Probably need downsampling or upsampling.
-
-    if normalization_dict is None:
-        error_string = 'normalization_dict cannot be None.  Must be specified.'
-        raise TypeError(error_string)
-
-    random.shuffle(netcdf_file_names)
-    num_files = len(netcdf_file_names)
-    file_index = 0
-
-    num_examples_in_memory = 0
-    full_predictor_matrix = None
-    full_target_matrix = None
-    predictor_names = None
-
-    while True:
-        while num_examples_in_memory < num_examples_per_batch:
-            print('Reading data from: "{0:s}"...'.format(
-                netcdf_file_names[file_index]))
-
-            this_image_dict = read_image_file(netcdf_file_names[file_index])
-            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
-
-            file_index += 1
-            if file_index >= num_files:
-                file_index = 0
-
-            if full_target_matrix is None or full_target_matrix.size == 0:
-                full_predictor_matrix = (
-                    this_image_dict[PREDICTOR_MATRIX_KEY] + 0.
-                )
-                full_target_matrix = this_image_dict[TARGET_MATRIX_KEY] + 0.
-
-            else:
-                full_predictor_matrix = numpy.concatenate(
-                    (full_predictor_matrix,
-                     this_image_dict[PREDICTOR_MATRIX_KEY]),
-                    axis=0)
-
-                full_target_matrix = numpy.concatenate(
-                    (full_target_matrix, this_image_dict[TARGET_MATRIX_KEY]),
-                    axis=0)
-
-            num_examples_in_memory = full_target_matrix.shape[0]
-
-        batch_indices = numpy.linspace(
-            0, num_examples_in_memory - 1, num=num_examples_in_memory,
-            dtype=int)
-        batch_indices = numpy.random.choice(
-            batch_indices, size=num_examples_per_batch, replace=False)
-
-        predictor_matrix, _ = normalize_images(
-            predictor_matrix=full_predictor_matrix[batch_indices, ...],
-            predictor_names=predictor_names,
-            normalization_dict=normalization_dict)
-        predictor_matrix = predictor_matrix.astype('float32')
-
-        target_values = binarize_target_images(
-            target_matrix=full_target_matrix[batch_indices, ...],
-            binarization_threshold=binarization_threshold)
-
-        print('Fraction of examples in positive class: {0:.4f}'.format(
-            numpy.mean(target_values)))
-
-        num_examples_in_memory = 0
-        full_predictor_matrix = None
-        full_target_matrix = None
-
-        yield (predictor_matrix, target_values)
-
-
-def train_cnn(
-        model_object, training_file_names, normalization_dict,
-        binarization_threshold, num_examples_per_batch, num_epochs,
-        num_training_batches_per_epoch, output_model_file_name,
-        validation_file_names=None, num_validation_batches_per_epoch=None):
-    """Trains CNN (convolutional neural net).
-
-    :param model_object: Untrained instance of `keras.models.Model` (may be
-        created by `setup_cnn`).
-    :param training_file_names: 1-D list of paths to training files (must be
-        readable by `read_image_file`).
-    :param normalization_dict: See doc for `deep_learning_generator`.
-    :param binarization_threshold: Same.
-    :param num_examples_per_batch: Same.
-    :param num_epochs: Number of epochs.
-    :param num_training_batches_per_epoch: Number of training batches furnished
-        to model in each epoch.
-    :param output_model_file_name: Path to output file.  The model will be saved
-        as an HDF5 file (extension should be ".h5", but this is not enforced).
-    :param validation_file_names: 1-D list of paths to training files (must be
-        readable by `read_image_file`).  If `validation_file_names is None`,
-        will omit on-the-fly validation.
-    :param num_validation_batches_per_epoch:
-        [used only if `validation_file_names is not None`]
-        Number of validation batches furnished to model in each epoch.
-
-    :return: model_metadata_dict: Dictionary with the following keys.
-    model_metadata_dict['training_file_names']: See input doc.
-    model_metadata_dict['normalization_dict']: Same.
-    model_metadata_dict['binarization_threshold']: Same.
-    model_metadata_dict['num_examples_per_batch']: Same.
-    model_metadata_dict['num_training_batches_per_epoch']: Same.
-    model_metadata_dict['validation_file_names']: Same.
-    model_metadata_dict['num_validation_batches_per_epoch']: Same.
-    """
-
-    _create_directory(file_name=output_model_file_name)
-
-    if validation_file_names is None:
-        checkpoint_object = keras.callbacks.ModelCheckpoint(
-            filepath=output_model_file_name, monitor='loss', verbose=1,
-            save_best_only=False, save_weights_only=False, mode='min',
-            period=1)
-    else:
-        checkpoint_object = keras.callbacks.ModelCheckpoint(
-            filepath=output_model_file_name, monitor='val_loss', verbose=1,
-            save_best_only=True, save_weights_only=False, mode='min',
-            period=1)
-
-    list_of_callback_objects = [checkpoint_object]
-
-    model_metadata_dict = {
-        TRAINING_FILES_KEY: training_file_names,
-        NORMALIZATION_DICT_KEY: normalization_dict,
-        BINARIZATION_THRESHOLD_KEY: binarization_threshold,
-        NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
-        NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
-        VALIDATION_FILES_KEY: validation_file_names,
-        NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch
-    }
-
-    training_generator = deep_learning_generator(
-        netcdf_file_names=training_file_names,
-        num_examples_per_batch=num_examples_per_batch,
-        normalization_dict=normalization_dict,
-        binarization_threshold=binarization_threshold)
-
-    # TODO(thunderhoser): This is a HACK to prevent segmentation faults on
-    # Schooner.
-    if num_examples_per_batch < 500:
-        workers_arg = 0
-    else:
-        workers_arg = 1
-
-    if validation_file_names is None:
-        model_object.fit_generator(
-            generator=training_generator,
-            steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-            verbose=1, callbacks=list_of_callback_objects, workers=workers_arg)
-
-        return model_metadata_dict
-
-    early_stopping_object = keras.callbacks.EarlyStopping(
-        monitor='val_loss', min_delta=MIN_XENTROPY_DECREASE_FOR_EARLY_STOP,
-        patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
-
-    list_of_callback_objects.append(early_stopping_object)
-
-    validation_generator = deep_learning_generator(
-        netcdf_file_names=validation_file_names,
-        num_examples_per_batch=num_examples_per_batch,
-        normalization_dict=normalization_dict,
-        binarization_threshold=binarization_threshold)
-
-    model_object.fit_generator(
-        generator=training_generator,
-        steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-        verbose=1, callbacks=list_of_callback_objects, workers=workers_arg,
-        validation_data=validation_generator,
-        validation_steps=num_validation_batches_per_epoch)
-
-    return model_metadata_dict
-
-
-def _create_directory(directory_name=None, file_name=None):
-    """Creates directory (along with parents if necessary).
-
-    This method creates directories only when necessary, so you don't have to
-    worry about it overwriting anything.
-
-    :param directory_name: Name of desired directory.
-    :param file_name: [used only if `directory_name is None`]
-        Path to desired file.  All directories in path will be created.
-    """
-
-    if directory_name is None:
-        directory_name = os.path.split(file_name)[0]
-
-    try:
-        os.makedirs(directory_name)
-    except OSError as this_error:
-        if this_error.errno == errno.EEXIST and os.path.isdir(directory_name):
-            pass
-        else:
-            raise
-
-
-def train_cnn_example(model_object, training_file_names, normalization_dict,
-                      binarization_threshold):
-    """Actually trains the CNN.
-
-    :param model_object: See doc for `train_cnn`.
-    :param training_file_names: Same.
-    :param normalization_dict: Same.
-    :param binarization_threshold: Same.
-    """
-
     validation_file_names = find_many_image_files(
         first_date_string='20150101', last_date_string='20151231')
-
-    cnn_file_name = '{0:s}/cnn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
-    model_metadata_dict = train_cnn(
-        model_object=model_object, training_file_names=training_file_names,
-        normalization_dict=normalization_dict,
-        binarization_threshold=binarization_threshold,
-        num_examples_per_batch=256, num_epochs=10,
-        num_training_batches_per_epoch=10,
-        validation_file_names=validation_file_names,
-        num_validation_batches_per_epoch=10,
-        output_model_file_name=cnn_file_name)
-
-
-def _apply_cnn(model_object, predictor_matrix, verbose=True,
-               output_layer_name=None):
-    """Applies trained CNN (convolutional neural net) to new data.
-
-    E = number of examples (storm objects) in file
-    M = number of rows in each storm-centered grid
-    N = number of columns in each storm-centered grid
-    C = number of channels (predictor variables)
-
-    :param model_object: Trained instance of `keras.models.Model`.
-    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
-    :param verbose: Boolean flag.  If True, progress messages will be printed.
-    :param output_layer_name: Name of output layer.  If
-        `output_layer_name is None`, this method will use the actual output
-        layer, so will return predictions.  If `output_layer_name is not None`,
-        will return "features" (outputs from the given layer).
-
-    If `output_layer_name is None`...
-
-    :return: forecast_probabilities: length-E numpy array with forecast
-        probabilities of positive class (label = 1).
-
-    If `output_layer_name is not None`...
-
-    :return: feature_matrix: numpy array of features (outputs from the given
-        layer).  There is no guarantee on the shape of this array, except that
-        the first axis has length E.
-    """
-
-    num_examples = predictor_matrix.shape[0]
-    num_examples_per_batch = 1000
-
-    if output_layer_name is None:
-        model_object_to_use = model_object
-    else:
-        model_object_to_use = keras.models.Model(
-            inputs=model_object.input,
-            outputs=model_object.get_layer(name=output_layer_name).output)
-
-    output_array = None
-
-    for i in range(0, num_examples, num_examples_per_batch):
-        this_first_index = i
-        this_last_index = min(
-            [i + num_examples_per_batch - 1, num_examples - 1]
-        )
-
-        if verbose:
-            print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
-                this_first_index, this_last_index, num_examples))
-
-        these_indices = numpy.linspace(
-            this_first_index, this_last_index,
-            num=this_last_index - this_first_index + 1, dtype=int)
-
-        this_output_array = model_object_to_use.predict(
-            predictor_matrix[these_indices, ...],
-            batch_size=num_examples_per_batch)
-
-        if output_layer_name is None:
-            this_output_array = this_output_array[:, -1]
-
-        if output_array is None:
-            output_array = this_output_array + 0.
-        else:
-            output_array = numpy.concatenate(
-                (output_array, this_output_array), axis=0)
-
-    return output_array
-
-
-def evaluate_cnn(
-        model_object, image_dict, model_metadata_dict, output_dir_name):
-    """Evaluates trained CNN (convolutional neural net).
-
-    :param model_object: Trained instance of `keras.models.Model`.
-    :param image_dict: Dictionary created by `read_image_file` or
-        `read_many_image_files`.  Should contain validation or testing data (not
-        training data), but this is not enforced.
-    :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
-        ensure that data in `image_dict` are processed the exact same way as the
-        training data for `model_object`.
-    :param output_dir_name: Path to output directory.  Figures will be saved
-        here.
-    """
-
-    predictor_matrix, _ = normalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
-        predictor_names=image_dict[PREDICTOR_NAMES_KEY],
-        normalization_dict=model_metadata_dict[NORMALIZATION_DICT_KEY])
-    predictor_matrix = predictor_matrix.astype('float32')
-
-    target_values = binarize_target_images(
-        target_matrix=image_dict[TARGET_MATRIX_KEY],
-        binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
-
-    forecast_probabilities = _apply_cnn(model_object=model_object,
-                                        predictor_matrix=predictor_matrix)
-    print(MINOR_SEPARATOR_STRING)
-
-    pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
-        observed_labels=target_values,
-        forecast_probabilities=forecast_probabilities)
-    pyplot.show()
-
-    area_under_roc_curve = scikit_learn_auc(pofd_by_threshold, pod_by_threshold)
-    print('Area under ROC curve: {0:.4f}'.format(area_under_roc_curve))
-
-    _create_directory(directory_name=output_dir_name)
-    roc_curve_file_name = '{0:s}/roc_curve.jpg'.format(output_dir_name)
-
-    print('Saving figure to: "{0:s}"...'.format(roc_curve_file_name))
-    pyplot.savefig(roc_curve_file_name, dpi=FIGURE_RESOLUTION_DPI)
-    pyplot.close()
-
-    performance_diagrams.plot_performance_diagram(
-        observed_labels=target_values,
-        forecast_probabilities=forecast_probabilities)
-    pyplot.show()
-
-    perf_diagram_file_name = '{0:s}/performance_diagram.jpg'.format(
-        output_dir_name)
-
-    print('Saving figure to: "{0:s}"...'.format(perf_diagram_file_name))
-    pyplot.savefig(perf_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
-    pyplot.close()
-
-    attributes_diagrams.plot_attributes_diagram(
-        observed_labels=target_values,
-        forecast_probabilities=forecast_probabilities, num_bins=20)
-    pyplot.show()
-
-    attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
-        output_dir_name)
-
-    print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
-    pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
-    pyplot.close()
-
-
-def evaluate_cnn_example(validation_file_names, model_object,
-                         model_metadata_dict):
-    """Evaluates CNN on validation data.
-
-    :param validation_file_names: 1-D list of paths to input files.
-    :param model_object: See doc for `evaluate_cnn`.
-    :param model_metadata_dict: Same.
-    """
-
-    validation_image_dict = read_many_image_files(validation_file_names)
-    print(SEPARATOR_STRING)
-
-    validation_dir_name = '{0:s}/validation'.format(DEFAULT_OUTPUT_DIR_NAME)
-    evaluate_cnn(
-        model_object=model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict,
-        output_dir_name=validation_dir_name)
-    print(SEPARATOR_STRING)
-
-
-def _get_binary_xentropy(target_values, forecast_probabilities):
-    """Computes binary cross-entropy.
-
-    This function satisfies the requirements for `cost_function` in the input to
-    `run_permutation_test`.
-
-    E = number of examples
-
-    :param: target_values: length-E numpy array of target values (integer class
-        labels).
-    :param: forecast_probabilities: length-E numpy array with predicted
-        probabilities of positive class (target value = 1).
-    :return: cross_entropy: Cross-entropy.
-    """
-
-    forecast_probabilities[
-        forecast_probabilities < MIN_PROBABILITY] = MIN_PROBABILITY
-    forecast_probabilities[
-        forecast_probabilities > MAX_PROBABILITY] = MAX_PROBABILITY
-
-    return -1 * numpy.mean(
-        target_values * numpy.log2(forecast_probabilities) +
-        (1 - target_values) * numpy.log2(1 - forecast_probabilities)
-    )
-
-
-def permutation_test_for_cnn(
-        model_object, image_dict, model_metadata_dict, output_pickle_file_name,
-        cost_function=_get_binary_xentropy):
-    """Runs permutation test on CNN (convolutional neural net).
-
-    E = number of examples (storm objects)
-    C = number of channels (predictor variables)
-
-    :param model_object: Trained instance of `keras.models.Model`.
-    :param image_dict: Dictionary created by `read_image_file` or
-        `read_many_image_files`.  Should contain validation data (rather than
-        training data), but this is not enforced.
-    :param model_metadata_dict: Dictionary created by `train_cnn`.  This will
-        ensure that data in `image_dict` are processed the exact same way as the
-        training data for `model_object`.
-    :param output_pickle_file_name: Path to output file.  `result_dict` (the
-        output variable) will be saved here.
-
-    :param cost_function: Cost function (used to evaluate model predictions).
-        Must be negatively oriented (lower values are better).  Must have the
-        following inputs and outputs.
-    Input: target_values: length-E numpy array of target values (integer class
-        labels).
-    Input: forecast_probabilities: length-E numpy array with predicted
-        probabilities of positive class (target value = 1).
-    Output: cost: Scalar value.
-
-    :return: result_dict: Dictionary with the following keys.
-    result_dict['permuted_predictor_name_by_step']: length-C list with name of
-        predictor permuted at each step.
-    result_dict['highest_cost_by_step']: length-C numpy array with corresponding
-        cost at each step.  highest_cost_by_step[m] = cost after permuting
-        permuted_predictor_name_by_step[m].
-    result_dict['original_cost']: Original cost (before any permutation).
-    result_dict['predictor_names_step1']: length-C list of predictor names.
-    result_dict['costs_step1']: length-C numpy array of corresponding costs.
-        costs_step1[m] = cost after permuting only predictor_names_step1[m].
-        This key and "predictor_names_step1" correspond to the Breiman version
-        of the permutation test, while "permuted_predictor_name_by_step" and
-        "highest_cost_by_step" correspond to the Lakshmanan version.
-    """
-
-    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
-
-    predictor_matrix, _ = normalize_images(
-        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
-        predictor_names=image_dict[PREDICTOR_NAMES_KEY],
-        normalization_dict=model_metadata_dict[NORMALIZATION_DICT_KEY])
-    predictor_matrix = predictor_matrix.astype('float32')
-
-    target_values = binarize_target_images(
-        target_matrix=image_dict[TARGET_MATRIX_KEY],
-        binarization_threshold=model_metadata_dict[BINARIZATION_THRESHOLD_KEY])
-
-    # Get original cost (before permutation).
-    these_probabilities = _apply_cnn(model_object=model_object,
-                                     predictor_matrix=predictor_matrix)
-    print(MINOR_SEPARATOR_STRING)
-
-    original_cost = cost_function(target_values, these_probabilities)
-    print('Original cost (no permutation): {0:.4e}\n'.format(original_cost))
-
-    num_examples = len(target_values)
-    remaining_predictor_names = predictor_names + []
-    current_step_num = 0
-
-    permuted_predictor_name_by_step = []
-    highest_cost_by_step = []
-    predictor_names_step1 = []
-    costs_step1 = []
-
-    while len(remaining_predictor_names) > 0:
-        current_step_num += 1
-
-        highest_cost = -numpy.inf
-        best_predictor_name = None
-        best_predictor_permuted_values = None
-
-        for this_predictor_name in remaining_predictor_names:
-            print(
-                ('Trying predictor "{0:s}" at step {1:d} of permutation test...'
-                 ).format(this_predictor_name, current_step_num)
-            )
-
-            this_predictor_index = predictor_names.index(this_predictor_name)
-            this_predictor_matrix = predictor_matrix + 0.
-
-            for i in range(num_examples):
-                this_predictor_matrix[i, ..., this_predictor_index] = (
-                    numpy.random.permutation(
-                        this_predictor_matrix[i, ..., this_predictor_index])
-                )
-
-            print(MINOR_SEPARATOR_STRING)
-            these_probabilities = _apply_cnn(
-                model_object=model_object,
-                predictor_matrix=this_predictor_matrix)
-            print(MINOR_SEPARATOR_STRING)
-
-            this_cost = cost_function(target_values, these_probabilities)
-            print('Resulting cost = {0:.4e}'.format(this_cost))
-
-            if current_step_num == 1:
-                predictor_names_step1.append(this_predictor_name)
-                costs_step1.append(this_cost)
-
-            if this_cost < highest_cost:
-                continue
-
-            highest_cost = this_cost + 0.
-            best_predictor_name = this_predictor_name + ''
-            best_predictor_permuted_values = this_predictor_matrix[
-                ..., this_predictor_index]
-
-        permuted_predictor_name_by_step.append(best_predictor_name)
-        highest_cost_by_step.append(highest_cost)
-
-        # Remove best predictor from list.
-        remaining_predictor_names.remove(best_predictor_name)
-
-        # Leave values of best predictor permuted.
-        this_predictor_index = predictor_names.index(best_predictor_name)
-        predictor_matrix[
-            ..., this_predictor_index] = best_predictor_permuted_values
-
-        print('\nBest predictor = "{0:s}" ... new cost = {1:.4e}\n'.format(
-            best_predictor_name, highest_cost))
-
-    result_dict = {
-        PERMUTED_PREDICTORS_KEY: permuted_predictor_name_by_step,
-        HIGHEST_COSTS_KEY: numpy.array(highest_cost_by_step),
-        ORIGINAL_COST_KEY: original_cost,
-        STEP1_PREDICTORS_KEY: predictor_names_step1,
-        STEP1_COSTS_KEY: numpy.array(costs_step1)
-    }
-
-    _create_directory(file_name=output_pickle_file_name)
-
-    print('Writing results to: "{0:s}"...'.format(output_pickle_file_name))
-    file_handle = open(output_pickle_file_name, 'wb')
-    pickle.dump(result_dict, file_handle)
-    file_handle.close()
-
-    return result_dict
-
-
-def permutation_test_example(model_object, validation_image_dict,
-                             model_metadata_dict):
-    """Runs the permutation test on validation data.
-
-    :param model_object: See doc for `permutation_test_for_cnn`.
-    :param validation_image_dict: Same.
-    :param model_metadata_dict: Same.
-    """
-
-    permutation_dir_name = '{0:s}/permutation_test'.format(
-        DEFAULT_OUTPUT_DIR_NAME)
-    main_permutation_file_name = '{0:s}/permutation_results.p'.format(
-        permutation_dir_name)
-
-    permutation_dict = permutation_test_for_cnn(
-        model_object=model_object, image_dict=validation_image_dict,
-        model_metadata_dict=model_metadata_dict,
-        output_pickle_file_name=main_permutation_file_name)
-
-
-def _label_bars_in_graph(axes_object, y_coords, y_strings):
-    """Labels bars in graph.
-
-    J = number of bars
-
-    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
-        Will plot on these axes.
-    :param y_coords: length-J numpy array with y-coordinates of bars.
-    :param y_strings: length-J list of labels.
-    """
-
-    x_min, x_max = pyplot.xlim()
-    x_coord_for_text = x_min + 0.01 * (x_max - x_min)
-
-    for j in range(len(y_coords)):
-        axes_object.text(
-            x_coord_for_text, y_coords[j], y_strings[j], color='k',
-            horizontalalignment='left', verticalalignment='center')
-
-
-def plot_breiman_results(
-        result_dict, output_file_name, plot_percent_increase=False):
-    """Plots results of Breiman (single-pass) permutation test.
-
-    :param result_dict: Dictionary created by `permutation_test_for_cnn`.
-    :param output_file_name: Path to output file.  Figure will be saved here.
-    :param plot_percent_increase: Boolean flag.  If True, x-axis will be
-        percentage of original cost (before permutation).  If False, will be
-        actual cost.
-    """
-
-    cost_values = result_dict[STEP1_COSTS_KEY]
-    predictor_names = result_dict[STEP1_PREDICTORS_KEY]
-
-    sort_indices = numpy.argsort(cost_values)
-    cost_values = cost_values[sort_indices]
-    predictor_names = [predictor_names[k] for k in sort_indices]
-
-    x_coords = numpy.concatenate((
-        numpy.array([result_dict[ORIGINAL_COST_KEY]]), cost_values
-    ))
-
-    if plot_percent_increase:
-        x_coords = 100 * x_coords / x_coords[0]
-
-    y_strings = ['No permutation'] + predictor_names
-    y_coords = numpy.linspace(
-        0, len(y_strings) - 1, num=len(y_strings), dtype=float)
-
-    _, axes_object = pyplot.subplots(
-        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-    )
-
-    axes_object.barh(
-        y_coords, x_coords, color=BAR_GRAPH_FACE_COLOUR,
-        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
-
-    pyplot.yticks([], [])
-    pyplot.ylabel('Predictor permuted')
-
-    if plot_percent_increase:
-        pyplot.xlabel('Cost (percentage of original)')
-    else:
-        pyplot.xlabel('Cost')
-
-    _label_bars_in_graph(
-        axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
-    pyplot.show()
-
-    _create_directory(file_name=output_file_name)
-    print('Saving figure to: "{0:s}"...'.format(output_file_name))
-    pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
-    pyplot.close()
-
-
-def plot_lakshmanan_results(
-        result_dict, output_file_name, plot_percent_increase=False):
-    """Plots results of Lakshmanan (multi-pass) permutation test.
-
-    :param result_dict: See doc for `plot_breiman_results`.
-    :param output_file_name: Same.
-    :param plot_percent_increase: Same.
-    """
-
-    x_coords = numpy.concatenate((
-        numpy.array([result_dict[ORIGINAL_COST_KEY]]),
-        result_dict[HIGHEST_COSTS_KEY]
-    ))
-
-    if plot_percent_increase:
-        x_coords = 100 * x_coords / x_coords[0]
-
-    y_strings = ['No permutation'] + result_dict[PERMUTED_PREDICTORS_KEY]
-    y_coords = numpy.linspace(
-        0, len(y_strings) - 1, num=len(y_strings), dtype=float
-    )[::-1]
-
-    _, axes_object = pyplot.subplots(
-        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-    )
-
-    axes_object.barh(
-        y_coords, x_coords, color=BAR_GRAPH_FACE_COLOUR,
-        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
-
-    pyplot.yticks([], [])
-    pyplot.ylabel('Predictor permuted')
-
-    if plot_percent_increase:
-        pyplot.xlabel('Cost (percentage of original)')
-    else:
-        pyplot.xlabel('Cost')
-
-    _label_bars_in_graph(
-        axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
-    pyplot.show()
-
-    _create_directory(file_name=output_file_name)
-    print('Saving figure to: "{0:s}"...'.format(output_file_name))
-    pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
-    pyplot.close()
-
-
-def plot_breiman_results_example(permutation_dir_name, permutation_dict):
-    """Plots results of Breiman permutation test.
-
-    :param permutation_dir_name: Name of output directory.
-    :param permutation_dict: Dictionary created by `permutation_test_for_cnn`.
-    """
-
-    breiman_file_name = '{0:s}/breiman_results.jpg'.format(permutation_dir_name)
-    plot_breiman_results(
-        result_dict=permutation_dict, output_file_name=breiman_file_name,
-        plot_percent_increase=False)
-
-
-def plot_lakshmanan_results_example(permutation_dir_name, permutation_dict):
-    """Plots results of Lakshmanan permutation test.
-
-    :param permutation_dir_name: Name of output directory.
-    :param permutation_dict: Dictionary created by `permutation_test_for_cnn`.
-    """
-
-    lakshmanan_file_name = '{0:s}/lakshmanan_results.jpg'.format(
-        permutation_dir_name)
-    plot_lakshmanan_results(
-        result_dict=permutation_dict, output_file_name=lakshmanan_file_name,
-        plot_percent_increase=False)
-
-
-def _gradient_descent_for_bwo(
-        model_object, loss_tensor, init_function_or_matrices, num_iterations,
-        learning_rate):
-    """Does gradient descent (the nitty-gritty part) for backwards optimization.
-
-    :param model_object: Trained instance of `keras.models.Model`.
-    :param loss_tensor: Keras tensor, defining the loss function to be
-        minimized.
-    :param init_function_or_matrices: Either a function or list of numpy arrays.
-
-    If function, will be used to initialize input matrices.  See
-    `create_gaussian_initializer` for an example.
-
-    If list of numpy arrays, these are the input matrices themselves.  Matrices
-    should be processed in the exact same way that training data were processed
-    (e.g., normalization method).  Matrices must also be in the same order as
-    training matrices, and the [q]th matrix in this list must have the same
-    shape as the [q]th training matrix.
-
-    :param num_iterations: Number of gradient-descent iterations (number of
-        times that the input matrices are adjusted).
-    :param learning_rate: Learning rate.  At each iteration, each input value x
-        will be decremented by `learning_rate * gradient`, where `gradient` is
-        the gradient of the loss function with respect to x.
-    :return: list_of_optimized_input_matrices: length-T list of optimized input
-        matrices (numpy arrays), where T = number of input tensors to the model.
-        If the input arg `init_function_or_matrices` is a list of numpy arrays
-        (rather than a function), `list_of_optimized_input_matrices` will have
-        the exact same shape, just with different values.
-    """
-
-    if isinstance(model_object.input, list):
-        list_of_input_tensors = model_object.input
-    else:
-        list_of_input_tensors = [model_object.input]
-
-    num_input_tensors = len(list_of_input_tensors)
-
-    list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
-    for i in range(num_input_tensors):
-        list_of_gradient_tensors[i] /= K.maximum(
-            K.sqrt(K.mean(list_of_gradient_tensors[i] ** 2)),
-            K.epsilon()
-        )
-
-    inputs_to_loss_and_gradients = K.function(
-        list_of_input_tensors + [K.learning_phase()],
-        ([loss_tensor] + list_of_gradient_tensors)
-    )
-
-    if isinstance(init_function_or_matrices, list):
-        list_of_optimized_input_matrices = copy.deepcopy(
-            init_function_or_matrices)
-    else:
-        list_of_optimized_input_matrices = [None] * num_input_tensors
-
-        for i in range(num_input_tensors):
-            these_dimensions = numpy.array(
-                [1] + list_of_input_tensors[i].get_shape().as_list()[1:],
-                dtype=int)
-
-            list_of_optimized_input_matrices[i] = init_function_or_matrices(
-                these_dimensions)
-
-    for j in range(num_iterations):
-        these_outputs = inputs_to_loss_and_gradients(
-            list_of_optimized_input_matrices + [0])
-
-        if numpy.mod(j, 100) == 0:
-            print('Loss after {0:d} of {1:d} iterations: {2:.2e}'.format(
-                j, num_iterations, these_outputs[0]))
-
-        for i in range(num_input_tensors):
-            list_of_optimized_input_matrices[i] -= (
-                these_outputs[i + 1] * learning_rate)
-
-    print('Loss after {0:d} iterations: {1:.2e}'.format(
-        num_iterations, these_outputs[0]))
-    return list_of_optimized_input_matrices
-
-
-def bwo_for_class(
-        model_object, target_class, init_function_or_matrices,
-        num_iterations=DEFAULT_NUM_BWO_ITERATIONS,
-        learning_rate=DEFAULT_BWO_LEARNING_RATE):
-    """Does backwards optimization to maximize probability of target class.
-
-    :param model_object: Trained instance of `keras.models.Model`.
-    :param target_class: Synthetic input data will be created to maximize
-        probability of this class.
-    :param init_function_or_matrices: See doc for `_gradient_descent_for_bwo`.
-    :param num_iterations: Same.
-    :param learning_rate: Same.
-    :return: list_of_optimized_input_matrices: Same.
-    """
-
-    target_class = int(numpy.round(target_class))
-    num_iterations = int(numpy.round(num_iterations))
-
-    assert target_class >= 0
-    assert num_iterations > 0
-    assert learning_rate > 0.
-    assert  learning_rate < 1.
-
-    num_output_neurons = (
-        model_object.layers[-1].output.get_shape().as_list()[-1]
-    )
-
-    if num_output_neurons == 1:
-        assert target_class <= 1
-
-        if target_class == 1:
-            loss_tensor = K.mean(
-                (model_object.layers[-1].output[..., 0] - 1) ** 2
-            )
-        else:
-            loss_tensor = K.mean(
-                model_object.layers[-1].output[..., 0] ** 2
-            )
-    else:
-        assert target_class < num_output_neurons
-
-        loss_tensor = K.mean(
-            (model_object.layers[-1].output[..., target_class] - 1) ** 2
-        )
-
-    return _gradient_descent_for_bwo(
-        model_object=model_object, loss_tensor=loss_tensor,
-        init_function_or_matrices=init_function_or_matrices,
-        num_iterations=num_iterations, learning_rate=learning_rate)
 
 
 def _init_figure_panels(num_rows, num_columns, horizontal_space_fraction=0.1,
@@ -2232,11 +888,14 @@ def plot_many_predictors_sans_barbs(
     return figure_object, axes_objects_2d_list
 
 
-def plot_predictors_example1(validation_image_dict):
+def plot_predictors_example1(validation_file_names):
     """Plots all predictors for random example (storm object).
 
-    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param validation_file_names: 1-D list of paths to input files.
     """
+
+    validation_image_dict = read_many_image_files(validation_file_names)
+    print(SEPARATOR_STRING)
 
     predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
     predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
@@ -2280,13 +939,1486 @@ def plot_predictors_example2(validation_image_dict):
     pyplot.show()
 
 
-def bwo_example1(validation_image_dict, normalization_dict, model_object):
+def _update_normalization_params(intermediate_normalization_dict, new_values):
+    """Updates normalization params for one predictor.
+
+    :param intermediate_normalization_dict: Dictionary with the following keys.
+    intermediate_normalization_dict['num_values']: Number of values on which
+        current estimates are based.
+    intermediate_normalization_dict['mean_value']: Current estimate for mean.
+    intermediate_normalization_dict['mean_of_squares']: Current mean of squared
+        values.
+
+    :param new_values: numpy array of new values (will be used to update
+        `intermediate_normalization_dict`).
+    :return: intermediate_normalization_dict: Same as input but with updated
+        values.
+    """
+
+    if MEAN_VALUE_KEY not in intermediate_normalization_dict:
+        intermediate_normalization_dict = {
+            NUM_VALUES_KEY: 0,
+            MEAN_VALUE_KEY: 0.,
+            MEAN_OF_SQUARES_KEY: 0.
+        }
+
+    these_means = numpy.array([
+        intermediate_normalization_dict[MEAN_VALUE_KEY], numpy.mean(new_values)
+    ])
+    these_weights = numpy.array([
+        intermediate_normalization_dict[NUM_VALUES_KEY], new_values.size
+    ])
+
+    intermediate_normalization_dict[MEAN_VALUE_KEY] = numpy.average(
+        these_means, weights=these_weights)
+
+    these_means = numpy.array([
+        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY],
+        numpy.mean(new_values ** 2)
+    ])
+
+    intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] = numpy.average(
+        these_means, weights=these_weights)
+
+    intermediate_normalization_dict[NUM_VALUES_KEY] += new_values.size
+    return intermediate_normalization_dict
+
+
+def _get_standard_deviation(intermediate_normalization_dict):
+    """Computes stdev from intermediate normalization params.
+
+    :param intermediate_normalization_dict: See doc for
+        `_update_normalization_params`.
+    :return: standard_deviation: Standard deviation.
+    """
+
+    num_values = float(intermediate_normalization_dict[NUM_VALUES_KEY])
+    multiplier = num_values / (num_values - 1)
+
+    return numpy.sqrt(multiplier * (
+        intermediate_normalization_dict[MEAN_OF_SQUARES_KEY] -
+        intermediate_normalization_dict[MEAN_VALUE_KEY] ** 2
+    ))
+
+
+def get_image_normalization_params(netcdf_file_names):
+    """Computes normalization params (mean and stdev) for each predictor.
+
+    :param netcdf_file_names: 1-D list of paths to input files.
+    :return: normalization_dict: See input doc for `normalize_images`.
+    """
+
+    predictor_names = None
+    norm_dict_by_predictor = None
+
+    for this_file_name in netcdf_file_names:
+        print('Reading data from: "{0:s}"...'.format(this_file_name))
+        this_image_dict = read_image_file(this_file_name)
+
+        if predictor_names is None:
+            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
+            norm_dict_by_predictor = [{}] * len(predictor_names)
+
+        for m in range(len(predictor_names)):
+            norm_dict_by_predictor[m] = _update_normalization_params(
+                intermediate_normalization_dict=norm_dict_by_predictor[m],
+                new_values=this_image_dict[PREDICTOR_MATRIX_KEY][..., m])
+
+    print('\n')
+    normalization_dict = {}
+
+    for m in range(len(predictor_names)):
+        this_mean = norm_dict_by_predictor[m][MEAN_VALUE_KEY]
+        this_stdev = _get_standard_deviation(norm_dict_by_predictor[m])
+        normalization_dict[predictor_names[m]] = numpy.array(
+            [this_mean, this_stdev])
+
+        print(
+            ('Mean and standard deviation for "{0:s}" = {1:.4f}, {2:.4f}'
+             ).format(predictor_names[m], this_mean, this_stdev)
+        )
+
+    return normalization_dict
+
+
+def get_norm_params_example(training_file_names):
+    """Gets normalization parameters.
+
+    :param training_file_names: 1-D list of paths to input files.
+    """
+
+    normalization_dict = get_image_normalization_params(training_file_names)
+
+
+def normalize_images(
+        predictor_matrix, predictor_names, normalization_dict=None):
+    """Normalizes images to z-scores.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :param predictor_names: length-C list of predictor names.
+    :param normalization_dict: Dictionary.  Each key is the name of a predictor
+        value, and the corresponding value is a length-2 numpy array with
+        [mean, standard deviation].  If `normalization_dict is None`, mean and
+        standard deviation will be computed for each predictor.
+    :return: predictor_matrix: Normalized version of input.
+    :return: normalization_dict: See doc for input variable.  If input was None,
+        this will be a newly created dictionary.  Otherwise, this will be the
+        same dictionary passed as input.
+    """
+
+    num_predictors = len(predictor_names)
+
+    if normalization_dict is None:
+        normalization_dict = {}
+
+        for m in range(num_predictors):
+            this_mean = numpy.mean(predictor_matrix[..., m])
+            this_stdev = numpy.std(predictor_matrix[..., m], ddof=1)
+
+            normalization_dict[predictor_names[m]] = numpy.array(
+                [this_mean, this_stdev])
+
+    for m in range(num_predictors):
+        this_mean = normalization_dict[predictor_names[m]][0]
+        this_stdev = normalization_dict[predictor_names[m]][1]
+
+        predictor_matrix[..., m] = (
+            (predictor_matrix[..., m] - this_mean) / float(this_stdev)
+        )
+
+    return predictor_matrix, normalization_dict
+
+
+def denormalize_images(predictor_matrix, predictor_names, normalization_dict):
+    """Denormalizes images from z-scores back to original scales.
+
+    :param predictor_matrix: See doc for `normalize_images`.
+    :param predictor_names: Same.
+    :param normalization_dict: Same.
+    :return: predictor_matrix: Denormalized version of input.
+    """
+
+    num_predictors = len(predictor_names)
+    for m in range(num_predictors):
+        this_mean = normalization_dict[predictor_names[m]][0]
+        this_stdev = normalization_dict[predictor_names[m]][1]
+
+        predictor_matrix[..., m] = (
+            this_mean + this_stdev * predictor_matrix[..., m]
+        )
+
+    return predictor_matrix
+
+
+def norm_denorm_example(training_file_names, normalization_dict):
+    """Normalizes and denormalizes images.
+
+    :param training_file_names: 1-D list of paths to input files.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    """
+
+    image_dict = read_image_file(training_file_names[0])
+
+    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+
+    print('\nOriginal values of "{0:s}" for first storm object:\n{1:s}'.format(
+        predictor_names[0], str(these_predictor_values)
+    ))
+
+    image_dict[PREDICTOR_MATRIX_KEY], _ = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+    print(
+        '\nNormalized values of "{0:s}" for first storm object:\n{1:s}'.format(
+            predictor_names[0], str(these_predictor_values))
+    )
+
+    image_dict[PREDICTOR_MATRIX_KEY] = denormalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY],
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+
+    these_predictor_values = image_dict[PREDICTOR_MATRIX_KEY][0, :5, :5, 0]
+    print(
+        ('\nDenormalized values of "{0:s}" for first storm object:\n{1:s}'
+         ).format(predictor_names[0], str(these_predictor_values))
+    )
+
+
+def get_binarization_threshold(netcdf_file_names, percentile_level):
+    """Computes binarization threshold for target variable.
+
+    Binarization threshold will be [q]th percentile of all image maxima, where
+    q = `percentile_level`.
+
+    :param netcdf_file_names: 1-D list of paths to input files.
+    :param percentile_level: q in the above discussion.
+    :return: binarization_threshold: Binarization threshold (used to turn each
+        target image into a yes-or-no label).
+    """
+
+    max_target_values = numpy.array([])
+
+    for this_file_name in netcdf_file_names:
+        print('Reading data from: "{0:s}"...'.format(this_file_name))
+        this_image_dict = read_image_file(this_file_name)
+
+        this_target_matrix = this_image_dict[TARGET_MATRIX_KEY]
+        this_num_examples = this_target_matrix.shape[0]
+        these_max_target_values = numpy.full(this_num_examples, numpy.nan)
+
+        for i in range(this_num_examples):
+            these_max_target_values[i] = numpy.max(this_target_matrix[i, ...])
+
+        max_target_values = numpy.concatenate((
+            max_target_values, these_max_target_values))
+
+    binarization_threshold = numpy.percentile(
+        max_target_values, percentile_level)
+
+    print('\nBinarization threshold for "{0:s}" = {1:.4e}'.format(
+        TARGET_NAME, binarization_threshold))
+
+    return binarization_threshold
+
+
+def find_binarization_threshold_example(training_file_names):
+    """Finds binarization threshold for target variable.
+
+    :param training_file_names: 1-D list of paths to input files.
+    """
+
+    binarization_threshold = get_binarization_threshold(
+        netcdf_file_names=training_file_names, percentile_level=90.)
+
+
+def binarize_target_images(target_matrix, binarization_threshold):
+    """Binarizes target images.
+
+    Specifically, this method turns each target image into a binary label,
+    depending on whether or not (max value in image) >= binarization_threshold.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+
+    :param target_matrix: E-by-M-by-N numpy array of floats.
+    :param binarization_threshold: Binarization threshold.
+    :return: target_values: length-E numpy array of target values (integers in
+        0...1).
+    """
+
+    num_examples = target_matrix.shape[0]
+    target_values = numpy.full(num_examples, -1, dtype=int)
+
+    for i in range(num_examples):
+        target_values[i] = (
+            numpy.max(target_matrix[i, ...]) >= binarization_threshold
+        )
+
+    return target_values
+
+
+def binarization_example(training_file_names, binarization_threshold):
+    """Binarizes target images.
+
+    :param training_file_names: 1-D list of paths to input files.
+    :param binarization_threshold: Binarization threshold.
+    """
+
+    image_dict = read_image_file(training_file_names[0])
+    these_max_target_values = numpy.array(
+        [numpy.max(image_dict[TARGET_MATRIX_KEY][i, ...]) for i in range(10)]
+    )
+
+    print(
+        ('\nSpatial maxima of "{0:s}" for the first few storm objects:\n{1:s}'
+         ).format(image_dict[TARGET_NAME_KEY], str(these_max_target_values))
+    )
+
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=binarization_threshold)
+
+    print(
+        ('\nBinarized target values for the first few storm objects:\n{0:s}'
+         ).format(str(target_values[:10]))
+    )
+
+
+def _get_dense_layer_dimensions(num_input_units, num_classes, num_dense_layers):
+    """Returns dimensions (number of input and output units) for each dense lyr.
+
+    D = number of dense layers
+
+    :param num_input_units: Number of input units (features created by
+        flattening layer).
+    :param num_classes: Number of output classes (possible values of target
+        variable).
+    :param num_dense_layers: Number of dense layers.
+    :return: num_inputs_by_layer: length-D numpy array with number of input
+        units by dense layer.
+    :return: num_outputs_by_layer: length-D numpy array with number of output
+        units by dense layer.
+    """
+
+    if num_classes == 2:
+        num_output_units = 1
+    else:
+        num_output_units = num_classes + 0
+
+    e_folding_param = (
+        float(-1 * num_dense_layers) /
+        numpy.log(float(num_output_units) / num_input_units)
+    )
+
+    dense_layer_indices = numpy.linspace(
+        0, num_dense_layers - 1, num=num_dense_layers, dtype=float)
+    num_inputs_by_layer = num_input_units * numpy.exp(
+        -1 * dense_layer_indices / e_folding_param)
+    num_inputs_by_layer = numpy.round(num_inputs_by_layer).astype(int)
+
+    num_outputs_by_layer = numpy.concatenate((
+        num_inputs_by_layer[1:],
+        numpy.array([num_output_units], dtype=int)
+    ))
+
+    return num_inputs_by_layer, num_outputs_by_layer
+
+
+def setup_cnn(num_grid_rows, num_grid_columns):
+    """Sets up (but does not train) CNN (convolutional neural net).
+
+    :param num_grid_rows: Number of rows in each predictor image.
+    :param num_grid_columns: Number of columns in each predictor image.
+    :return: cnn_model_object: Untrained instance of `keras.models.Model`.
+    """
+
+    regularizer_object = keras.regularizers.l1_l2(l1=L1_WEIGHT, l2=L2_WEIGHT)
+
+    num_predictors = len(NETCDF_PREDICTOR_NAMES)
+    input_layer_object = keras.layers.Input(
+        shape=(num_grid_rows, num_grid_columns, num_predictors)
+    )
+
+    current_num_filters = None
+    current_layer_object = None
+
+    # Add convolutional layers.
+    for _ in range(NUM_CONV_LAYER_SETS):
+        for _ in range(NUM_CONV_LAYERS_PER_SET):
+
+            if current_num_filters is None:
+                current_num_filters = (
+                    num_predictors * NUM_PREDICTORS_TO_FIRST_NUM_FILTERS)
+                this_input_layer_object = input_layer_object
+
+            else:
+                current_num_filters *= 2
+                this_input_layer_object = current_layer_object
+
+            current_layer_object = keras.layers.Conv2D(
+                filters=current_num_filters,
+                kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
+                strides=(1, 1), padding='valid', data_format='channels_last',
+                dilation_rate=(1, 1), activation=None, use_bias=True,
+                kernel_initializer='glorot_uniform', bias_initializer='zeros',
+                kernel_regularizer=regularizer_object
+            )(this_input_layer_object)
+
+            current_layer_object = keras.layers.LeakyReLU(
+                alpha=SLOPE_FOR_RELU
+            )(current_layer_object)
+
+            if CONV_LAYER_DROPOUT_FRACTION is not None:
+                current_layer_object = keras.layers.Dropout(
+                    rate=CONV_LAYER_DROPOUT_FRACTION
+                )(current_layer_object)
+
+            if USE_BATCH_NORMALIZATION:
+                current_layer_object = keras.layers.BatchNormalization(
+                    axis=-1, center=True, scale=True
+                )(current_layer_object)
+
+        current_layer_object = keras.layers.MaxPooling2D(
+            pool_size=(NUM_POOLING_ROWS, NUM_POOLING_COLUMNS),
+            strides=(NUM_POOLING_ROWS, NUM_POOLING_COLUMNS),
+            padding='valid', data_format='channels_last'
+        )(current_layer_object)
+
+    these_dimensions = numpy.array(
+        current_layer_object.get_shape().as_list()[1:], dtype=int)
+    num_features = numpy.prod(these_dimensions)
+
+    current_layer_object = keras.layers.Flatten()(current_layer_object)
+
+    # Add intermediate dense layers.
+    _, num_outputs_by_dense_layer = _get_dense_layer_dimensions(
+        num_input_units=num_features, num_classes=2,
+        num_dense_layers=NUM_DENSE_LAYERS)
+
+    for k in range(NUM_DENSE_LAYERS - 1):
+        current_layer_object = keras.layers.Dense(
+            num_outputs_by_dense_layer[k], activation=None, use_bias=True,
+            kernel_initializer='glorot_uniform', bias_initializer='zeros',
+            kernel_regularizer=regularizer_object
+        )(current_layer_object)
+
+        current_layer_object = keras.layers.LeakyReLU(
+            alpha=SLOPE_FOR_RELU
+        )(current_layer_object)
+
+        if DENSE_LAYER_DROPOUT_FRACTION is not None:
+            current_layer_object = keras.layers.Dropout(
+                rate=DENSE_LAYER_DROPOUT_FRACTION
+            )(current_layer_object)
+
+        if USE_BATCH_NORMALIZATION:
+            current_layer_object = keras.layers.BatchNormalization(
+                axis=-1, center=True, scale=True
+            )(current_layer_object)
+
+    # Add output layer (also dense).
+    current_layer_object = keras.layers.Dense(
+        1, activation=None, use_bias=True,
+        kernel_initializer='glorot_uniform', bias_initializer='zeros',
+        kernel_regularizer=regularizer_object
+    )(current_layer_object)
+
+    current_layer_object = keras.layers.Activation(
+        'sigmoid'
+    )(current_layer_object)
+
+    if DENSE_LAYER_DROPOUT_FRACTION is not None and NUM_DENSE_LAYERS == 1:
+        current_layer_object = keras.layers.Dropout(
+            rate=DENSE_LAYER_DROPOUT_FRACTION
+        )(current_layer_object)
+
+    # Put the whole thing together and compile.
+    cnn_model_object = keras.models.Model(
+        inputs=input_layer_object, outputs=current_layer_object)
+    cnn_model_object.compile(
+        loss=keras.losses.binary_crossentropy,
+        optimizer=keras.optimizers.Adam(),
+        metrics=LIST_OF_METRIC_FUNCTIONS)
+
+    cnn_model_object.summary()
+    return cnn_model_object
+
+
+def setup_cnn_example(training_file_names):
+    """Sets up CNN.
+
+    :param training_file_names: 1-D list of paths to input files.
+    """
+
+    this_image_dict = read_image_file(training_file_names[0])
+    cnn_model_object = setup_cnn(
+        num_grid_rows=this_image_dict[PREDICTOR_MATRIX_KEY].shape[1],
+        num_grid_columns=this_image_dict[PREDICTOR_MATRIX_KEY].shape[2])
+
+
+def deep_learning_generator(netcdf_file_names, num_examples_per_batch,
+                            normalization_dict, binarization_threshold):
+    """Generates training examples for deep-learning model on the fly.
+
+    E = number of examples (storm objects)
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param netcdf_file_names: 1-D list of paths to input (NetCDF) files.
+    :param num_examples_per_batch: Number of examples per training batch.
+    :param normalization_dict: See doc for `normalize_images`.  You cannot leave
+        this as None.
+    :param binarization_threshold: Binarization threshold for target variable.
+        See `binarize_target_images` for details on what this does.
+    :return: predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :return: target_values: length-E numpy array of target values (integers in
+        0...1).
+    :raises: TypeError: if `normalization_dict is None`.
+    """
+
+    # TODO(thunderhoser): Maybe add upsampling or downsampling.
+
+    if normalization_dict is None:
+        error_string = 'normalization_dict cannot be None.  Must be specified.'
+        raise TypeError(error_string)
+
+    random.shuffle(netcdf_file_names)
+    num_files = len(netcdf_file_names)
+    file_index = 0
+
+    num_examples_in_memory = 0
+    full_predictor_matrix = None
+    full_target_matrix = None
+    predictor_names = None
+
+    while True:
+        while num_examples_in_memory < num_examples_per_batch:
+            print('Reading data from: "{0:s}"...'.format(
+                netcdf_file_names[file_index]))
+
+            this_image_dict = read_image_file(netcdf_file_names[file_index])
+            predictor_names = this_image_dict[PREDICTOR_NAMES_KEY]
+
+            file_index += 1
+            if file_index >= num_files:
+                file_index = 0
+
+            if full_target_matrix is None or full_target_matrix.size == 0:
+                full_predictor_matrix = (
+                    this_image_dict[PREDICTOR_MATRIX_KEY] + 0.
+                )
+                full_target_matrix = this_image_dict[TARGET_MATRIX_KEY] + 0.
+
+            else:
+                full_predictor_matrix = numpy.concatenate(
+                    (full_predictor_matrix,
+                     this_image_dict[PREDICTOR_MATRIX_KEY]),
+                    axis=0)
+
+                full_target_matrix = numpy.concatenate(
+                    (full_target_matrix, this_image_dict[TARGET_MATRIX_KEY]),
+                    axis=0)
+
+            num_examples_in_memory = full_target_matrix.shape[0]
+
+        batch_indices = numpy.linspace(
+            0, num_examples_in_memory - 1, num=num_examples_in_memory,
+            dtype=int)
+        batch_indices = numpy.random.choice(
+            batch_indices, size=num_examples_per_batch, replace=False)
+
+        predictor_matrix, _ = normalize_images(
+            predictor_matrix=full_predictor_matrix[batch_indices, ...],
+            predictor_names=predictor_names,
+            normalization_dict=normalization_dict)
+        predictor_matrix = predictor_matrix.astype('float32')
+
+        target_values = binarize_target_images(
+            target_matrix=full_target_matrix[batch_indices, ...],
+            binarization_threshold=binarization_threshold)
+
+        print('Fraction of examples in positive class: {0:.4f}'.format(
+            numpy.mean(target_values)))
+
+        num_examples_in_memory = 0
+        full_predictor_matrix = None
+        full_target_matrix = None
+
+        yield (predictor_matrix, target_values)
+
+
+def train_cnn(
+        cnn_model_object, training_file_names, normalization_dict,
+        binarization_threshold, num_examples_per_batch, num_epochs,
+        num_training_batches_per_epoch, output_model_file_name,
+        validation_file_names=None, num_validation_batches_per_epoch=None):
+    """Trains CNN (convolutional neural net).
+
+    :param cnn_model_object: Untrained instance of `keras.models.Model` (may be
+        created by `setup_cnn`).
+    :param training_file_names: 1-D list of paths to training files (must be
+        readable by `read_image_file`).
+    :param normalization_dict: See doc for `deep_learning_generator`.
+    :param binarization_threshold: Same.
+    :param num_examples_per_batch: Same.
+    :param num_epochs: Number of epochs.
+    :param num_training_batches_per_epoch: Number of training batches furnished
+        to model in each epoch.
+    :param output_model_file_name: Path to output file.  The model will be saved
+        as an HDF5 file (extension should be ".h5", but this is not enforced).
+    :param validation_file_names: 1-D list of paths to training files (must be
+        readable by `read_image_file`).  If `validation_file_names is None`,
+        will omit on-the-fly validation.
+    :param num_validation_batches_per_epoch:
+        [used only if `validation_file_names is not None`]
+        Number of validation batches furnished to model in each epoch.
+
+    :return: cnn_metadata_dict: Dictionary with the following keys.
+    cnn_metadata_dict['training_file_names']: See input doc.
+    cnn_metadata_dict['normalization_dict']: Same.
+    cnn_metadata_dict['binarization_threshold']: Same.
+    cnn_metadata_dict['num_examples_per_batch']: Same.
+    cnn_metadata_dict['num_training_batches_per_epoch']: Same.
+    cnn_metadata_dict['validation_file_names']: Same.
+    cnn_metadata_dict['num_validation_batches_per_epoch']: Same.
+    """
+
+    _create_directory(file_name=output_model_file_name)
+
+    if validation_file_names is None:
+        checkpoint_object = keras.callbacks.ModelCheckpoint(
+            filepath=output_model_file_name, monitor='loss', verbose=1,
+            save_best_only=False, save_weights_only=False, mode='min',
+            period=1)
+    else:
+        checkpoint_object = keras.callbacks.ModelCheckpoint(
+            filepath=output_model_file_name, monitor='val_loss', verbose=1,
+            save_best_only=True, save_weights_only=False, mode='min',
+            period=1)
+
+    list_of_callback_objects = [checkpoint_object]
+
+    cnn_metadata_dict = {
+        TRAINING_FILES_KEY: training_file_names,
+        NORMALIZATION_DICT_KEY: normalization_dict,
+        BINARIZATION_THRESHOLD_KEY: binarization_threshold,
+        NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
+        NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
+        VALIDATION_FILES_KEY: validation_file_names,
+        NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch
+    }
+
+    training_generator = deep_learning_generator(
+        netcdf_file_names=training_file_names,
+        num_examples_per_batch=num_examples_per_batch,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold)
+
+    if validation_file_names is None:
+        cnn_model_object.fit_generator(
+            generator=training_generator,
+            steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
+            verbose=1, callbacks=list_of_callback_objects, workers=0)
+
+        return cnn_metadata_dict
+
+    early_stopping_object = keras.callbacks.EarlyStopping(
+        monitor='val_loss', min_delta=MIN_XENTROPY_DECREASE_FOR_EARLY_STOP,
+        patience=NUM_EPOCHS_FOR_EARLY_STOPPING, verbose=1, mode='min')
+
+    list_of_callback_objects.append(early_stopping_object)
+
+    validation_generator = deep_learning_generator(
+        netcdf_file_names=validation_file_names,
+        num_examples_per_batch=num_examples_per_batch,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold)
+
+    cnn_model_object.fit_generator(
+        generator=training_generator,
+        steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
+        verbose=1, callbacks=list_of_callback_objects, workers=0,
+        validation_data=validation_generator,
+        validation_steps=num_validation_batches_per_epoch)
+
+    return cnn_metadata_dict
+
+
+def _create_directory(directory_name=None, file_name=None):
+    """Creates directory (along with parents if necessary).
+
+    This method creates directories only when necessary, so you don't have to
+    worry about it overwriting anything.
+
+    :param directory_name: Name of desired directory.
+    :param file_name: [used only if `directory_name is None`]
+        Path to desired file.  All directories in path will be created.
+    """
+
+    if directory_name is None:
+        directory_name = os.path.split(file_name)[0]
+
+    try:
+        os.makedirs(directory_name)
+    except OSError as this_error:
+        if this_error.errno == errno.EEXIST and os.path.isdir(directory_name):
+            pass
+        else:
+            raise
+
+
+def read_keras_model(hdf5_file_name):
+    """Reads Keras model from HDF5 file.
+
+    :param hdf5_file_name: Path to input file.
+    :return: model_object: Instance of `keras.models.Model`.
+    """
+
+    return keras.models.load_model(
+        hdf5_file_name, custom_objects=METRIC_FUNCTION_DICT)
+
+
+def find_model_metafile(model_file_name, raise_error_if_missing=False):
+    """Finds metafile for machine-learning model.
+
+    :param model_file_name: Path to file with trained model.
+    :param raise_error_if_missing: Boolean flag.  If True and metafile is not
+        found, this method will error out.
+    :return: model_metafile_name: Path to file with metadata.  If file is not
+        found and `raise_error_if_missing = False`, this will be the expected
+        path.
+    :raises: ValueError: if metafile is not found and
+        `raise_error_if_missing = True`.
+    """
+
+    model_directory_name, pathless_model_file_name = os.path.split(
+        model_file_name)
+    model_metafile_name = '{0:s}/{1:s}_metadata.json'.format(
+        model_directory_name, os.path.splitext(pathless_model_file_name)[0]
+    )
+
+    if not os.path.isfile(model_metafile_name) and raise_error_if_missing:
+        error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
+            model_metafile_name)
+        raise ValueError(error_string)
+
+    return model_metafile_name
+
+
+def _metadata_numpy_to_list(model_metadata_dict):
+    """Converts numpy arrays in model metadata to lists.
+
+    This is needed so that the metadata can be written to a JSON file (JSON does
+    not handle numpy arrays).
+
+    This method does not overwrite the original dictionary.
+
+    :param model_metadata_dict: Dictionary created by `train_cnn` or
+        `train_ucn`.
+    :return: new_metadata_dict: Same but with lists instead of numpy arrays.
+    """
+
+    new_metadata_dict = copy.deepcopy(model_metadata_dict)
+
+    if NORMALIZATION_DICT_KEY in new_metadata_dict.keys():
+        this_norm_dict = new_metadata_dict[NORMALIZATION_DICT_KEY]
+
+        for this_key in this_norm_dict.keys():
+            if isinstance(this_norm_dict[this_key], numpy.ndarray):
+                this_norm_dict[this_key] = this_norm_dict[this_key].tolist()
+
+    return new_metadata_dict
+
+
+def _metadata_list_to_numpy(model_metadata_dict):
+    """Converts lists in model metadata to numpy arrays.
+
+    This method is the inverse of `_metadata_numpy_to_list`.
+
+    This method overwrites the original dictionary.
+
+    :param model_metadata_dict: Dictionary created by `train_cnn` or
+        `train_ucn`.
+    :return: model_metadata_dict: Same but numpy arrays instead of lists.
+    """
+
+    if NORMALIZATION_DICT_KEY in model_metadata_dict.keys():
+        this_norm_dict = model_metadata_dict[NORMALIZATION_DICT_KEY]
+
+        for this_key in this_norm_dict.keys():
+            this_norm_dict[this_key] = numpy.array(this_norm_dict[this_key])
+
+    return model_metadata_dict
+
+
+def write_model_metadata(model_metadata_dict, json_file_name):
+    """Writes metadata for machine-learning model to JSON file.
+
+    :param model_metadata_dict: Dictionary created by `train_cnn` or
+        `train_ucn`.
+    :param json_file_name: Path to output file.
+    """
+
+    _create_directory(file_name=json_file_name)
+
+    new_metadata_dict = _metadata_numpy_to_list(model_metadata_dict)
+    with open(json_file_name, 'w') as this_file:
+        json.dump(new_metadata_dict, this_file)
+
+
+def read_model_metadata(json_file_name):
+    """Reads metadata for machine-learning model from JSON file.
+
+    :param json_file_name: Path to output file.
+    :return: model_metadata_dict: Dictionary with keys listed in doc for
+        `train_cnn` or `train_ucn`.
+    """
+
+    with open(json_file_name) as this_file:
+        model_metadata_dict = json.load(this_file)
+        return _metadata_list_to_numpy(model_metadata_dict)
+
+
+def train_cnn_example(
+        cnn_model_object, training_file_names, validation_file_names,
+        normalization_dict, binarization_threshold):
+    """Actually trains the CNN.
+
+    :param cnn_model_object: See doc for `train_cnn`.
+    :param training_file_names: Same.
+    :param validation_file_names: Same.
+    :param normalization_dict: Same.
+    :param binarization_threshold: Same.
+    """
+
+    cnn_file_name = '{0:s}/cnn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
+    cnn_metadata_dict = train_cnn(
+        cnn_model_object=cnn_model_object,
+        training_file_names=training_file_names,
+        normalization_dict=normalization_dict,
+        binarization_threshold=binarization_threshold,
+        num_examples_per_batch=256, num_epochs=10,
+        num_training_batches_per_epoch=10,
+        validation_file_names=validation_file_names,
+        num_validation_batches_per_epoch=10,
+        output_model_file_name=cnn_file_name)
+
+
+def _apply_cnn(cnn_model_object, predictor_matrix, verbose=True,
+               output_layer_name=None):
+    """Applies trained CNN (convolutional neural net) to new data.
+
+    E = number of examples (storm objects) in file
+    M = number of rows in each storm-centered grid
+    N = number of columns in each storm-centered grid
+    C = number of channels (predictor variables)
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param predictor_matrix: E-by-M-by-N-by-C numpy array of predictor values.
+    :param verbose: Boolean flag.  If True, progress messages will be printed.
+    :param output_layer_name: Name of output layer.  If
+        `output_layer_name is None`, this method will use the actual output
+        layer, so will return predictions.  If `output_layer_name is not None`,
+        will return "features" (outputs from the given layer).
+
+    If `output_layer_name is None`...
+
+    :return: forecast_probabilities: length-E numpy array with forecast
+        probabilities of positive class (label = 1).
+
+    If `output_layer_name is not None`...
+
+    :return: feature_matrix: numpy array of features (outputs from the given
+        layer).  There is no guarantee on the shape of this array, except that
+        the first axis has length E.
+    """
+
+    num_examples = predictor_matrix.shape[0]
+    num_examples_per_batch = 1000
+
+    if output_layer_name is None:
+        model_object_to_use = cnn_model_object
+    else:
+        model_object_to_use = keras.models.Model(
+            inputs=cnn_model_object.input,
+            outputs=cnn_model_object.get_layer(name=output_layer_name).output)
+
+    output_array = None
+
+    for i in range(0, num_examples, num_examples_per_batch):
+        this_first_index = i
+        this_last_index = min(
+            [i + num_examples_per_batch - 1, num_examples - 1]
+        )
+
+        if verbose:
+            print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
+                this_first_index, this_last_index, num_examples))
+
+        these_indices = numpy.linspace(
+            this_first_index, this_last_index,
+            num=this_last_index - this_first_index + 1, dtype=int)
+
+        this_output_array = model_object_to_use.predict(
+            predictor_matrix[these_indices, ...],
+            batch_size=num_examples_per_batch)
+
+        if output_layer_name is None:
+            this_output_array = this_output_array[:, -1]
+
+        if output_array is None:
+            output_array = this_output_array + 0.
+        else:
+            output_array = numpy.concatenate(
+                (output_array, this_output_array), axis=0)
+
+    return output_array
+
+
+def evaluate_cnn(
+        cnn_model_object, image_dict, cnn_metadata_dict, output_dir_name):
+    """Evaluates trained CNN (convolutional neural net).
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param image_dict: Dictionary created by `read_image_file` or
+        `read_many_image_files`.  Should contain validation or testing data (not
+        training data), but this is not enforced.
+    :param cnn_metadata_dict: Dictionary created by `train_cnn`.  This will
+        ensure that data in `image_dict` are processed the exact same way as the
+        training data for `cnn_model_object`.
+    :param output_dir_name: Path to output directory.  Figures will be saved
+        here.
+    """
+
+    predictor_matrix, _ = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
+        predictor_names=image_dict[PREDICTOR_NAMES_KEY],
+        normalization_dict=cnn_metadata_dict[NORMALIZATION_DICT_KEY])
+    predictor_matrix = predictor_matrix.astype('float32')
+
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=cnn_metadata_dict[BINARIZATION_THRESHOLD_KEY])
+
+    forecast_probabilities = _apply_cnn(cnn_model_object=cnn_model_object,
+                                        predictor_matrix=predictor_matrix)
+    print(MINOR_SEPARATOR_STRING)
+
+    pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
+        observed_labels=target_values,
+        forecast_probabilities=forecast_probabilities)
+
+    area_under_roc_curve = scikit_learn_auc(pofd_by_threshold, pod_by_threshold)
+    title_string = 'Area under ROC curve: {0:.4f}'.format(area_under_roc_curve)
+
+    pyplot.title(title_string)
+    pyplot.show()
+
+    _create_directory(directory_name=output_dir_name)
+    roc_curve_file_name = '{0:s}/roc_curve.jpg'.format(output_dir_name)
+
+    print('Saving figure to: "{0:s}"...'.format(roc_curve_file_name))
+    pyplot.savefig(roc_curve_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+    performance_diagrams.plot_performance_diagram(
+        observed_labels=target_values,
+        forecast_probabilities=forecast_probabilities)
+    pyplot.show()
+
+    perf_diagram_file_name = '{0:s}/performance_diagram.jpg'.format(
+        output_dir_name)
+
+    print('Saving figure to: "{0:s}"...'.format(perf_diagram_file_name))
+    pyplot.savefig(perf_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+    attributes_diagrams.plot_attributes_diagram(
+        observed_labels=target_values,
+        forecast_probabilities=forecast_probabilities, num_bins=20)
+    pyplot.show()
+
+    attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
+        output_dir_name)
+
+    print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
+    pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+
+def evaluate_cnn_example(validation_image_dict):
+    """Evaluates CNN on validation data.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    """
+
+    cnn_file_name = '{0:s}/pretrained_cnn/pretrained_cnn.h5'.format(
+        DEFAULT_OUTPUT_DIR_NAME)
+    cnn_metafile_name = find_model_metafile(model_file_name=cnn_file_name)
+
+    cnn_model_object = read_keras_model(cnn_file_name)
+    cnn_metadata_dict = read_model_metadata(cnn_metafile_name)
+    validation_dir_name = '{0:s}/validation'.format(DEFAULT_OUTPUT_DIR_NAME)
+
+    evaluate_cnn(
+        cnn_model_object=cnn_model_object, image_dict=validation_image_dict,
+        cnn_metadata_dict=cnn_metadata_dict,
+        output_dir_name=validation_dir_name)
+    print(SEPARATOR_STRING)
+
+
+def _get_binary_xentropy(target_values, forecast_probabilities):
+    """Computes binary cross-entropy.
+
+    This function satisfies the requirements for `cost_function` in the input to
+    `run_permutation_test`.
+
+    E = number of examples
+
+    :param: target_values: length-E numpy array of target values (integer class
+        labels).
+    :param: forecast_probabilities: length-E numpy array with predicted
+        probabilities of positive class (target value = 1).
+    :return: cross_entropy: Cross-entropy.
+    """
+
+    forecast_probabilities[
+        forecast_probabilities < MIN_PROBABILITY] = MIN_PROBABILITY
+    forecast_probabilities[
+        forecast_probabilities > MAX_PROBABILITY] = MAX_PROBABILITY
+
+    return -1 * numpy.nanmean(
+        target_values * numpy.log2(forecast_probabilities) +
+        (1 - target_values) * numpy.log2(1 - forecast_probabilities)
+    )
+
+
+def permutation_test_for_cnn(
+        cnn_model_object, image_dict, cnn_metadata_dict,
+        output_pickle_file_name, cost_function=_get_binary_xentropy):
+    """Runs permutation test on CNN (convolutional neural net).
+
+    E = number of examples (storm objects)
+    C = number of channels (predictor variables)
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param image_dict: Dictionary created by `read_image_file` or
+        `read_many_image_files`.  Should contain validation data (rather than
+        training data), but this is not enforced.
+    :param cnn_metadata_dict: Dictionary created by `train_cnn`.  This will
+        ensure that data in `image_dict` are processed the exact same way as the
+        training data for `cnn_model_object`.
+    :param output_pickle_file_name: Path to output file.  `result_dict` (the
+        output variable) will be saved here.
+
+    :param cost_function: Cost function (used to evaluate model predictions).
+        Must be negatively oriented (lower values are better).  Must have the
+        following inputs and outputs.
+    Input: target_values: length-E numpy array of target values (integer class
+        labels).
+    Input: forecast_probabilities: length-E numpy array with predicted
+        probabilities of positive class (target value = 1).
+    Output: cost: Scalar value.
+
+    :return: result_dict: Dictionary with the following keys.
+    result_dict['permuted_predictor_name_by_step']: length-C list with name of
+        predictor permuted at each step.
+    result_dict['highest_cost_by_step']: length-C numpy array with corresponding
+        cost at each step.  highest_cost_by_step[m] = cost after permuting
+        permuted_predictor_name_by_step[m].
+    result_dict['original_cost']: Original cost (before any permutation).
+    result_dict['predictor_names_step1']: length-C list of predictor names.
+    result_dict['costs_step1']: length-C numpy array of corresponding costs.
+        costs_step1[m] = cost after permuting only predictor_names_step1[m].
+        This key and "predictor_names_step1" correspond to the Breiman version
+        of the permutation test, while "permuted_predictor_name_by_step" and
+        "highest_cost_by_step" correspond to the Lakshmanan version.
+    """
+
+    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix, _ = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
+        predictor_names=image_dict[PREDICTOR_NAMES_KEY],
+        normalization_dict=cnn_metadata_dict[NORMALIZATION_DICT_KEY])
+    predictor_matrix = predictor_matrix.astype('float32')
+
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=cnn_metadata_dict[BINARIZATION_THRESHOLD_KEY])
+
+    # Get original cost (before permutation).
+    these_probabilities = _apply_cnn(cnn_model_object=cnn_model_object,
+                                     predictor_matrix=predictor_matrix)
+    print(MINOR_SEPARATOR_STRING)
+
+    original_cost = cost_function(target_values, these_probabilities)
+    print('Original cost (no permutation): {0:.4e}\n'.format(original_cost))
+
+    num_examples = len(target_values)
+    remaining_predictor_names = predictor_names + []
+    current_step_num = 0
+
+    permuted_predictor_name_by_step = []
+    highest_cost_by_step = []
+    predictor_names_step1 = []
+    costs_step1 = []
+
+    while len(remaining_predictor_names) > 0:
+        current_step_num += 1
+
+        highest_cost = -numpy.inf
+        best_predictor_name = None
+        best_predictor_permuted_values = None
+
+        for this_predictor_name in remaining_predictor_names:
+            print(
+                ('Trying predictor "{0:s}" at step {1:d} of permutation test...'
+                 ).format(this_predictor_name, current_step_num)
+            )
+
+            this_predictor_index = predictor_names.index(this_predictor_name)
+            this_predictor_matrix = predictor_matrix + 0.
+
+            for i in range(num_examples):
+                this_predictor_matrix[i, ..., this_predictor_index] = (
+                    numpy.random.permutation(
+                        this_predictor_matrix[i, ..., this_predictor_index])
+                )
+
+            print(MINOR_SEPARATOR_STRING)
+            these_probabilities = _apply_cnn(
+                cnn_model_object=cnn_model_object,
+                predictor_matrix=this_predictor_matrix)
+            print(MINOR_SEPARATOR_STRING)
+
+            this_cost = cost_function(target_values, these_probabilities)
+            print('Resulting cost = {0:.4e}'.format(this_cost))
+
+            if current_step_num == 1:
+                predictor_names_step1.append(this_predictor_name)
+                costs_step1.append(this_cost)
+
+            if this_cost < highest_cost:
+                continue
+
+            highest_cost = this_cost + 0.
+            best_predictor_name = this_predictor_name + ''
+            best_predictor_permuted_values = this_predictor_matrix[
+                ..., this_predictor_index]
+
+        permuted_predictor_name_by_step.append(best_predictor_name)
+        highest_cost_by_step.append(highest_cost)
+
+        # Remove best predictor from list.
+        remaining_predictor_names.remove(best_predictor_name)
+
+        # Leave values of best predictor permuted.
+        this_predictor_index = predictor_names.index(best_predictor_name)
+        predictor_matrix[
+            ..., this_predictor_index] = best_predictor_permuted_values
+
+        print('\nBest predictor = "{0:s}" ... new cost = {1:.4e}\n'.format(
+            best_predictor_name, highest_cost))
+
+    result_dict = {
+        PERMUTED_PREDICTORS_KEY: permuted_predictor_name_by_step,
+        HIGHEST_COSTS_KEY: numpy.array(highest_cost_by_step),
+        ORIGINAL_COST_KEY: original_cost,
+        STEP1_PREDICTORS_KEY: predictor_names_step1,
+        STEP1_COSTS_KEY: numpy.array(costs_step1)
+    }
+
+    _create_directory(file_name=output_pickle_file_name)
+
+    print('Writing results to: "{0:s}"...'.format(output_pickle_file_name))
+    file_handle = open(output_pickle_file_name, 'wb')
+    pickle.dump(result_dict, file_handle)
+    file_handle.close()
+
+    return result_dict
+
+
+def permutation_test_example(cnn_model_object, validation_image_dict,
+                             cnn_metadata_dict):
+    """Runs the permutation test on validation data.
+
+    :param cnn_model_object: See doc for `permutation_test_for_cnn`.
+    :param validation_image_dict: Same.
+    :param cnn_metadata_dict: Same.
+    """
+
+    permutation_dir_name = '{0:s}/permutation_test'.format(
+        DEFAULT_OUTPUT_DIR_NAME)
+    main_permutation_file_name = '{0:s}/permutation_results.p'.format(
+        permutation_dir_name)
+
+    permutation_dict = permutation_test_for_cnn(
+        cnn_model_object=cnn_model_object, image_dict=validation_image_dict,
+        cnn_metadata_dict=cnn_metadata_dict,
+        output_pickle_file_name=main_permutation_file_name)
+
+
+def _label_bars_in_graph(axes_object, y_coords, y_strings):
+    """Labels bars in graph.
+
+    J = number of bars
+
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :param y_coords: length-J numpy array with y-coordinates of bars.
+    :param y_strings: length-J list of labels.
+    """
+
+    x_min, x_max = pyplot.xlim()
+    x_coord_for_text = x_min + 0.01 * (x_max - x_min)
+
+    for j in range(len(y_coords)):
+        axes_object.text(
+            x_coord_for_text, y_coords[j], y_strings[j], color='k',
+            horizontalalignment='left', verticalalignment='center')
+
+
+def plot_breiman_results(
+        result_dict, output_file_name, plot_percent_increase=False):
+    """Plots results of Breiman (single-pass) permutation test.
+
+    :param result_dict: Dictionary created by `permutation_test_for_cnn`.
+    :param output_file_name: Path to output file.  Figure will be saved here.
+    :param plot_percent_increase: Boolean flag.  If True, x-axis will be
+        percentage of original cost (before permutation).  If False, will be
+        actual cost.
+    """
+
+    cost_values = result_dict[STEP1_COSTS_KEY]
+    predictor_names = result_dict[STEP1_PREDICTORS_KEY]
+
+    sort_indices = numpy.argsort(cost_values)
+    cost_values = cost_values[sort_indices]
+    predictor_names = [predictor_names[k] for k in sort_indices]
+
+    x_coords = numpy.concatenate((
+        numpy.array([result_dict[ORIGINAL_COST_KEY]]), cost_values
+    ))
+
+    if plot_percent_increase:
+        x_coords = 100 * x_coords / x_coords[0]
+
+    y_strings = ['No permutation'] + predictor_names
+    y_coords = numpy.linspace(
+        0, len(y_strings) - 1, num=len(y_strings), dtype=float)
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, x_coords, color=BAR_GRAPH_FACE_COLOUR,
+        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
+
+    pyplot.yticks([], [])
+    pyplot.ylabel('Predictor permuted')
+
+    if plot_percent_increase:
+        pyplot.xlabel('Cost (percentage of original)')
+    else:
+        pyplot.xlabel('Cost')
+
+    _label_bars_in_graph(
+        axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
+    pyplot.show()
+
+    _create_directory(file_name=output_file_name)
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
+    pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+
+def plot_lakshmanan_results(
+        result_dict, output_file_name, plot_percent_increase=False):
+    """Plots results of Lakshmanan (multi-pass) permutation test.
+
+    :param result_dict: See doc for `plot_breiman_results`.
+    :param output_file_name: Same.
+    :param plot_percent_increase: Same.
+    """
+
+    x_coords = numpy.concatenate((
+        numpy.array([result_dict[ORIGINAL_COST_KEY]]),
+        result_dict[HIGHEST_COSTS_KEY]
+    ))
+
+    if plot_percent_increase:
+        x_coords = 100 * x_coords / x_coords[0]
+
+    y_strings = ['No permutation'] + result_dict[PERMUTED_PREDICTORS_KEY]
+    y_coords = numpy.linspace(
+        0, len(y_strings) - 1, num=len(y_strings), dtype=float
+    )[::-1]
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, x_coords, color=BAR_GRAPH_FACE_COLOUR,
+        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
+
+    pyplot.yticks([], [])
+    pyplot.ylabel('Predictor permuted')
+
+    if plot_percent_increase:
+        pyplot.xlabel('Cost (percentage of original)')
+    else:
+        pyplot.xlabel('Cost')
+
+    _label_bars_in_graph(
+        axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
+    pyplot.show()
+
+    _create_directory(file_name=output_file_name)
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
+    pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+
+def plot_breiman_results_example(permutation_dir_name, permutation_dict):
+    """Plots results of Breiman permutation test.
+
+    :param permutation_dir_name: Name of output directory.
+    :param permutation_dict: Dictionary created by `permutation_test_for_cnn`.
+    """
+
+    breiman_file_name = '{0:s}/breiman_results.jpg'.format(permutation_dir_name)
+    plot_breiman_results(
+        result_dict=permutation_dict, output_file_name=breiman_file_name,
+        plot_percent_increase=False)
+
+
+def plot_lakshmanan_results_example(permutation_dir_name, permutation_dict):
+    """Plots results of Lakshmanan permutation test.
+
+    :param permutation_dir_name: Name of output directory.
+    :param permutation_dict: Dictionary created by `permutation_test_for_cnn`.
+    """
+
+    lakshmanan_file_name = '{0:s}/lakshmanan_results.jpg'.format(
+        permutation_dir_name)
+    plot_lakshmanan_results(
+        result_dict=permutation_dict, output_file_name=lakshmanan_file_name,
+        plot_percent_increase=False)
+
+
+def _gradient_descent_for_bwo(
+        cnn_model_object, loss_tensor, init_function_or_matrices,
+        num_iterations, learning_rate):
+    """Does gradient descent (the nitty-gritty part) for backwards optimization.
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param loss_tensor: Keras tensor, defining the loss function to be
+        minimized.
+    :param init_function_or_matrices: Either a function or list of numpy arrays.
+
+    If function, will be used to initialize input matrices.  See
+    `create_gaussian_initializer` for an example.
+
+    If list of numpy arrays, these are the input matrices themselves.  Matrices
+    should be processed in the exact same way that training data were processed
+    (e.g., normalization method).  Matrices must also be in the same order as
+    training matrices, and the [q]th matrix in this list must have the same
+    shape as the [q]th training matrix.
+
+    :param num_iterations: Number of gradient-descent iterations (number of
+        times that the input matrices are adjusted).
+    :param learning_rate: Learning rate.  At each iteration, each input value x
+        will be decremented by `learning_rate * gradient`, where `gradient` is
+        the gradient of the loss function with respect to x.
+    :return: list_of_optimized_input_matrices: length-T list of optimized input
+        matrices (numpy arrays), where T = number of input tensors to the model.
+        If the input arg `init_function_or_matrices` is a list of numpy arrays
+        (rather than a function), `list_of_optimized_input_matrices` will have
+        the exact same shape, just with different values.
+    """
+
+    if isinstance(cnn_model_object.input, list):
+        list_of_input_tensors = cnn_model_object.input
+    else:
+        list_of_input_tensors = [cnn_model_object.input]
+
+    num_input_tensors = len(list_of_input_tensors)
+    list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
+
+    for i in range(num_input_tensors):
+        list_of_gradient_tensors[i] /= K.maximum(
+            K.sqrt(K.mean(list_of_gradient_tensors[i] ** 2)),
+            K.epsilon()
+        )
+
+    inputs_to_loss_and_gradients = K.function(
+        list_of_input_tensors + [K.learning_phase()],
+        ([loss_tensor] + list_of_gradient_tensors)
+    )
+
+    if isinstance(init_function_or_matrices, list):
+        list_of_optimized_input_matrices = copy.deepcopy(
+            init_function_or_matrices)
+    else:
+        list_of_optimized_input_matrices = [None] * num_input_tensors
+
+        for i in range(num_input_tensors):
+            these_dimensions = numpy.array(
+                [1] + list_of_input_tensors[i].get_shape().as_list()[1:],
+                dtype=int)
+
+            list_of_optimized_input_matrices[i] = init_function_or_matrices(
+                these_dimensions)
+
+    for j in range(num_iterations):
+        these_outputs = inputs_to_loss_and_gradients(
+            list_of_optimized_input_matrices + [0])
+
+        if numpy.mod(j, 100) == 0:
+            print('Loss after {0:d} of {1:d} iterations: {2:.2e}'.format(
+                j, num_iterations, these_outputs[0]))
+
+        for i in range(num_input_tensors):
+            list_of_optimized_input_matrices[i] -= (
+                these_outputs[i + 1] * learning_rate)
+
+    print('Loss after {0:d} iterations: {1:.2e}'.format(
+        num_iterations, these_outputs[0]))
+    return list_of_optimized_input_matrices
+
+
+def bwo_for_class(
+        cnn_model_object, target_class, init_function_or_matrices,
+        num_iterations=DEFAULT_NUM_BWO_ITERATIONS,
+        learning_rate=DEFAULT_BWO_LEARNING_RATE):
+    """Does backwards optimization to maximize probability of target class.
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param target_class: Synthetic input data will be created to maximize
+        probability of this class.
+    :param init_function_or_matrices: See doc for `_gradient_descent_for_bwo`.
+    :param num_iterations: Same.
+    :param learning_rate: Same.
+    :return: list_of_optimized_input_matrices: Same.
+    """
+
+    target_class = int(numpy.round(target_class))
+    num_iterations = int(numpy.round(num_iterations))
+
+    assert target_class >= 0
+    assert num_iterations > 0
+    assert learning_rate > 0.
+    assert  learning_rate < 1.
+
+    num_output_neurons = (
+        cnn_model_object.layers[-1].output.get_shape().as_list()[-1]
+    )
+
+    if num_output_neurons == 1:
+        assert target_class <= 1
+
+        if target_class == 1:
+            loss_tensor = K.mean(
+                (cnn_model_object.layers[-1].output[..., 0] - 1) ** 2
+            )
+        else:
+            loss_tensor = K.mean(
+                cnn_model_object.layers[-1].output[..., 0] ** 2
+            )
+    else:
+        assert target_class < num_output_neurons
+
+        loss_tensor = K.mean(
+            (cnn_model_object.layers[-1].output[..., target_class] - 1) ** 2
+        )
+
+    return _gradient_descent_for_bwo(
+        cnn_model_object=cnn_model_object, loss_tensor=loss_tensor,
+        init_function_or_matrices=init_function_or_matrices,
+        num_iterations=num_iterations, learning_rate=learning_rate)
+
+
+def bwo_example1(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes random example (storm object) for positive class.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     orig_predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
@@ -2299,7 +2431,7 @@ def bwo_example1(validation_image_dict, normalization_dict, model_object):
         orig_predictor_matrix_norm, axis=0)
 
     optimized_predictor_matrix_norm = bwo_for_class(
-        model_object=model_object, target_class=1,
+        cnn_model_object=cnn_model_object, target_class=1,
         init_function_or_matrices=[orig_predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2316,32 +2448,32 @@ def bwo_example1(validation_image_dict, normalization_dict, model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (before optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Real example (before optimization)')
     pyplot.show()
 
-    print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Synthetic example (after optimization)')
     pyplot.show()
 
 
-def bwo_example2(validation_image_dict, normalization_dict, model_object):
+def bwo_example2(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes random example (storm object) for negative class.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     orig_predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
@@ -2354,7 +2486,7 @@ def bwo_example2(validation_image_dict, normalization_dict, model_object):
         orig_predictor_matrix_norm, axis=0)
 
     optimized_predictor_matrix_norm = bwo_for_class(
-        model_object=model_object, target_class=0,
+        cnn_model_object=cnn_model_object, target_class=0,
         init_function_or_matrices=[orig_predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2371,32 +2503,32 @@ def bwo_example2(validation_image_dict, normalization_dict, model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (before optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Real example (before optimization)')
     pyplot.show()
 
-    print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Synthetic example (after optimization)')
     pyplot.show()
 
 
-def bwo_example3(validation_image_dict, normalization_dict, model_object):
+def bwo_example3(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes extreme example (storm object) for positive class.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
@@ -2415,7 +2547,7 @@ def bwo_example3(validation_image_dict, normalization_dict, model_object):
         orig_predictor_matrix_norm, axis=0)
 
     optimized_predictor_matrix_norm = bwo_for_class(
-        model_object=model_object, target_class=1,
+        cnn_model_object=cnn_model_object, target_class=1,
         init_function_or_matrices=[orig_predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2432,32 +2564,32 @@ def bwo_example3(validation_image_dict, normalization_dict, model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (before optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Real example (before optimization)')
     pyplot.show()
 
-    print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Synthetic example (after optimization)')
     pyplot.show()
 
 
-def bwo_example4(validation_image_dict, normalization_dict, model_object):
+def bwo_example4(validation_image_dict, normalization_dict, cnn_model_object):
     """Optimizes extreme example (storm object) for negative class.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
@@ -2476,7 +2608,7 @@ def bwo_example4(validation_image_dict, normalization_dict, model_object):
         orig_predictor_matrix_norm, axis=0)
 
     optimized_predictor_matrix_norm = bwo_for_class(
-        model_object=model_object, target_class=0,
+        cnn_model_object=cnn_model_object, target_class=0,
         init_function_or_matrices=[orig_predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2493,33 +2625,33 @@ def bwo_example4(validation_image_dict, normalization_dict, model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (before optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Real example (before optimization)')
     pyplot.show()
 
-    print('\nSynthetic example (after optimization):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Synthetic example (after optimization)')
     pyplot.show()
 
 
 def _do_saliency_calculations(
-        model_object, loss_tensor, list_of_input_matrices):
+        cnn_model_object, loss_tensor, list_of_input_matrices):
     """Does the nitty-gritty part of computing saliency maps.
 
     T = number of input tensors to the model
     E = number of examples (storm objects)
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param loss_tensor: Keras tensor defining the loss function.
     :param list_of_input_matrices: length-T list of numpy arrays, comprising one
         or more examples (storm objects).  list_of_input_matrices[i] must have
@@ -2531,31 +2663,36 @@ def _do_saliency_calculations(
         which is the gradient of the loss function with respect to x.
     """
 
-    if isinstance(model_object.input, list):
-        list_of_input_tensors = model_object.input
+    if isinstance(cnn_model_object.input, list):
+        list_of_input_tensors = cnn_model_object.input
     else:
-        list_of_input_tensors = [model_object.input]
+        list_of_input_tensors = [cnn_model_object.input]
 
     list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
     num_input_tensors = len(list_of_input_tensors)
+
     for i in range(num_input_tensors):
         list_of_gradient_tensors[i] /= K.maximum(
-            K.std(list_of_gradient_tensors[i]), K.epsilon())
+            K.std(list_of_gradient_tensors[i]), K.epsilon()
+        )
 
     inputs_to_gradients_function = K.function(
-        list_of_input_tensors + [K.learning_phase()], list_of_gradient_tensors)
+        list_of_input_tensors + [K.learning_phase()],
+        list_of_gradient_tensors)
+
     list_of_saliency_matrices = inputs_to_gradients_function(
         list_of_input_matrices + [0])
+
     for i in range(num_input_tensors):
         list_of_saliency_matrices[i] *= -1
 
     return list_of_saliency_matrices
 
 
-def saliency_for_class(model_object, target_class, list_of_input_matrices):
+def saliency_for_class(cnn_model_object, target_class, list_of_input_matrices):
     """For each input example, creates saliency map for prob of given class.
 
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     :param target_class: Saliency maps will be created for probability of this
         class.
     :param list_of_input_matrices: See doc for `_do_saliency_calculations`.
@@ -2566,7 +2703,7 @@ def saliency_for_class(model_object, target_class, list_of_input_matrices):
     assert target_class >= 0
 
     num_output_neurons = (
-        model_object.layers[-1].output.get_shape().as_list()[-1]
+        cnn_model_object.layers[-1].output.get_shape().as_list()[-1]
     )
 
     if num_output_neurons == 1:
@@ -2574,17 +2711,21 @@ def saliency_for_class(model_object, target_class, list_of_input_matrices):
 
         if target_class == 1:
             loss_tensor = K.mean(
-                (model_object.layers[-1].output[..., 0] - 1) ** 2)
+                (cnn_model_object.layers[-1].output[..., 0] - 1) ** 2
+            )
         else:
-            loss_tensor = K.mean(model_object.layers[-1].output[..., 0] ** 2)
+            loss_tensor = K.mean(
+                cnn_model_object.layers[-1].output[..., 0] ** 2
+            )
     else:
         assert target_class < num_output_neurons
 
         loss_tensor = K.mean(
-            (model_object.layers[-1].output[..., target_class] - 1) ** 2)
+            (cnn_model_object.layers[-1].output[..., target_class] - 1) ** 2
+        )
 
     return _do_saliency_calculations(
-        model_object=model_object, loss_tensor=loss_tensor,
+        cnn_model_object=cnn_model_object, loss_tensor=loss_tensor,
         list_of_input_matrices=list_of_input_matrices)
 
 
@@ -2687,13 +2828,14 @@ def plot_many_saliency_maps(
             contour_interval=contour_interval, line_width=line_width)
 
 
-def saliency_example1(validation_image_dict, normalization_dict, model_object):
+def saliency_example1(validation_image_dict, normalization_dict,
+                      cnn_model_object):
     """Computes saliency map for random example wrt positive-class probability.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
@@ -2705,7 +2847,7 @@ def saliency_example1(validation_image_dict, normalization_dict, model_object):
     predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
 
     saliency_matrix = saliency_for_class(
-        model_object=model_object, target_class=1,
+        cnn_model_object=cnn_model_object, target_class=1,
         list_of_input_matrices=[predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2742,13 +2884,14 @@ def saliency_example1(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def saliency_example2(validation_image_dict, normalization_dict, model_object):
+def saliency_example2(validation_image_dict, normalization_dict,
+                      cnn_model_object):
     """Computes saliency map for random example wrt negative-class probability.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
@@ -2760,7 +2903,7 @@ def saliency_example2(validation_image_dict, normalization_dict, model_object):
     predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
 
     saliency_matrix = saliency_for_class(
-        model_object=model_object, target_class=0,
+        cnn_model_object=cnn_model_object, target_class=0,
         list_of_input_matrices=[predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2797,13 +2940,14 @@ def saliency_example2(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def saliency_example3(validation_image_dict, normalization_dict, model_object):
+def saliency_example3(validation_image_dict, normalization_dict,
+                      cnn_model_object):
     """Computes saliency map for extreme example wrt positive-class probability.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
@@ -2821,7 +2965,7 @@ def saliency_example3(validation_image_dict, normalization_dict, model_object):
     predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
 
     saliency_matrix = saliency_for_class(
-        model_object=model_object, target_class=1,
+        cnn_model_object=cnn_model_object, target_class=1,
         list_of_input_matrices=[predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2858,13 +3002,14 @@ def saliency_example3(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def saliency_example4(validation_image_dict, normalization_dict, model_object):
+def saliency_example4(validation_image_dict, normalization_dict,
+                      cnn_model_object):
     """Computes saliency map for extreme example wrt negative-class probability.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
     """
 
     target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
@@ -2882,7 +3027,7 @@ def saliency_example4(validation_image_dict, normalization_dict, model_object):
     predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
 
     saliency_matrix = saliency_for_class(
-        model_object=model_object, target_class=0,
+        cnn_model_object=cnn_model_object, target_class=0,
         list_of_input_matrices=[predictor_matrix_norm]
     )[0][0, ...]
 
@@ -2919,24 +3064,91 @@ def saliency_example4(validation_image_dict, normalization_dict, model_object):
     pyplot.show()
 
 
-def setup_ucn(num_input_features, first_num_rows, first_num_columns,
-              upsampling_factor_by_upconv_layer, num_output_channels,
-              use_activation_for_out_layer, use_bn_for_out_layer):
-    """Sets up (but does not train) UCN (upconvolutional network).
+def _create_smoothing_filter(
+        smoothing_radius_px, num_half_filter_rows, num_half_filter_columns,
+        num_channels):
+    """Creates convolution filter for Gaussian smoothing.
+
+    M = number of rows in filter
+    N = number of columns in filter
+    C = number of channels (or "variables" or "features") to smooth.  Each
+        channel will be smoothed independently.
+
+    :param smoothing_radius_px: e-folding radius (pixels).
+    :param num_half_filter_rows: Number of rows in one half of filter.  Total
+        number of rows will be 2 * `num_half_filter_rows` + 1.
+    :param num_half_filter_columns: Same but for columns.
+    :param num_channels: C in the above discussion.
+    :return: weight_matrix: M-by-N-by-C-by-C numpy array of convolution weights.
+    """
+
+    num_filter_rows = 2 * num_half_filter_rows + 1
+    num_filter_columns = 2 * num_half_filter_columns + 1
+
+    row_offsets_unique = numpy.linspace(
+        -num_half_filter_rows, num_half_filter_rows, num=num_filter_rows,
+        dtype=float)
+    column_offsets_unique = numpy.linspace(
+        -num_half_filter_columns, num_half_filter_columns,
+        num=num_filter_columns, dtype=float)
+
+    column_offset_matrix, row_offset_matrix = numpy.meshgrid(
+        column_offsets_unique, row_offsets_unique)
+
+    pixel_offset_matrix = numpy.sqrt(
+        row_offset_matrix ** 2 + column_offset_matrix ** 2)
+
+    small_weight_matrix = numpy.exp(
+        -pixel_offset_matrix ** 2 / (2 * smoothing_radius_px ** 2)
+    )
+    small_weight_matrix = small_weight_matrix / numpy.sum(small_weight_matrix)
+
+    weight_matrix = numpy.zeros(
+        (num_filter_rows, num_filter_columns, num_channels, num_channels)
+    )
+
+    for k in range(num_channels):
+        weight_matrix[..., k, k] = small_weight_matrix
+
+    return weight_matrix
+
+
+def setup_ucn(
+        num_input_features, first_num_rows, first_num_columns,
+        upsampling_factors, num_output_channels,
+        use_activation_for_out_layer=False, use_bn_for_out_layer=True,
+        use_transposed_conv=False, smoothing_radius_px=None):
+    """Creates (but does not train) upconvnet.
+
+    L = number of conv or deconv layers
 
     :param num_input_features: Number of input features.
-    :param first_num_rows: Number of rows in input to first upconv layer.  The
+    :param first_num_rows: Number of rows in input to first deconv layer.  The
         input features will be reshaped into a grid with this many rows.
     :param first_num_columns: Same but for columns.
-    :param upsampling_factor_by_upconv_layer: length-L numpy array of upsampling
-        factors, where L = number of upconv layers.
-    :param num_output_channels: Number of channels in final output.
-    :param use_activation_for_out_layer: Boolean flag.  If True, activation
-        will be applied to output layer.
+    :param upsampling_factors: length-L numpy array of upsampling factors.  Must
+        all be positive integers.
+    :param num_output_channels: Number of channels in output images.
+    :param use_activation_for_out_layer: Boolean flag.  If True, activation will
+        be applied to output layer.
     :param use_bn_for_out_layer: Boolean flag.  If True, batch normalization
         will be applied to output layer.
-    :return: model_object: Untrained instance of `keras.models.Model`.
+    :param use_transposed_conv: Boolean flag.  If True, upsampling will be done
+        with transposed-convolution layers.  If False, each upsampling will be
+        done with an upsampling layer followed by a conv layer.
+    :param smoothing_radius_px: Smoothing radius (pixels).  Gaussian smoothing
+        with this e-folding radius will be done after each upsampling.  If
+        `smoothing_radius_px is None`, no smoothing will be done.
+    :return: ucn_model_object: Untrained instance of `keras.models.Model`.
     """
+
+    if smoothing_radius_px is not None:
+        num_half_smoothing_rows = int(numpy.round(
+            (NUM_SMOOTHING_FILTER_ROWS - 1) / 2
+        ))
+        num_half_smoothing_columns = int(numpy.round(
+            (NUM_SMOOTHING_FILTER_COLUMNS - 1) / 2
+        ))
 
     regularizer_object = keras.regularizers.l1_l2(l1=L1_WEIGHT, l2=L2_WEIGHT)
     input_layer_object = keras.layers.Input(shape=(num_input_features,))
@@ -2949,63 +3161,153 @@ def setup_ucn(num_input_features, first_num_rows, first_num_columns,
         target_shape=(first_num_rows, first_num_columns, current_num_filters)
     )(input_layer_object)
 
-    num_upconv_layers = len(upsampling_factor_by_upconv_layer)
+    num_main_layers = len(upsampling_factors)
 
-    for i in range(num_upconv_layers):
-        this_upsampling_factor = upsampling_factor_by_upconv_layer[i]
+    for i in range(num_main_layers):
+        this_upsampling_factor = upsampling_factors[i]
 
-        if this_upsampling_factor > 1:
-            this_padding_arg = 'same'
-        else:
-            this_padding_arg = 'valid'
+        if i == num_main_layers - 1:
+            current_num_filters = num_output_channels + 0
+        elif this_upsampling_factor == 1:
             current_num_filters = int(numpy.round(current_num_filters / 2))
 
-        if i == num_upconv_layers - 1:
-            current_num_filters = num_output_channels + 0
+        if use_transposed_conv:
+            if this_upsampling_factor > 1:
+                this_padding_arg = 'same'
+            else:
+                this_padding_arg = 'valid'
 
-        layer_object = keras.layers.Conv2DTranspose(
-            filters=current_num_filters,
-            kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
-            strides=(this_upsampling_factor, this_upsampling_factor),
-            padding=this_padding_arg, data_format='channels_last',
-            dilation_rate=(1, 1), activation=None, use_bias=True,
-            kernel_initializer='glorot_uniform', bias_initializer='zeros',
-            kernel_regularizer=regularizer_object
-        )(layer_object)
+            layer_object = keras.layers.Conv2DTranspose(
+                filters=current_num_filters,
+                kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
+                strides=(this_upsampling_factor, this_upsampling_factor),
+                padding=this_padding_arg, data_format='channels_last',
+                dilation_rate=(1, 1), activation=None, use_bias=True,
+                kernel_initializer='glorot_uniform', bias_initializer='zeros',
+                kernel_regularizer=regularizer_object
+            )(layer_object)
 
-        if i < num_upconv_layers - 1 or use_activation_for_out_layer:
+        else:
+            if this_upsampling_factor > 1:
+                try:
+                    layer_object = keras.layers.UpSampling2D(
+                        size=(this_upsampling_factor, this_upsampling_factor),
+                        data_format='channels_last', interpolation='nearest'
+                    )(layer_object)
+                except:
+                    layer_object = keras.layers.UpSampling2D(
+                        size=(this_upsampling_factor, this_upsampling_factor),
+                        data_format='channels_last'
+                    )(layer_object)
+
+            layer_object = keras.layers.Conv2D(
+                filters=current_num_filters,
+                kernel_size=(NUM_CONV_FILTER_ROWS, NUM_CONV_FILTER_COLUMNS),
+                strides=(1, 1), padding='same', data_format='channels_last',
+                dilation_rate=(1, 1), activation=None, use_bias=True,
+                kernel_initializer='glorot_uniform', bias_initializer='zeros',
+                kernel_regularizer=regularizer_object
+            )(layer_object)
+
+            if this_upsampling_factor == 1:
+                layer_object = keras.layers.ZeroPadding2D(
+                    padding=(1, 1), data_format='channels_last'
+                )(layer_object)
+
+        if smoothing_radius_px is not None:
+            this_weight_matrix = _create_smoothing_filter(
+                smoothing_radius_px=smoothing_radius_px,
+                num_half_filter_rows=num_half_smoothing_rows,
+                num_half_filter_columns=num_half_smoothing_columns,
+                num_channels=current_num_filters)
+
+            this_bias_vector = numpy.zeros(current_num_filters)
+
+            layer_object = keras.layers.Conv2D(
+                filters=current_num_filters,
+                kernel_size=(NUM_SMOOTHING_FILTER_ROWS,
+                             NUM_SMOOTHING_FILTER_COLUMNS),
+                strides=(1, 1), padding='same', data_format='channels_last',
+                dilation_rate=(1, 1), activation=None, use_bias=True,
+                kernel_initializer='glorot_uniform', bias_initializer='zeros',
+                kernel_regularizer=regularizer_object, trainable=False,
+                weights=[this_weight_matrix, this_bias_vector]
+            )(layer_object)
+
+        if i < num_main_layers - 1 or use_activation_for_out_layer:
             layer_object = keras.layers.LeakyReLU(
                 alpha=SLOPE_FOR_RELU
             )(layer_object)
 
-        if not USE_BATCH_NORMALIZATION:
-            continue
-
-        if i < num_upconv_layers - 1 or use_bn_for_out_layer:
+        if i < num_main_layers - 1 or use_bn_for_out_layer:
             layer_object = keras.layers.BatchNormalization(
                 axis=-1, center=True, scale=True
             )(layer_object)
 
-    model_object = keras.models.Model(
+    ucn_model_object = keras.models.Model(
         inputs=input_layer_object, outputs=layer_object)
-    model_object.compile(
+    ucn_model_object.compile(
         loss=keras.losses.mean_squared_error, optimizer=keras.optimizers.Adam())
 
-    model_object.summary()
-    return model_object
+    ucn_model_object.summary()
+    return ucn_model_object
 
 
-def setup_ucn_example():
-    """Sets up UCN."""
+def get_cnn_flatten_layer(cnn_model_object):
+    """Finds flattening layer in CNN.
 
-    upsampling_factor_by_upconv_layer = numpy.array(
-        [2, 1, 1, 2, 1, 1], dtype=int)
+    This method assumes that there is only one flattening layer.  If there are
+    several, this method will return the first (shallowest).
+
+    :param cnn_model_object: Instance of `keras.models.Model`.
+    :return: layer_name: Name of flattening layer.
+    :raises: TypeError: if flattening layer cannot be found.
+    """
+
+    layer_names = [lyr.name for lyr in cnn_model_object.layers]
+
+    flattening_flags = numpy.array(
+        ['flatten' in n for n in layer_names], dtype=bool)
+    flattening_indices = numpy.where(flattening_flags)[0]
+
+    if len(flattening_indices) == 0:
+        error_string = (
+            'Cannot find flattening layer in model.  Layer names are listed '
+            'below.\n{0:s}'
+        ).format(str(layer_names))
+
+        raise TypeError(error_string)
+
+    return layer_names[flattening_indices[0]]
+
+
+def setup_ucn_example(cnn_model_object):
+    """Example of UCN architecture (with transposed conv, no smoothing).
+
+    :param cnn_model_object: Trained CNN (instance of `keras.models.Model`).
+    """
+
+    cnn_feature_layer_name = get_cnn_flatten_layer(cnn_model_object)
+    cnn_feature_layer_object = cnn_model_object.get_layer(
+        name=cnn_feature_layer_name)
+    cnn_feature_dimensions = numpy.array(
+        cnn_feature_layer_object.input.shape[1:], dtype=int)
+
+    num_input_features = numpy.prod(cnn_feature_dimensions)
+    first_num_rows = cnn_feature_dimensions[0]
+    first_num_columns = cnn_feature_dimensions[1]
+    num_output_channels = numpy.array(
+        cnn_model_object.input.shape[1:], dtype=int
+    )[-1]
+
+    upsampling_factors = numpy.array([2, 1, 1, 2, 1, 1], dtype=int)
 
     ucn_model_object = setup_ucn(
-        num_input_features=6400, first_num_rows=5, first_num_columns=5,
-        upsampling_factor_by_upconv_layer=upsampling_factor_by_upconv_layer,
-        num_output_channels=4, use_activation_for_out_layer=False,
-        use_bn_for_out_layer=True)
+        num_input_features=num_input_features, first_num_rows=first_num_rows,
+        first_num_columns=first_num_columns,
+        upsampling_factors=upsampling_factors,
+        num_output_channels=num_output_channels,
+        use_transposed_conv=True, smoothing_radius_px=None)
 
 
 def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
@@ -3082,7 +3384,7 @@ def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
         target_matrix = target_matrix.astype('float32')
 
         feature_matrix = _apply_cnn(
-            model_object=cnn_model_object, predictor_matrix=target_matrix,
+            cnn_model_object=cnn_model_object, predictor_matrix=target_matrix,
             verbose=False, output_layer_name=cnn_feature_layer_name)
 
         num_examples_in_memory = 0
@@ -3093,9 +3395,10 @@ def ucn_generator(netcdf_file_names, num_examples_per_batch, normalization_dict,
 
 def train_ucn(
         ucn_model_object, training_file_names, normalization_dict,
-        cnn_model_object, cnn_feature_layer_name, num_examples_per_batch,
-        num_epochs, num_training_batches_per_epoch, output_model_file_name,
-        validation_file_names=None, num_validation_batches_per_epoch=None):
+        cnn_model_object, cnn_file_name, cnn_feature_layer_name,
+        num_examples_per_batch, num_epochs, num_training_batches_per_epoch,
+        output_model_file_name, validation_file_names=None,
+        num_validation_batches_per_epoch=None):
     """Trains UCN (upconvolutional network).
 
     :param ucn_model_object: Untrained instance of `keras.models.Model` (may be
@@ -3104,6 +3407,9 @@ def train_ucn(
         readable by `read_image_file`).
     :param normalization_dict: See doc for `ucn_generator`.
     :param cnn_model_object: Same.
+    :param cnn_file_name: Path to file with trained CNN (represented by
+        `cnn_model_object`).  This is needed only for the output dictionary
+        (metadata).
     :param cnn_feature_layer_name: Same.
     :param num_examples_per_batch: Same.
     :param num_epochs: Number of epochs.
@@ -3118,14 +3424,15 @@ def train_ucn(
         [used only if `validation_file_names is not None`]
         Number of validation batches furnished to model in each epoch.
 
-    :return: model_metadata_dict: Dictionary with the following keys.
-    model_metadata_dict['training_file_names']: See input doc.
-    model_metadata_dict['normalization_dict']: Same.
-    model_metadata_dict['cnn_feature_layer_name']: Same.
-    model_metadata_dict['num_examples_per_batch']: Same.
-    model_metadata_dict['num_training_batches_per_epoch']: Same.
-    model_metadata_dict['validation_file_names']: Same.
-    model_metadata_dict['num_validation_batches_per_epoch']: Same.
+    :return: ucn_metadata_dict: Dictionary with the following keys.
+    ucn_metadata_dict['training_file_names']: See input doc.
+    ucn_metadata_dict['normalization_dict']: Same.
+    ucn_metadata_dict['cnn_file_name']: Same.
+    ucn_metadata_dict['cnn_feature_layer_name']: Same.
+    ucn_metadata_dict['num_examples_per_batch']: Same.
+    ucn_metadata_dict['num_training_batches_per_epoch']: Same.
+    ucn_metadata_dict['validation_file_names']: Same.
+    ucn_metadata_dict['num_validation_batches_per_epoch']: Same.
     """
 
     _create_directory(file_name=output_model_file_name)
@@ -3143,9 +3450,10 @@ def train_ucn(
 
     list_of_callback_objects = [checkpoint_object]
 
-    model_metadata_dict = {
+    ucn_metadata_dict = {
         TRAINING_FILES_KEY: training_file_names,
         NORMALIZATION_DICT_KEY: normalization_dict,
+        CNN_FILE_KEY: cnn_file_name,
         CNN_FEATURE_LAYER_KEY: cnn_feature_layer_name,
         NUM_EXAMPLES_PER_BATCH_KEY: num_examples_per_batch,
         NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
@@ -3160,20 +3468,13 @@ def train_ucn(
         cnn_model_object=cnn_model_object,
         cnn_feature_layer_name=cnn_feature_layer_name)
 
-    # TODO(thunderhoser): This is a HACK to prevent segmentation faults on
-    # Schooner.
-    if num_examples_per_batch < 500:
-        workers_arg = 0
-    else:
-        workers_arg = 1
-
     if validation_file_names is None:
         ucn_model_object.fit_generator(
             generator=training_generator,
             steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-            verbose=1, callbacks=list_of_callback_objects, workers=workers_arg)
+            verbose=1, callbacks=list_of_callback_objects, workers=0)
 
-        return model_metadata_dict
+        return ucn_metadata_dict
 
     early_stopping_object = keras.callbacks.EarlyStopping(
         monitor='val_loss', min_delta=MIN_MSE_DECREASE_FOR_EARLY_STOP,
@@ -3191,21 +3492,22 @@ def train_ucn(
     ucn_model_object.fit_generator(
         generator=training_generator,
         steps_per_epoch=num_training_batches_per_epoch, epochs=num_epochs,
-        verbose=1, callbacks=list_of_callback_objects, workers=workers_arg,
+        verbose=1, callbacks=list_of_callback_objects, workers=0,
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch)
 
-    return model_metadata_dict
+    return ucn_metadata_dict
 
 
 def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
-                      model_object):
+                      cnn_model_object, cnn_file_name):
     """Actually trains the UCN (upconvolutional network).
 
     :param ucn_model_object: See doc for `train_ucn`.
     :param training_file_names: Same.
     :param normalization_dict: Same.
-    :param model_object: See doc for `cnn_model_object` in `train_ucn`.
+    :param cnn_model_object: See doc for `cnn_model_object` in `train_ucn`.
+    :param cnn_file_name: See doc for `train_ucn`.
     """
 
     validation_file_names = find_many_image_files(
@@ -3216,27 +3518,31 @@ def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
         ucn_model_object=ucn_model_object,
         training_file_names=training_file_names,
         normalization_dict=normalization_dict,
-        cnn_model_object=model_object,
-        cnn_feature_layer_name='flatten_1',
+        cnn_model_object=cnn_model_object, cnn_file_name=cnn_file_name,
+        cnn_feature_layer_name=get_cnn_flatten_layer(cnn_model_object),
         num_examples_per_batch=100, num_epochs=10,
         num_training_batches_per_epoch=10, output_model_file_name=ucn_file_name,
         validation_file_names=validation_file_names,
         num_validation_batches_per_epoch=10)
 
 
-def plot_ucn_example1(
-        validation_image_dict, normalization_dict, model_object,
-        ucn_model_object):
-    """Plots UCN output for random validation example.
+def apply_ucn_example1(
+        validation_image_dict, normalization_dict, cnn_model_object):
+    """Uses upconvnet to reconstruct random validation example.
 
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`,
-        representing the CNN or "encoder".
-    :param ucn_model_object: Trained instance of `keras.models.Model`,
-        representing the UCN or "decoder".
+    :param cnn_model_object: Trained instance of `keras.models.Model`,
+        representing the CNN that goes with the upconvnet.
     """
+
+    ucn_file_name = '{0:s}/pretrained_cnn/pretrained_ucn.h5'.format(
+        DEFAULT_OUTPUT_DIR_NAME)
+    ucn_metafile_name = find_model_metafile(model_file_name=ucn_file_name)
+
+    ucn_model_object = read_keras_model(ucn_file_name)
+    ucn_metadata_dict = read_model_metadata(ucn_metafile_name)
 
     image_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
     predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
@@ -3247,8 +3553,9 @@ def plot_ucn_example1(
     image_matrix_norm = numpy.expand_dims(image_matrix_norm, axis=0)
 
     feature_matrix = _apply_cnn(
-        model_object=model_object, predictor_matrix=image_matrix_norm,
-        verbose=False, output_layer_name='flatten_1')
+        cnn_model_object=cnn_model_object, predictor_matrix=image_matrix_norm,
+        output_layer_name=get_cnn_flatten_layer(cnn_model_object),
+        verbose=False)
 
     reconstructed_image_matrix_norm = ucn_model_object.predict(
         feature_matrix, batch_size=1)
@@ -3267,22 +3574,91 @@ def plot_ucn_example1(
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    print('\nReal example (input to CNN):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=image_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Original image (CNN input)')
     pyplot.show()
 
-    print('\nReconstructed example (output of UCN):\n')
-    plot_many_predictors_with_barbs(
+    figure_object, _ = plot_many_predictors_with_barbs(
         predictor_matrix=reconstructed_image_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
+    figure_object.suptitle('Reconstructed image (upconvnet output)')
+    pyplot.show()
+
+
+def apply_ucn_example2(
+        validation_image_dict, normalization_dict, ucn_model_object,
+        cnn_model_object):
+    """Uses upconvnet to reconstruct extreme validation example.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param ucn_model_object: Trained instance of `keras.models.Model`,
+        representing the upconvnet.
+    :param cnn_model_object: Trained instance of `keras.models.Model`,
+        representing the CNN that goes with the upconvnet.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    image_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    image_matrix_norm, _ = normalize_images(
+        predictor_matrix=image_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    image_matrix_norm = numpy.expand_dims(image_matrix_norm, axis=0)
+
+    feature_matrix = _apply_cnn(
+        cnn_model_object=cnn_model_object, predictor_matrix=image_matrix_norm,
+        output_layer_name=get_cnn_flatten_layer(cnn_model_object),
+        verbose=False)
+
+    reconstructed_image_matrix_norm = ucn_model_object.predict(
+        feature_matrix, batch_size=1)
+
+    reconstructed_image_matrix = denormalize_images(
+        predictor_matrix=reconstructed_image_matrix_norm,
+        predictor_names=predictor_names, normalization_dict=normalization_dict
+    )[0, ...]
+
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+    combined_temp_matrix_kelvins = numpy.concatenate(
+        (image_matrix[..., temperature_index],
+         reconstructed_image_matrix[..., temperature_index]),
+        axis=0)
+
+    min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
+    max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
+
+    figure_object, _ = plot_many_predictors_with_barbs(
+        predictor_matrix=image_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    figure_object.suptitle('Original image (CNN input)')
+    pyplot.show()
+
+    figure_object, _ = plot_many_predictors_with_barbs(
+        predictor_matrix=reconstructed_image_matrix,
+        predictor_names=predictor_names,
+        min_colour_temp_kelvins=min_colour_temp_kelvins,
+        max_colour_temp_kelvins=max_colour_temp_kelvins)
+
+    figure_object.suptitle('Reconstructed image (upconvnet output)')
     pyplot.show()
 
 
@@ -3452,12 +3828,12 @@ def do_novelty_detection(
         normalization_dict=image_normalization_dict)
 
     baseline_feature_matrix = _apply_cnn(
-        model_object=cnn_model_object,
+        cnn_model_object=cnn_model_object,
         predictor_matrix=baseline_image_matrix_norm, verbose=False,
         output_layer_name=cnn_feature_layer_name)
 
     test_feature_matrix = _apply_cnn(
-        model_object=cnn_model_object,
+        cnn_model_object=cnn_model_object,
         predictor_matrix=test_image_matrix_norm, verbose=False,
         output_layer_name=cnn_feature_layer_name)
 
@@ -3540,7 +3916,7 @@ def do_novelty_detection(
 
 
 def do_novelty_detection_example(
-        validation_image_dict, normalization_dict, model_object,
+        validation_image_dict, normalization_dict, cnn_model_object,
         ucn_model_object):
     """Runs novelty detection.
 
@@ -3551,7 +3927,7 @@ def do_novelty_detection_example(
     :param validation_image_dict: Dictionary created by `read_many_image_files`.
     :param normalization_dict: Dictionary created by
         `get_image_normalization_params`.
-    :param model_object: Trained instance of `keras.models.Model`,
+    :param cnn_model_object: Trained instance of `keras.models.Model`,
         representing the CNN or "encoder".
     :param ucn_model_object: Trained instance of `keras.models.Model`,
         representing the UCN or "decoder".
@@ -3568,6 +3944,8 @@ def do_novelty_detection_example(
     test_indices = test_indices[test_indices >= 100]
     baseline_indices = numpy.linspace(0, 100, num=100, dtype=int)
 
+    num_novel_test_images = 4
+
     novelty_dict = do_novelty_detection(
         baseline_image_matrix=validation_image_dict[
             PREDICTOR_MATRIX_KEY][baseline_indices, ...],
@@ -3575,50 +3953,148 @@ def do_novelty_detection_example(
             PREDICTOR_MATRIX_KEY][test_indices, ...],
         image_normalization_dict=normalization_dict,
         predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        cnn_model_object=model_object, cnn_feature_layer_name='flatten_1',
+        cnn_model_object=cnn_model_object,
+        cnn_feature_layer_name=get_cnn_flatten_layer(cnn_model_object),
         ucn_model_object=ucn_model_object,
-        num_novel_test_images=1)
+        num_novel_test_images=num_novel_test_images)
 
     predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
     temperature_index = predictor_names.index(TEMPERATURE_NAME)
-    min_colour_temp_kelvins = numpy.percentile(
-        novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][..., temperature_index], 1)
-    max_colour_temp_kelvins = numpy.percentile(
-        novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][..., temperature_index], 99)
 
-    figure_object, _ = plot_many_predictors_with_barbs(
-        predictor_matrix=novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][0, ...],
-        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        min_colour_temp_kelvins=min_colour_temp_kelvins,
-        max_colour_temp_kelvins=max_colour_temp_kelvins)
+    for i in range(num_novel_test_images):
+        this_actual_matrix = novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][i, ...]
+        this_reconstructed_matrix = novelty_dict[NOVEL_IMAGES_RECON_KEY][i, ...]
 
-    figure_object.suptitle('Actual test image')
-    pyplot.show()
+        this_combined_matrix_kelvins = numpy.concatenate(
+            (this_actual_matrix[..., temperature_index],
+             this_reconstructed_matrix[..., temperature_index]),
+            axis=0)
 
-    figure_object, _ = plot_many_predictors_with_barbs(
-        predictor_matrix=novelty_dict[NOVEL_IMAGES_RECON_KEY][0, ...],
-        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        min_colour_temp_kelvins=min_colour_temp_kelvins,
-        max_colour_temp_kelvins=max_colour_temp_kelvins)
+        this_min_temp_kelvins = numpy.percentile(
+            this_combined_matrix_kelvins, 1)
+        this_max_temp_kelvins = numpy.percentile(
+            this_combined_matrix_kelvins, 99)
 
-    figure_object.suptitle('Reconstruction of test image by upconvnet')
-    pyplot.show()
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_actual_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
 
-    difference_matrix = (
-        novelty_dict[NOVEL_IMAGES_RECON_KEY] -
-        novelty_dict[NOVEL_IMAGES_RECON_EXPECTED_KEY]
-    )
+        this_title_string = '{0:d}th-most novel example: actual'.format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
 
-    min_colour_temp_kelvins = numpy.percentile(
-        difference_matrix[..., temperature_index], 1)
-    max_colour_temp_kelvins = numpy.percentile(
-        difference_matrix[..., temperature_index], 99)
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_reconstructed_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
 
-    figure_object, _ = plot_many_predictors_with_barbs(
-        predictor_matrix=difference_matrix[0, ...],
-        predictor_names=validation_image_dict[PREDICTOR_NAMES_KEY],
-        min_colour_temp_kelvins=min_colour_temp_kelvins,
-        max_colour_temp_kelvins=max_colour_temp_kelvins)
+        this_title_string = (
+            '{0:d}th-most novel example: upconvnet reconstruction (X)'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
 
-    figure_object.suptitle('Novel part of test image')
-    pyplot.show()
+        this_difference_matrix = (
+            this_reconstructed_matrix -
+            novelty_dict[NOVEL_IMAGES_RECON_EXPECTED_KEY][i, ...]
+        )
+
+        this_min_temp_kelvins = numpy.percentile(
+            this_difference_matrix[..., temperature_index], 1)
+        this_max_temp_kelvins = numpy.percentile(
+            this_difference_matrix[..., temperature_index], 99)
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_difference_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = (
+            '{0:d}th-most novel example: novelty (X - X'')'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
+
+
+def foo(validation_image_dict, novelty_dict):
+    """Debugging."""
+
+    num_novel_test_images = 4
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+    temperature_index = predictor_names.index(TEMPERATURE_NAME)
+
+    for i in range(num_novel_test_images):
+        this_actual_matrix = novelty_dict[NOVEL_IMAGES_ACTUAL_KEY][i, ...]
+        this_reconstructed_matrix = novelty_dict[NOVEL_IMAGES_RECON_KEY][i, ...]
+        this_reconstructed_svd_matrix = novelty_dict[
+            NOVEL_IMAGES_RECON_EXPECTED_KEY][i, ...]
+
+        this_combined_matrix_kelvins = numpy.concatenate(
+            (this_actual_matrix[..., temperature_index],
+             this_reconstructed_matrix[..., temperature_index]),
+            axis=0)
+
+        this_min_temp_kelvins = numpy.percentile(
+            this_combined_matrix_kelvins, 1)
+        this_max_temp_kelvins = numpy.percentile(
+            this_combined_matrix_kelvins, 99)
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_actual_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = '{0:d}th-most novel example: actual'.format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_reconstructed_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = (
+            '{0:d}th-most novel example: upconvnet reconstruction (X)'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_reconstructed_svd_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = (
+            '{0:d}th-most novel example: upconvnet reconstruction of SVD '
+            'reconstruction'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
+
+        this_difference_matrix = (
+            this_reconstructed_matrix - this_reconstructed_svd_matrix
+        )
+
+        this_min_temp_kelvins = numpy.percentile(
+            this_difference_matrix[..., temperature_index], 1)
+        this_max_temp_kelvins = numpy.percentile(
+            this_difference_matrix[..., temperature_index], 99)
+
+        this_figure_object, _ = plot_many_predictors_with_barbs(
+            predictor_matrix=this_difference_matrix,
+            predictor_names=predictor_names,
+            min_colour_temp_kelvins=this_min_temp_kelvins,
+            max_colour_temp_kelvins=this_max_temp_kelvins)
+
+        this_title_string = (
+            '{0:d}th-most novel example: novelty (X - X'')'
+        ).format(i + 1)
+        this_figure_object.suptitle(this_title_string)
+        pyplot.show()
