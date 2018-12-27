@@ -2,9 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
+      <change beforePath="$PROJECT_DIR$/.idea/ams-ml-python-course.iml" afterPath="$PROJECT_DIR$/.idea/ams-ml-python-course.iml" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.ipynb" />
+      <change beforePath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" afterPath="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -18,8 +20,8 @@
       <file leaf-file-name="ML_Short_Course_Module_4_Interpretation.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="615">
-              <caret line="3996" column="54" lean-forward="true" selection-start-line="3996" selection-start-column="54" selection-end-line="3996" selection-end-column="54" />
+            <state relative-caret-position="287">
+              <caret line="3993" column="0" lean-forward="true" selection-start-line="3993" selection-start-column="0" selection-end-line="3993" selection-end-column="0" />
               <folding>
                 <element signature="e#39#50#0" expanded="true" />
               </folding>
@@ -30,7 +32,7 @@
       <file leaf-file-name="train_ucn.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="324">
+            <state relative-caret-position="378">
               <caret line="21" column="55" lean-forward="false" selection-start-line="21" selection-start-column="27" selection-end-line="21" selection-end-column="55" />
               <folding>
                 <element signature="e#55#70#0" expanded="true" />
@@ -42,7 +44,7 @@
       <file leaf-file-name="apply_ucn.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/scripts/apply_ucn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1356">
+            <state relative-caret-position="2844">
               <caret line="158" column="22" lean-forward="false" selection-start-line="158" selection-start-column="22" selection-end-line="158" selection-end-column="22" />
               <folding>
                 <element signature="e#56#69#0" expanded="true" />
@@ -55,9 +57,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>def setup_ucn</find>
-      <find>pickle.</find>
-      <find>pickle</find>
       <find>NORMALIZATION</find>
       <find>def train_ucn</find>
       <find>def write</find>
@@ -71,7 +70,6 @@
       <find>train_cnn(</find>
       <find>def train_uc</find>
       <find>num_examples</find>
-      <find>predictor_matrix</find>
       <find>model_object</find>
       <find>def train_cnn(</find>
       <find>def train_ucn(</find>
@@ -85,9 +83,12 @@
       <find>validation_image_dict</find>
       <find>0</find>
       <find>_apply_svd</find>
+      <find>feature_matrix</find>
+      <find>_fit_svd</find>
+      <find>expect</find>
+      <find>predictor_matrix</find>
     </findStrings>
     <replaceStrings>
-      <replace>current_layer_object</replace>
       <replace>intermediate_normalization_dict</replace>
       <replace>right</replace>
       <replace>inputs_to_bins</replace>
@@ -117,6 +118,7 @@
       <replace>UPSAMPLING_FACTORS</replace>
       <replace>cnn_metadata_dict</replace>
       <replace>ucn_metadata_dict</replace>
+      <replace>novelty_matrix</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -143,10 +145,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="1920" />
-    <option name="y" value="28" />
-    <option name="width" value="1920" />
-    <option name="height" value="1138" />
+    <option name="x" value="64" />
+    <option name="y" value="17" />
+    <option name="width" value="1857" />
+    <option name="height" value="1064" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -163,10 +165,8 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scratches" />
       <pane id="Scope" />
-      <pane id="AndroidView" />
-      <pane id="PackagesPane" />
+      <pane id="Scratches" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -193,10 +193,12 @@
           <select />
         </subPane>
       </pane>
+      <pane id="PackagesPane" />
+      <pane id="AndroidView" />
     </panes>
   </component>
   <component name="PropertiesComponent">
-    <property name="last_opened_file_path" value="$USER_HOME$/anaconda3_short_course/bin/python3.6" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="project.structure.last.edited" value="Project" />
     <property name="project.structure.proportion" value="0.15" />
     <property name="project.structure.side.proportion" value="0.2" />
@@ -214,23 +216,6 @@
     </option>
   </component>
   <component name="RunManager" selected="Python.ML_Short_Course_Module_4_Interpretation">
-    <configuration name="ML_Short_Course_Module_4_Interpretation" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/module_4" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="ams-ml-python-course" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-    </configuration>
     <configuration default="true" type="Applet" factoryName="Applet">
       <option name="HTML_USED" value="false" />
       <option name="WIDTH" value="400" />
@@ -272,11 +257,77 @@
       <envs />
       <patterns />
     </configuration>
-    <configuration default="true" type="#org.jetbrains.idea.devkit.run.PluginConfigurationType" factoryName="Plugin">
-      <module name="" />
-      <option name="VM_PARAMETERS" value="-Xmx512m -Xms256m -XX:MaxPermSize=250m -ea" />
-      <option name="PROGRAM_PARAMETERS" />
-      <predefined_log_file id="idea.log" enabled="true" />
+    <configuration name="ML_Short_Course_Module_4_Interpretation" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/module_4" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="ams-ml-python-course" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+    </configuration>
+    <configuration name="attributes_diagrams" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/module_4" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="ams-ml-python-course" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+    </configuration>
+    <configuration name="performance_diagrams" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/module_4" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="ams-ml-python-course" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/module_4/performance_diagrams.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+    </configuration>
+    <configuration name="roc_curves" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/module_4" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="ams-ml-python-course" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/module_4/roc_curves.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
     </configuration>
     <configuration default="true" type="Remote" factoryName="Remote">
       <option name="USE_SOCKET_TRANSPORT" value="true" />
@@ -312,56 +363,11 @@
       <properties />
       <listeners />
     </configuration>
-    <configuration name="attributes_diagrams" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/module_4" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="ams-ml-python-course" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/module_4/attributes_diagrams.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-    </configuration>
-    <configuration name="performance_diagrams" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/module_4" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="ams-ml-python-course" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/module_4/performance_diagrams.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-    </configuration>
-    <configuration name="roc_curves" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/module_4" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="ams-ml-python-course" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/module_4/roc_curves.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
+    <configuration default="true" type="#org.jetbrains.idea.devkit.run.PluginConfigurationType" factoryName="Plugin">
+      <module name="" />
+      <option name="VM_PARAMETERS" value="-Xmx512m -Xms256m -XX:MaxPermSize=250m -ea" />
+      <option name="PROGRAM_PARAMETERS" />
+      <predefined_log_file id="idea.log" enabled="true" />
     </configuration>
     <list size="4">
       <item index="0" class="java.lang.String" itemvalue="Python.ML_Short_Course_Module_4_Interpretation" />
@@ -381,6 +387,9 @@
   <component name="ShelveChangesManager" show_recycled="false">
     <option name="remove_strategy" value="false" />
   </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="4f9aa3d4-0fe4-4b7d-abed-c59d8b418e96" name="Default" comment="" />
@@ -392,7 +401,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="1920" y="28" width="1920" height="1138" extended-state="6" />
+    <frame x="65" y="-4" width="1855" height="1084" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
@@ -407,18 +416,18 @@
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Tool" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.14322917" sideWeight="0.5" order="4" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.14285715" sideWeight="0.5" order="4" side_tool="false" content_ui="combo" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="UI Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Theme Preview" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3994112" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="true" content_ui="tabs" />
-      <window_info id="Data View" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="8" side_tool="false" content_ui="combo" />
+      <window_info id="Data View" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32973504" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
     </layout>
@@ -431,6 +440,66 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding>
+            <element signature="e#39#50#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="378">
+          <caret line="21" column="55" lean-forward="false" selection-start-line="21" selection-start-column="27" selection-end-line="21" selection-end-column="55" />
+          <folding>
+            <element signature="e#55#70#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/scripts/apply_ucn.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2844">
+          <caret line="158" column="22" lean-forward="false" selection-start-line="158" selection-start-column="22" selection-end-line="158" selection-end-column="22" />
+          <folding>
+            <element signature="e#56#69#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding>
+            <element signature="e#39#50#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="324">
+          <caret line="21" column="55" lean-forward="false" selection-start-line="21" selection-start-column="27" selection-end-line="21" selection-end-column="55" />
+          <folding>
+            <element signature="e#55#70#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/scripts/apply_ucn.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2790">
+          <caret line="158" column="22" lean-forward="false" selection-start-line="158" selection-start-column="22" selection-end-line="158" selection-end-column="22" />
+          <folding>
+            <element signature="e#56#69#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
@@ -528,7 +597,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="270">
           <caret line="15" column="79" lean-forward="false" selection-start-line="15" selection-start-column="5" selection-end-line="15" selection-end-column="79" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -536,7 +604,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="291">
           <caret line="31" column="53" lean-forward="false" selection-start-line="31" selection-start-column="53" selection-end-line="31" selection-end-column="53" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -544,9 +611,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="414">
           <caret line="23" column="0" lean-forward="true" selection-start-line="23" selection-start-column="0" selection-end-line="23" selection-end-column="0" />
-          <folding>
-            <element signature="e#48#60#0" expanded="false" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -554,15 +618,12 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="348">
           <caret line="112" column="55" lean-forward="true" selection-start-line="112" selection-start-column="55" selection-end-line="130" selection-end-column="0" />
-          <folding>
-            <marker date="1545690547935" expanded="true" signature="4298:4897" ph="..." />
-          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/scripts/apply_ucn.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1356">
+        <state relative-caret-position="2844">
           <caret line="158" column="22" lean-forward="false" selection-start-line="158" selection-start-column="22" selection-end-line="158" selection-end-column="22" />
           <folding>
             <element signature="e#56#69#0" expanded="true" />
@@ -572,7 +633,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/scripts/train_ucn.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="324">
+        <state relative-caret-position="378">
           <caret line="21" column="55" lean-forward="false" selection-start-line="21" selection-start-column="27" selection-end-line="21" selection-end-column="55" />
           <folding>
             <element signature="e#55#70#0" expanded="true" />
@@ -582,8 +643,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/module_4/ML_Short_Course_Module_4_Interpretation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="615">
-          <caret line="3996" column="54" lean-forward="true" selection-start-line="3996" selection-start-column="54" selection-end-line="3996" selection-end-column="54" />
+        <state relative-caret-position="287">
+          <caret line="3993" column="0" lean-forward="true" selection-start-line="3993" selection-start-column="0" selection-end-line="3993" selection-end-column="0" />
           <folding>
             <element signature="e#39#50#0" expanded="true" />
           </folding>
@@ -619,7 +680,7 @@
       </state>
       <state key="GlobalLibrariesConfigurable.UI">
         <settings>
-          <last-edited>Python 3.6.7 (~/anaconda3_short_course/bin/python3.6) interpreter library</last-edited>
+          <last-edited>Python 2.7 interpreter library</last-edited>
           <splitter-proportions>
             <option name="proportions">
               <list>
@@ -631,7 +692,7 @@
       </state>
       <state key="JdkListConfigurable.UI">
         <settings>
-          <last-edited>Python 3.6.7 (~/anaconda3_short_course/bin/python3.6)</last-edited>
+          <last-edited>Python 2.7</last-edited>
           <splitter-proportions>
             <option name="proportions">
               <list>
