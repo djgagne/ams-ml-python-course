@@ -106,3 +106,4 @@ venv.bak/
 # Ryan's shit.
 figures/
 slurm/
+.idea/
