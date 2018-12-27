@@ -300,7 +300,7 @@ def _run(input_ucn_file_name, input_image_dir_name, first_date_string,
         test_image_matrix=test_image_matrix,
         image_normalization_dict=cnn_metadata_dict[
             short_course.NORMALIZATION_DICT_KEY],
-        predictor_names=cnn_metadata_dict[short_course.PREDICTOR_NAMES_KEY],
+        predictor_names=image_dict[short_course.PREDICTOR_NAMES_KEY],
         cnn_model_object=cnn_model_object,
         cnn_feature_layer_name=short_course.get_cnn_flatten_layer(
             cnn_model_object),
