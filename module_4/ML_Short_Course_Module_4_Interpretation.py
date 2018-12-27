@@ -10,7 +10,6 @@ import pickle
 import time
 import calendar
 import numpy
-import pandas
 import netCDF4
 import keras
 from keras import backend as K
