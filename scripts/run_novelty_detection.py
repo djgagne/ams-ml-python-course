@@ -22,7 +22,7 @@ FIRST_DATE_ARG_NAME = 'first_date_string'
 LAST_DATE_ARG_NAME = 'last_date_string'
 NUM_BASELINE_EX_ARG_NAME = 'num_baseline_examples'
 NUM_TEST_EX_ARG_NAME = 'num_test_examples'
-NUM_SVD_MODES_ARG_NAME = 'num_svd_modes_to_keep'
+PERCENT_VARIANCE_ARG_NAME = 'percent_svd_variance_to_keep'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 UCN_FILE_HELP_STRING = (
@@ -55,9 +55,9 @@ NUM_TEST_EX_HELP_STRING = (
     'by their novelty with respect to baseline examples.'
 ).format(NUM_TEST_EX_ARG_NAME, FIRST_DATE_ARG_NAME, LAST_DATE_ARG_NAME)
 
-NUM_SVD_MODES_HELP_STRING = (
-    'Number of modes (top eigenvectors) to retain in the SVD (singular-value '
-    'decomposition) model.')
+PERCENT_VARIANCE_HELP_STRING = (
+    'Percent of variance to retain in the SVD (singular-value decomposition) '
+    'model.  This determines how many modes (eigenvectors) are kept.')
 
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory.  The dictionary created by '
@@ -70,6 +70,7 @@ DEFAULT_IMAGE_DIR_NAME = (
 )
 DEFAULT_NUM_BASELINE_EXAMPLES = 100
 DEFAULT_NUM_TEST_EXAMPLES = 100
+DEFAULT_PCT_VARIANCE_TO_KEEP = 97.5
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
@@ -95,8 +96,8 @@ INPUT_ARG_PARSER.add_argument(
     default=DEFAULT_NUM_TEST_EXAMPLES, help=NUM_TEST_EX_HELP_STRING)
 
 INPUT_ARG_PARSER.add_argument(
-    '--' + NUM_SVD_MODES_ARG_NAME, type=int, required=True,
-    help=NUM_SVD_MODES_HELP_STRING)
+    '--' + PERCENT_VARIANCE_ARG_NAME, type=float, required=False,
+    default=DEFAULT_PCT_VARIANCE_TO_KEEP, help=PERCENT_VARIANCE_HELP_STRING)
 
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -205,7 +206,7 @@ def _plot_novelty_detection(image_dict, novelty_dict, test_index,
     this_figure_object.suptitle(this_title_string)
 
     this_file_name = (
-        '{0:s}/upconv_svd_images/upconv_svd_image{1:04d}.jpg'
+        '{0:s}/novelty_images/novelty_image{1:04d}.jpg'
     ).format(top_output_dir_name, test_index)
     short_course._create_directory(file_name=this_file_name)
 
@@ -216,7 +217,7 @@ def _plot_novelty_detection(image_dict, novelty_dict, test_index,
 
 def _run(input_ucn_file_name, input_image_dir_name, first_date_string,
          last_date_string, num_baseline_examples, num_test_examples,
-         num_svd_modes_to_keep, top_output_dir_name):
+         percent_svd_variance_to_keep, top_output_dir_name):
     """Runs novelty detection.
 
     This is effectively the main method.
@@ -227,7 +228,7 @@ def _run(input_ucn_file_name, input_image_dir_name, first_date_string,
     :param last_date_string: Same.
     :param num_baseline_examples: Same.
     :param num_test_examples: Same.
-    :param num_svd_modes_to_keep: Same.
+    :param percent_svd_variance_to_keep: Same.
     :param top_output_dir_name: Same.
     """
 
@@ -269,7 +270,9 @@ def _run(input_ucn_file_name, input_image_dir_name, first_date_string,
         [numpy.max(target_matrix_s01[i, ...]) for i in range(num_examples)]
     )
 
-    test_indices = numpy.argsort(-1 * max_target_by_example_s01)[:100]
+    test_indices = numpy.argsort(
+        -1 * max_target_by_example_s01
+    )[:num_test_examples]
 
     # test_storm_ids = numpy.round(
     #     image_dict[short_course.STORM_IDS_KEY][test_indices]
@@ -306,7 +309,7 @@ def _run(input_ucn_file_name, input_image_dir_name, first_date_string,
             cnn_model_object),
         ucn_model_object=ucn_model_object,
         num_novel_test_images=num_test_examples,
-        num_svd_modes_to_keep=num_svd_modes_to_keep)
+        percent_svd_variance_to_keep=percent_svd_variance_to_keep)
     print(SEPARATOR_STRING)
 
     novelty_file_name = '{0:s}/novelty_results.p'.format(top_output_dir_name)
@@ -332,6 +335,7 @@ if __name__ == '__main__':
         num_baseline_examples=getattr(
             INPUT_ARG_OBJECT, NUM_BASELINE_EX_ARG_NAME),
         num_test_examples=getattr(INPUT_ARG_OBJECT, NUM_TEST_EX_ARG_NAME),
-        num_svd_modes_to_keep=getattr(INPUT_ARG_OBJECT, NUM_SVD_MODES_ARG_NAME),
+        percent_svd_variance_to_keep=getattr(
+            INPUT_ARG_OBJECT, PERCENT_VARIANCE_ARG_NAME),
         top_output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

@@ -3526,7 +3526,8 @@ def _normalize_features(feature_matrix, feature_means=None,
     return feature_matrix, feature_means, feature_standard_deviations
 
 
-def _fit_svd(baseline_feature_matrix, test_feature_matrix, num_modes_to_keep):
+def _fit_svd(baseline_feature_matrix, test_feature_matrix,
+             percent_variance_to_keep):
     """Fits SVD (singular-value decomposition) model.
 
     B = number of baseline examples (storm objects)
@@ -3542,8 +3543,9 @@ def _fit_svd(baseline_feature_matrix, test_feature_matrix, num_modes_to_keep):
 
     :param baseline_feature_matrix: B-by-Z numpy array of features.
     :param test_feature_matrix: T-by-Z numpy array of features.
-    :param num_modes_to_keep: Number of modes (top eigenvectors) to use in SVD
-        model.  This is K in the above discussion.
+    :param percent_variance_to_keep: Percentage of variance to keep.  Determines
+        how many eigenvectors (K in the above discussion) will be used in the
+        SVD model.
     :return: svd_dictionary: Dictionary with the following keys.
     svd_dictionary['eof_matrix']: Z-by-K numpy array, where each column is an
         EOF (empirical orthogonal function).
@@ -3564,7 +3566,21 @@ def _fit_svd(baseline_feature_matrix, test_feature_matrix, num_modes_to_keep):
     baseline_feature_matrix = combined_feature_matrix[
         :num_baseline_examples, ...]
 
-    eof_matrix = numpy.linalg.svd(baseline_feature_matrix)[-1]
+    eigenvalues, eof_matrix = numpy.linalg.svd(baseline_feature_matrix)[1:]
+    eigenvalues = eigenvalues ** 2
+
+    explained_variances = eigenvalues / numpy.sum(eigenvalues)
+    cumulative_explained_variances = numpy.cumsum(explained_variances)
+
+    fraction_of_variance_to_keep = 0.01 * percent_variance_to_keep
+    num_modes_to_keep = 1 + numpy.where(
+        cumulative_explained_variances >= fraction_of_variance_to_keep
+    )[0][0]
+
+    print(
+        ('Number of modes required to explain {0:f}% of variance: {1:d}'
+         ).format(percent_variance_to_keep, num_modes_to_keep)
+    )
 
     return {
         EOF_MATRIX_KEY: numpy.transpose(eof_matrix)[..., :num_modes_to_keep],
@@ -3606,7 +3622,8 @@ def _apply_svd(feature_vector, svd_dictionary):
 def do_novelty_detection(
         baseline_image_matrix, test_image_matrix, image_normalization_dict,
         predictor_names, cnn_model_object, cnn_feature_layer_name,
-        ucn_model_object, num_novel_test_images, num_svd_modes_to_keep=10):
+        ucn_model_object, num_novel_test_images,
+        percent_svd_variance_to_keep=97.5):
     """Does novelty detection.
 
     Specifically, this method follows the procedure in Wagstaff et al. (2018)
@@ -3635,8 +3652,7 @@ def do_novelty_detection(
         `keras.models.Model`).  Will be used to turn scalar features into
         images.
     :param num_novel_test_images: Number of novel test images to find.
-    :param num_svd_modes_to_keep: Number of modes to keep in SVD (singular-value
-        decomposition) of scalar features.  See `fit_svd` for more details.
+    :param percent_svd_variance_to_keep: See doc for `_fit_svd`.
 
     :return: novelty_dict: Dictionary with the following keys.  In the following
         discussion, Q = number of novel test images found.
@@ -3702,7 +3718,7 @@ def do_novelty_detection(
         svd_dictionary = _fit_svd(
             baseline_feature_matrix=this_baseline_feature_matrix,
             test_feature_matrix=this_test_feature_matrix,
-            num_modes_to_keep=num_svd_modes_to_keep)
+            percent_variance_to_keep=percent_svd_variance_to_keep)
 
         svd_errors = numpy.full(num_test_examples, numpy.nan)
         test_feature_matrix_svd = numpy.full(
