@@ -22,13 +22,13 @@ from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
 
 # Directories.
-MAIN_DIRECTORY_NAME = '/home/ryan.lagerquist/Downloads/ams2019_short_course'
+# MODULE4_DIR_NAME = '.'
+# SHORT_COURSE_DIR_NAME = '..'
 
-DEFAULT_IMAGE_DIR_NAME = '{0:s}/track_data_ncar_ams_3km_nc_small'.format(
-    MAIN_DIRECTORY_NAME)
-DEFAULT_FEATURE_DIR_NAME = '{0:s}/track_data_ncar_ams_3km_csv_small'.format(
-    MAIN_DIRECTORY_NAME)
-DEFAULT_OUTPUT_DIR_NAME = MAIN_DIRECTORY_NAME + ''
+MODULE4_DIR_NAME = os.path.dirname(__file__)
+SHORT_COURSE_DIR_NAME = os.path.dirname(MODULE4_DIR_NAME)
+DEFAULT_IMAGE_DIR_NAME = '{0:s}/data/track_data_ncar_ams_3km_nc_small'.format(
+    SHORT_COURSE_DIR_NAME)
 
 # Plotting constants.
 FIGURE_WIDTH_INCHES = 15
@@ -1592,7 +1592,7 @@ def train_cnn_example(
     :param binarization_threshold: Same.
     """
 
-    cnn_file_name = '{0:s}/cnn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
+    cnn_file_name = '{0:s}/cnn_model.h5'.format(MODULE4_DIR_NAME)
     cnn_metadata_dict = train_cnn(
         cnn_model_object=cnn_model_object,
         training_file_names=training_file_names,
@@ -1754,12 +1754,12 @@ def evaluate_cnn_example(validation_image_dict):
     """
 
     cnn_file_name = '{0:s}/pretrained_cnn/pretrained_cnn.h5'.format(
-        DEFAULT_OUTPUT_DIR_NAME)
+        MODULE4_DIR_NAME)
     cnn_metafile_name = find_model_metafile(model_file_name=cnn_file_name)
 
     cnn_model_object = read_keras_model(cnn_file_name)
     cnn_metadata_dict = read_model_metadata(cnn_metafile_name)
-    validation_dir_name = '{0:s}/validation'.format(DEFAULT_OUTPUT_DIR_NAME)
+    validation_dir_name = '{0:s}/validation'.format(MODULE4_DIR_NAME)
 
     evaluate_cnn(
         cnn_model_object=cnn_model_object, image_dict=validation_image_dict,
@@ -1949,8 +1949,7 @@ def permutation_test_example(cnn_model_object, validation_image_dict,
     :param cnn_metadata_dict: Same.
     """
 
-    permutation_dir_name = '{0:s}/permutation_test'.format(
-        DEFAULT_OUTPUT_DIR_NAME)
+    permutation_dir_name = '{0:s}/permutation_test'.format(MODULE4_DIR_NAME)
     main_permutation_file_name = '{0:s}/permutation_results.p'.format(
         permutation_dir_name)
 
@@ -3343,7 +3342,7 @@ def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
     validation_file_names = find_many_image_files(
         first_date_string='20150101', last_date_string='20151231')
 
-    ucn_file_name = '{0:s}/ucn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
+    ucn_file_name = '{0:s}/ucn_model.h5'.format(MODULE4_DIR_NAME)
     ucn_metadata_dict = train_ucn(
         ucn_model_object=ucn_model_object,
         training_file_names=training_file_names,
@@ -3368,7 +3367,7 @@ def apply_ucn_example1(
     """
 
     ucn_file_name = '{0:s}/pretrained_cnn/pretrained_ucn.h5'.format(
-        DEFAULT_OUTPUT_DIR_NAME)
+        MODULE4_DIR_NAME)
     ucn_metafile_name = find_model_metafile(model_file_name=ucn_file_name)
 
     ucn_model_object = read_keras_model(ucn_file_name)
