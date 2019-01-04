@@ -3724,6 +3724,7 @@ def do_novelty_detection(
             test_feature_matrix.shape, numpy.nan)
 
         for i in range(num_test_examples):
+            print(i)
             if i in novel_indices:
                 continue
 
