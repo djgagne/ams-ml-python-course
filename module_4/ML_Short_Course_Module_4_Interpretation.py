@@ -10,7 +10,6 @@ import pickle
 import time
 import calendar
 import numpy
-import pandas
 import netCDF4
 import keras
 from keras import backend as K
@@ -23,13 +22,13 @@ from module_4 import performance_diagrams
 from module_4 import attributes_diagrams
 
 # Directories.
-MAIN_DIRECTORY_NAME = '/home/ryan.lagerquist/Downloads/ams2019_short_course'
+# MODULE4_DIR_NAME = '.'
+# SHORT_COURSE_DIR_NAME = '..'
 
-DEFAULT_IMAGE_DIR_NAME = '{0:s}/track_data_ncar_ams_3km_nc_small'.format(
-    MAIN_DIRECTORY_NAME)
-DEFAULT_FEATURE_DIR_NAME = '{0:s}/track_data_ncar_ams_3km_csv_small'.format(
-    MAIN_DIRECTORY_NAME)
-DEFAULT_OUTPUT_DIR_NAME = MAIN_DIRECTORY_NAME + ''
+MODULE4_DIR_NAME = os.path.dirname(__file__)
+SHORT_COURSE_DIR_NAME = os.path.dirname(MODULE4_DIR_NAME)
+DEFAULT_IMAGE_DIR_NAME = '{0:s}/data/track_data_ncar_ams_3km_nc_small'.format(
+    SHORT_COURSE_DIR_NAME)
 
 # Plotting constants.
 FIGURE_WIDTH_INCHES = 15
@@ -1593,7 +1592,7 @@ def train_cnn_example(
     :param binarization_threshold: Same.
     """
 
-    cnn_file_name = '{0:s}/cnn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
+    cnn_file_name = '{0:s}/cnn_model.h5'.format(MODULE4_DIR_NAME)
     cnn_metadata_dict = train_cnn(
         cnn_model_object=cnn_model_object,
         training_file_names=training_file_names,
@@ -1755,12 +1754,12 @@ def evaluate_cnn_example(validation_image_dict):
     """
 
     cnn_file_name = '{0:s}/pretrained_cnn/pretrained_cnn.h5'.format(
-        DEFAULT_OUTPUT_DIR_NAME)
+        MODULE4_DIR_NAME)
     cnn_metafile_name = find_model_metafile(model_file_name=cnn_file_name)
 
     cnn_model_object = read_keras_model(cnn_file_name)
     cnn_metadata_dict = read_model_metadata(cnn_metafile_name)
-    validation_dir_name = '{0:s}/validation'.format(DEFAULT_OUTPUT_DIR_NAME)
+    validation_dir_name = '{0:s}/validation'.format(MODULE4_DIR_NAME)
 
     evaluate_cnn(
         cnn_model_object=cnn_model_object, image_dict=validation_image_dict,
@@ -1950,8 +1949,7 @@ def permutation_test_example(cnn_model_object, validation_image_dict,
     :param cnn_metadata_dict: Same.
     """
 
-    permutation_dir_name = '{0:s}/permutation_test'.format(
-        DEFAULT_OUTPUT_DIR_NAME)
+    permutation_dir_name = '{0:s}/permutation_test'.format(MODULE4_DIR_NAME)
     main_permutation_file_name = '{0:s}/permutation_results.p'.format(
         permutation_dir_name)
 
@@ -3344,7 +3342,7 @@ def train_ucn_example(ucn_model_object, training_file_names, normalization_dict,
     validation_file_names = find_many_image_files(
         first_date_string='20150101', last_date_string='20151231')
 
-    ucn_file_name = '{0:s}/ucn_model.h5'.format(DEFAULT_OUTPUT_DIR_NAME)
+    ucn_file_name = '{0:s}/ucn_model.h5'.format(MODULE4_DIR_NAME)
     ucn_metadata_dict = train_ucn(
         ucn_model_object=ucn_model_object,
         training_file_names=training_file_names,
@@ -3369,7 +3367,7 @@ def apply_ucn_example1(
     """
 
     ucn_file_name = '{0:s}/pretrained_cnn/pretrained_ucn.h5'.format(
-        DEFAULT_OUTPUT_DIR_NAME)
+        MODULE4_DIR_NAME)
     ucn_metafile_name = find_model_metafile(model_file_name=ucn_file_name)
 
     ucn_model_object = read_keras_model(ucn_file_name)
@@ -3527,7 +3525,8 @@ def _normalize_features(feature_matrix, feature_means=None,
     return feature_matrix, feature_means, feature_standard_deviations
 
 
-def _fit_svd(baseline_feature_matrix, test_feature_matrix, num_modes_to_keep):
+def _fit_svd(baseline_feature_matrix, test_feature_matrix,
+             percent_variance_to_keep):
     """Fits SVD (singular-value decomposition) model.
 
     B = number of baseline examples (storm objects)
@@ -3543,8 +3542,9 @@ def _fit_svd(baseline_feature_matrix, test_feature_matrix, num_modes_to_keep):
 
     :param baseline_feature_matrix: B-by-Z numpy array of features.
     :param test_feature_matrix: T-by-Z numpy array of features.
-    :param num_modes_to_keep: Number of modes (top eigenvectors) to use in SVD
-        model.  This is K in the above discussion.
+    :param percent_variance_to_keep: Percentage of variance to keep.  Determines
+        how many eigenvectors (K in the above discussion) will be used in the
+        SVD model.
     :return: svd_dictionary: Dictionary with the following keys.
     svd_dictionary['eof_matrix']: Z-by-K numpy array, where each column is an
         EOF (empirical orthogonal function).
@@ -3565,7 +3565,21 @@ def _fit_svd(baseline_feature_matrix, test_feature_matrix, num_modes_to_keep):
     baseline_feature_matrix = combined_feature_matrix[
         :num_baseline_examples, ...]
 
-    eof_matrix = numpy.linalg.svd(baseline_feature_matrix)[-1]
+    eigenvalues, eof_matrix = numpy.linalg.svd(baseline_feature_matrix)[1:]
+    eigenvalues = eigenvalues ** 2
+
+    explained_variances = eigenvalues / numpy.sum(eigenvalues)
+    cumulative_explained_variances = numpy.cumsum(explained_variances)
+
+    fraction_of_variance_to_keep = 0.01 * percent_variance_to_keep
+    num_modes_to_keep = 1 + numpy.where(
+        cumulative_explained_variances >= fraction_of_variance_to_keep
+    )[0][0]
+
+    print(
+        ('Number of modes required to explain {0:f}% of variance: {1:d}'
+         ).format(percent_variance_to_keep, num_modes_to_keep)
+    )
 
     return {
         EOF_MATRIX_KEY: numpy.transpose(eof_matrix)[..., :num_modes_to_keep],
@@ -3607,7 +3621,8 @@ def _apply_svd(feature_vector, svd_dictionary):
 def do_novelty_detection(
         baseline_image_matrix, test_image_matrix, image_normalization_dict,
         predictor_names, cnn_model_object, cnn_feature_layer_name,
-        ucn_model_object, num_novel_test_images, num_svd_modes_to_keep=10):
+        ucn_model_object, num_novel_test_images,
+        percent_svd_variance_to_keep=97.5):
     """Does novelty detection.
 
     Specifically, this method follows the procedure in Wagstaff et al. (2018)
@@ -3636,8 +3651,7 @@ def do_novelty_detection(
         `keras.models.Model`).  Will be used to turn scalar features into
         images.
     :param num_novel_test_images: Number of novel test images to find.
-    :param num_svd_modes_to_keep: Number of modes to keep in SVD (singular-value
-        decomposition) of scalar features.  See `fit_svd` for more details.
+    :param percent_svd_variance_to_keep: See doc for `_fit_svd`.
 
     :return: novelty_dict: Dictionary with the following keys.  In the following
         discussion, Q = number of novel test images found.
@@ -3703,7 +3717,7 @@ def do_novelty_detection(
         svd_dictionary = _fit_svd(
             baseline_feature_matrix=this_baseline_feature_matrix,
             test_feature_matrix=this_test_feature_matrix,
-            num_modes_to_keep=num_svd_modes_to_keep)
+            percent_variance_to_keep=percent_svd_variance_to_keep)
 
         svd_errors = numpy.full(num_test_examples, numpy.nan)
         test_feature_matrix_svd = numpy.full(
