@@ -11,8 +11,10 @@ import time
 import calendar
 import numpy
 import netCDF4
+from cv2 import resize as cv2_resize
 import keras
 from keras import backend as K
+import tensorflow
 from sklearn.metrics import auc as scikit_learn_auc
 import matplotlib.colors
 import matplotlib.pyplot as pyplot
@@ -3987,3 +3989,400 @@ def plot_novelty_detection_example4(validation_image_dict, novelty_dict):
 
     plot_novelty_detection(image_dict=validation_image_dict,
                            novelty_dict=novelty_dict, test_index=3)
+
+
+def _normalize_tensor(input_tensor):
+    """Normalizes tensor by its L2 norm.
+
+    :param input_tensor: Unnormalized tensor.
+    :return: output_tensor: Normalized tensor.
+    """
+
+    rms_tensor = K.sqrt(K.mean(K.square(input_tensor)))
+    return input_tensor / (rms_tensor + K.epsilon())
+
+
+def _compute_gradients(loss_tensor, list_of_input_tensors):
+    """Computes gradient of each input tensor with respect to loss tensor.
+
+    :param loss_tensor: Loss tensor.
+    :param list_of_input_tensors: 1-D list of input tensors.
+    :return: list_of_gradient_tensors: 1-D list of gradient tensors.
+    """
+
+    list_of_gradient_tensors = tensorflow.gradients(
+        loss_tensor, list_of_input_tensors)
+
+    for i in range(len(list_of_gradient_tensors)):
+        if list_of_gradient_tensors[i] is not None:
+            continue
+
+        list_of_gradient_tensors[i] = tensorflow.zeros_like(
+            list_of_input_tensors[i])
+
+    return list_of_gradient_tensors
+
+
+def run_gradcam(model_object, input_matrix, target_class, conv_layer_name):
+    """Runs Grad-CAM.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param model_object: Trained instance of `keras.models.Model` or
+        `keras.models.Sequential`.  Grad-CAM will be run for this model.
+    :param input_matrix: numpy array containing one input example.  Array
+        dimensions must be the same as input dimensions for `model_object`.
+    :param target_class: Target class (integer from 0...[K - 1], where K =
+        number of classes).  The class-activation map (CAM) will be created for
+        this class.
+    :param conv_layer_name: Name of convolutional layer.  Neuron-importance
+        weights will be based on activations in this layer.
+    :return: class_activation_matrix: M-by-N numpy array of class activations.
+    """
+
+    # TODO(thunderhoser): Check input dimensions.
+
+    num_output_neurons = model_object.layers[-1].output.get_shape().as_list()[
+        -1]
+
+    if num_output_neurons == 1:
+        if target_class == 1:
+            loss_tensor = model_object.layers[-1].output[..., 0]
+        else:
+            loss_tensor = 1 - model_object.layers[-1].output[..., 0]
+    else:
+        loss_tensor = model_object.layers[-1].output[..., target_class]
+
+    # TODO(thunderhoser): Need post-activation values.
+    conv_layer_activation_tensor = model_object.get_layer(
+        name=conv_layer_name
+    ).output
+    gradient_tensor = _compute_gradients(
+        loss_tensor, [conv_layer_activation_tensor]
+    )[0]
+    gradient_tensor = _normalize_tensor(gradient_tensor)
+
+    gradient_function = K.function(
+        [model_object.input],
+        [conv_layer_activation_tensor, gradient_tensor]
+    )
+
+    conv_layer_activation_matrix, gradient_matrix = gradient_function(
+        [input_matrix])
+    conv_layer_activation_matrix = conv_layer_activation_matrix[0, ...]
+    gradient_matrix = gradient_matrix[0, ...]
+
+    weight_by_conv_filter = numpy.mean(gradient_matrix, axis=(0, 1))
+    class_activation_matrix = numpy.ones(conv_layer_activation_matrix.shape[:2])
+
+    num_conv_filters = len(weight_by_conv_filter)
+    for m in range(num_conv_filters):
+        class_activation_matrix += (
+            weight_by_conv_filter[m] * conv_layer_activation_matrix[..., m]
+        )
+
+    num_input_rows = input_matrix.shape[1]
+    num_input_columns = input_matrix.shape[2]
+    class_activation_matrix = cv2_resize(
+        class_activation_matrix, (num_input_rows, num_input_columns)
+    )
+
+    class_activation_matrix[class_activation_matrix < 0.] = 0.
+    denominator = numpy.maximum(numpy.max(class_activation_matrix), K.epsilon())
+    return class_activation_matrix / denominator
+
+
+def gradcam_example1(validation_image_dict, normalization_dict,
+                     cnn_model_object):
+    """Runs Grad-CAM for random example wrt positive-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    """
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    target_layer_names = [
+        'batch_normalization_1', 'batch_normalization_2',
+        'batch_normalization_3', 'batch_normalization_4'
+    ]
+
+    for this_layer_name in target_layer_names:
+        class_activation_matrix = run_gradcam(
+            model_object=cnn_model_object, input_matrix=predictor_matrix_norm,
+            target_class=1, conv_layer_name=this_layer_name)
+
+        temperature_index = predictor_names.index(TEMPERATURE_NAME)
+        min_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 1)
+        max_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 99)
+
+        wind_indices = numpy.array([
+            predictor_names.index(U_WIND_NAME),
+            predictor_names.index(V_WIND_NAME)
+        ], dtype=int)
+
+        max_colour_wind_speed_m_s01 = numpy.percentile(
+            numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+        figure_object, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+            predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+            min_colour_temp_kelvins=min_colour_temp_kelvins,
+            max_colour_temp_kelvins=max_colour_temp_kelvins,
+            max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+        dummy_saliency_matrix = numpy.expand_dims(
+            class_activation_matrix, axis=-1)
+        dummy_saliency_matrix = numpy.repeat(
+            dummy_saliency_matrix, repeats=4, axis=-1)
+
+        max_absolute_contour_level = numpy.percentile(
+            numpy.absolute(dummy_saliency_matrix), 99)
+        if max_absolute_contour_level == 0:
+            max_absolute_contour_level = 10.
+
+        contour_interval = max_absolute_contour_level / 10
+
+        plot_many_saliency_maps(
+            saliency_matrix=dummy_saliency_matrix,
+            axes_objects_2d_list=axes_objects_2d_list,
+            colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+            max_absolute_contour_level=max_absolute_contour_level,
+            contour_interval=contour_interval)
+
+        figure_object.suptitle(
+            'Class-activation map for layer "{0:s}"'.format(this_layer_name)
+        )
+        pyplot.show()
+
+
+def gradcam_example2(validation_image_dict, normalization_dict,
+                     cnn_model_object):
+    """Runs Grad-CAM for random example wrt negative-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    """
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][0, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    target_layer_names = [
+        'batch_normalization_1', 'batch_normalization_2',
+        'batch_normalization_3', 'batch_normalization_4'
+    ]
+
+    for this_layer_name in target_layer_names:
+        class_activation_matrix = run_gradcam(
+            model_object=cnn_model_object, input_matrix=predictor_matrix_norm,
+            target_class=0, conv_layer_name=this_layer_name)
+
+        temperature_index = predictor_names.index(TEMPERATURE_NAME)
+        min_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 1)
+        max_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 99)
+
+        wind_indices = numpy.array([
+            predictor_names.index(U_WIND_NAME),
+            predictor_names.index(V_WIND_NAME)
+        ], dtype=int)
+
+        max_colour_wind_speed_m_s01 = numpy.percentile(
+            numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+        figure_object, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+            predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+            min_colour_temp_kelvins=min_colour_temp_kelvins,
+            max_colour_temp_kelvins=max_colour_temp_kelvins,
+            max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+        dummy_saliency_matrix = numpy.expand_dims(
+            class_activation_matrix, axis=-1)
+        dummy_saliency_matrix = numpy.repeat(
+            dummy_saliency_matrix, repeats=4, axis=-1)
+
+        max_absolute_contour_level = numpy.percentile(
+            numpy.absolute(dummy_saliency_matrix), 99)
+        contour_interval = max_absolute_contour_level / 10
+
+        plot_many_saliency_maps(
+            saliency_matrix=dummy_saliency_matrix,
+            axes_objects_2d_list=axes_objects_2d_list,
+            colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+            max_absolute_contour_level=max_absolute_contour_level,
+            contour_interval=contour_interval)
+
+        figure_object.suptitle(
+            'Class-activation map for layer "{0:s}"'.format(this_layer_name)
+        )
+        pyplot.show()
+
+
+def gradcam_example3(validation_image_dict, normalization_dict,
+                     cnn_model_object):
+    """Runs Grad-CAM for extreme example wrt positive-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    target_layer_names = [
+        'batch_normalization_1', 'batch_normalization_2',
+        'batch_normalization_3', 'batch_normalization_4'
+    ]
+
+    for this_layer_name in target_layer_names:
+        class_activation_matrix = run_gradcam(
+            model_object=cnn_model_object, input_matrix=predictor_matrix_norm,
+            target_class=1, conv_layer_name=this_layer_name)
+
+        temperature_index = predictor_names.index(TEMPERATURE_NAME)
+        min_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 1)
+        max_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 99)
+
+        wind_indices = numpy.array([
+            predictor_names.index(U_WIND_NAME),
+            predictor_names.index(V_WIND_NAME)
+        ], dtype=int)
+
+        max_colour_wind_speed_m_s01 = numpy.percentile(
+            numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+        figure_object, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+            predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+            min_colour_temp_kelvins=min_colour_temp_kelvins,
+            max_colour_temp_kelvins=max_colour_temp_kelvins,
+            max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+        dummy_saliency_matrix = numpy.expand_dims(
+            class_activation_matrix, axis=-1)
+        dummy_saliency_matrix = numpy.repeat(
+            dummy_saliency_matrix, repeats=4, axis=-1)
+
+        max_absolute_contour_level = numpy.percentile(
+            numpy.absolute(dummy_saliency_matrix), 99)
+        contour_interval = max_absolute_contour_level / 10
+
+        plot_many_saliency_maps(
+            saliency_matrix=dummy_saliency_matrix,
+            axes_objects_2d_list=axes_objects_2d_list,
+            colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+            max_absolute_contour_level=max_absolute_contour_level,
+            contour_interval=contour_interval)
+
+        figure_object.suptitle(
+            'Class-activation map for layer "{0:s}"'.format(this_layer_name)
+        )
+        pyplot.show()
+
+
+def gradcam_example4(validation_image_dict, normalization_dict,
+                     cnn_model_object):
+    """Runs Grad-CAM for extreme example wrt negative-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    target_layer_names = [
+        'batch_normalization_1', 'batch_normalization_2',
+        'batch_normalization_3', 'batch_normalization_4'
+    ]
+
+    for this_layer_name in target_layer_names:
+        class_activation_matrix = run_gradcam(
+            model_object=cnn_model_object, input_matrix=predictor_matrix_norm,
+            target_class=0, conv_layer_name=this_layer_name)
+
+        temperature_index = predictor_names.index(TEMPERATURE_NAME)
+        min_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 1)
+        max_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 99)
+
+        wind_indices = numpy.array([
+            predictor_names.index(U_WIND_NAME),
+            predictor_names.index(V_WIND_NAME)
+        ], dtype=int)
+
+        max_colour_wind_speed_m_s01 = numpy.percentile(
+            numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+        figure_object, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+            predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+            min_colour_temp_kelvins=min_colour_temp_kelvins,
+            max_colour_temp_kelvins=max_colour_temp_kelvins,
+            max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+        dummy_saliency_matrix = numpy.expand_dims(
+            class_activation_matrix, axis=-1)
+        dummy_saliency_matrix = numpy.repeat(
+            dummy_saliency_matrix, repeats=4, axis=-1)
+
+        max_absolute_contour_level = numpy.percentile(
+            numpy.absolute(dummy_saliency_matrix), 99)
+        contour_interval = max_absolute_contour_level / 10
+
+        plot_many_saliency_maps(
+            saliency_matrix=dummy_saliency_matrix,
+            axes_objects_2d_list=axes_objects_2d_list,
+            colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+            max_absolute_contour_level=max_absolute_contour_level,
+            contour_interval=contour_interval)
+
+        figure_object.suptitle(
+            'Class-activation map for layer "{0:s}"'.format(this_layer_name)
+        )
+        pyplot.show()
