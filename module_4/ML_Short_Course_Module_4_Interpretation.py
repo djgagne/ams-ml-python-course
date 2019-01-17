@@ -11,10 +11,12 @@ import time
 import calendar
 import numpy
 import netCDF4
-from cv2 import resize as cv2_resize
+from scipy.interpolate import (
+    UnivariateSpline, RectBivariateSpline, RegularGridInterpolator)
 import keras
 from keras import backend as K
 import tensorflow
+from tensorflow.python.framework import ops as tensorflow_ops
 from sklearn.metrics import auc as scikit_learn_auc
 import matplotlib.colors
 import matplotlib.pyplot as pyplot
@@ -203,6 +205,8 @@ MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
 
 DATE_FORMAT = '%Y%m%d'
 DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
+
+BACKPROP_FUNCTION_NAME = 'GuidedBackProp'
 
 MIN_PROBABILITY = 1e-15
 MAX_PROBABILITY = 1. - MIN_PROBABILITY
@@ -3991,17 +3995,6 @@ def plot_novelty_detection_example4(validation_image_dict, novelty_dict):
                            novelty_dict=novelty_dict, test_index=3)
 
 
-def _normalize_tensor(input_tensor):
-    """Normalizes tensor by its L2 norm.
-
-    :param input_tensor: Unnormalized tensor.
-    :return: output_tensor: Normalized tensor.
-    """
-
-    rms_tensor = K.sqrt(K.mean(K.square(input_tensor)))
-    return input_tensor / (rms_tensor + K.epsilon())
-
-
 def _compute_gradients(loss_tensor, list_of_input_tensors):
     """Computes gradient of each input tensor with respect to loss tensor.
 
@@ -4023,28 +4016,107 @@ def _compute_gradients(loss_tensor, list_of_input_tensors):
     return list_of_gradient_tensors
 
 
-def run_gradcam(model_object, input_matrix, target_class, conv_layer_name):
-    """Runs Grad-CAM.
+def _normalize_tensor(input_tensor):
+    """Normalizes tensor by its L2 norm.
 
-    M = number of rows in grid
-    N = number of columns in grid
-
-    :param model_object: Trained instance of `keras.models.Model` or
-        `keras.models.Sequential`.  Grad-CAM will be run for this model.
-    :param input_matrix: numpy array containing one input example.  Array
-        dimensions must be the same as input dimensions for `model_object`.
-    :param target_class: Target class (integer from 0...[K - 1], where K =
-        number of classes).  The class-activation map (CAM) will be created for
-        this class.
-    :param conv_layer_name: Name of convolutional layer.  Neuron-importance
-        weights will be based on activations in this layer.
-    :return: class_activation_matrix: M-by-N numpy array of class activations.
+    :param input_tensor: Unnormalized tensor.
+    :return: output_tensor: Normalized tensor.
     """
 
-    # TODO(thunderhoser): Check input dimensions.
+    rms_tensor = K.sqrt(K.mean(K.square(input_tensor)))
+    return input_tensor / (rms_tensor + K.epsilon())
 
-    num_output_neurons = model_object.layers[-1].output.get_shape().as_list()[
-        -1]
+
+def _upsample_cam(class_activation_matrix, new_dimensions):
+    """Upsamples class-activation matrix (CAM).
+
+    CAM may be 1-D, 2-D, or 3-D.
+
+    :param class_activation_matrix: numpy array containing 1-D, 2-D, or 3-D
+        class-activation matrix.
+    :param new_dimensions: numpy array of new dimensions.  If matrix is
+        {1D, 2D, 3D}, this must be a length-{1, 2, 3} array, respectively.
+    :return: class_activation_matrix: Upsampled version of input.
+    """
+
+    num_rows_new = new_dimensions[0]
+    row_indices_new = numpy.linspace(
+        1, num_rows_new, num=num_rows_new, dtype=float)
+    row_indices_orig = numpy.linspace(
+        1, num_rows_new, num=class_activation_matrix.shape[0], dtype=float)
+
+    if len(new_dimensions) == 1:
+        interp_object = UnivariateSpline(
+            x=row_indices_orig, y=numpy.ravel(class_activation_matrix),
+            k=1, s=0)
+
+        return interp_object(row_indices_new)
+
+    num_columns_new = new_dimensions[1]
+    column_indices_new = numpy.linspace(
+        1, num_columns_new, num=num_columns_new, dtype=float)
+    column_indices_orig = numpy.linspace(
+        1, num_columns_new, num=class_activation_matrix.shape[1],
+        dtype=float)
+
+    if len(new_dimensions) == 2:
+        interp_object = RectBivariateSpline(
+            x=row_indices_orig, y=column_indices_orig,
+            z=class_activation_matrix, kx=1, ky=1, s=0)
+
+        return interp_object(x=row_indices_new, y=column_indices_new, grid=True)
+
+    num_heights_new = new_dimensions[2]
+    height_indices_new = numpy.linspace(
+        1, num_heights_new, num=num_heights_new, dtype=float)
+    height_indices_orig = numpy.linspace(
+        1, num_heights_new, num=class_activation_matrix.shape[2],
+        dtype=float)
+
+    interp_object = RegularGridInterpolator(
+        points=(row_indices_orig, column_indices_orig, height_indices_orig),
+        values=class_activation_matrix, method='linear')
+
+    row_index_matrix, column_index_matrix, height_index_matrix = (
+        numpy.meshgrid(row_indices_new, column_indices_new, height_indices_new)
+    )
+    query_point_matrix = numpy.stack(
+        (row_index_matrix, column_index_matrix, height_index_matrix), axis=-1)
+
+    return interp_object(query_point_matrix)
+
+
+def run_gradcam(model_object, list_of_input_matrices, target_class,
+                target_layer_name):
+    """Runs Grad-CAM.
+
+    T = number of input tensors to the model
+
+    :param model_object: Trained instance of `keras.models.Model` or
+        `keras.models.Sequential`.
+    :param list_of_input_matrices: length-T list of numpy arrays, containing
+        only one example (storm object).  list_of_input_matrices[i] must have
+        the same dimensions as the [i]th input tensor to the model.
+    :param target_class: Activation maps will be created for this class.  Must
+        be an integer in 0...(K - 1), where K = number of classes.
+    :param target_layer_name: Name of target layer.  Neuron-importance weights
+        will be based on activations in this layer.
+    :return: class_activation_matrix: Class-activation matrix.  Dimensions of
+        this numpy array will be the spatial dimensions of whichever input
+        tensor feeds into the target layer.  For example, if the given input
+        tensor is 2-dimensional with M rows and N columns, this array will be
+        M x N.
+    """
+
+    # Check input args.
+    for q in range(len(list_of_input_matrices)):
+        if list_of_input_matrices[q].shape[0] != 1:
+            list_of_input_matrices[q] = numpy.expand_dims(
+                list_of_input_matrices[q], axis=0)
+
+    # Create loss tensor.
+    output_layer_object = model_object.layers[-1].output
+    num_output_neurons = output_layer_object.get_shape().as_list()[-1]
 
     if num_output_neurons == 1:
         if target_class == 1:
@@ -4054,39 +4126,47 @@ def run_gradcam(model_object, input_matrix, target_class, conv_layer_name):
     else:
         loss_tensor = model_object.layers[-1].output[..., target_class]
 
-    # TODO(thunderhoser): Need post-activation values.
-    conv_layer_activation_tensor = model_object.get_layer(
-        name=conv_layer_name
+    # Create gradient function.
+    target_layer_activation_tensor = model_object.get_layer(
+        name=target_layer_name
     ).output
+
     gradient_tensor = _compute_gradients(
-        loss_tensor, [conv_layer_activation_tensor]
+        loss_tensor, [target_layer_activation_tensor]
     )[0]
     gradient_tensor = _normalize_tensor(gradient_tensor)
 
+    if isinstance(model_object.input, list):
+        list_of_input_tensors = model_object.input
+    else:
+        list_of_input_tensors = [model_object.input]
+
     gradient_function = K.function(
-        [model_object.input],
-        [conv_layer_activation_tensor, gradient_tensor]
+        list_of_input_tensors, [target_layer_activation_tensor, gradient_tensor]
     )
 
-    conv_layer_activation_matrix, gradient_matrix = gradient_function(
-        [input_matrix])
-    conv_layer_activation_matrix = conv_layer_activation_matrix[0, ...]
+    # Evaluate gradient function.
+    target_layer_activation_matrix, gradient_matrix = gradient_function(
+        list_of_input_matrices)
+    target_layer_activation_matrix = target_layer_activation_matrix[0, ...]
     gradient_matrix = gradient_matrix[0, ...]
 
-    weight_by_conv_filter = numpy.mean(gradient_matrix, axis=(0, 1))
-    class_activation_matrix = numpy.ones(conv_layer_activation_matrix.shape[:2])
+    # Compute class-activation matrix.
+    mean_weight_by_filter = numpy.mean(gradient_matrix, axis=(0, 1))
+    class_activation_matrix = numpy.ones(
+        target_layer_activation_matrix.shape[:-1])
 
-    num_conv_filters = len(weight_by_conv_filter)
-    for m in range(num_conv_filters):
+    num_filters = len(mean_weight_by_filter)
+    for m in range(num_filters):
         class_activation_matrix += (
-            weight_by_conv_filter[m] * conv_layer_activation_matrix[..., m]
+            mean_weight_by_filter[m] * target_layer_activation_matrix[..., m]
         )
 
-    num_input_rows = input_matrix.shape[1]
-    num_input_columns = input_matrix.shape[2]
-    class_activation_matrix = cv2_resize(
-        class_activation_matrix, (num_input_rows, num_input_columns)
-    )
+    spatial_dimensions = numpy.array(
+        list_of_input_matrices[0].shape[1:-1], dtype=int)
+    class_activation_matrix = _upsample_cam(
+        class_activation_matrix=class_activation_matrix,
+        new_dimensions=spatial_dimensions)
 
     class_activation_matrix[class_activation_matrix < 0.] = 0.
     denominator = numpy.maximum(numpy.max(class_activation_matrix), K.epsilon())
@@ -4118,8 +4198,9 @@ def gradcam_example1(validation_image_dict, normalization_dict,
 
     for this_layer_name in target_layer_names:
         class_activation_matrix = run_gradcam(
-            model_object=cnn_model_object, input_matrix=predictor_matrix_norm,
-            target_class=1, conv_layer_name=this_layer_name)
+            model_object=cnn_model_object,
+            list_of_input_matrices=[predictor_matrix_norm],
+            target_class=1, target_layer_name=this_layer_name)
 
         temperature_index = predictor_names.index(TEMPERATURE_NAME)
         min_colour_temp_kelvins = numpy.percentile(
@@ -4191,8 +4272,9 @@ def gradcam_example2(validation_image_dict, normalization_dict,
 
     for this_layer_name in target_layer_names:
         class_activation_matrix = run_gradcam(
-            model_object=cnn_model_object, input_matrix=predictor_matrix_norm,
-            target_class=0, conv_layer_name=this_layer_name)
+            model_object=cnn_model_object,
+            list_of_input_matrices=[predictor_matrix_norm],
+            target_class=0, target_layer_name=this_layer_name)
 
         temperature_index = predictor_names.index(TEMPERATURE_NAME)
         min_colour_temp_kelvins = numpy.percentile(
@@ -4267,8 +4349,9 @@ def gradcam_example3(validation_image_dict, normalization_dict,
 
     for this_layer_name in target_layer_names:
         class_activation_matrix = run_gradcam(
-            model_object=cnn_model_object, input_matrix=predictor_matrix_norm,
-            target_class=1, conv_layer_name=this_layer_name)
+            model_object=cnn_model_object,
+            list_of_input_matrices=[predictor_matrix_norm],
+            target_class=1, target_layer_name=this_layer_name)
 
         temperature_index = predictor_names.index(TEMPERATURE_NAME)
         min_colour_temp_kelvins = numpy.percentile(
@@ -4343,8 +4426,9 @@ def gradcam_example4(validation_image_dict, normalization_dict,
 
     for this_layer_name in target_layer_names:
         class_activation_matrix = run_gradcam(
-            model_object=cnn_model_object, input_matrix=predictor_matrix_norm,
-            target_class=0, conv_layer_name=this_layer_name)
+            model_object=cnn_model_object,
+            list_of_input_matrices=[predictor_matrix_norm],
+            target_class=0, target_layer_name=this_layer_name)
 
         temperature_index = predictor_names.index(TEMPERATURE_NAME)
         min_colour_temp_kelvins = numpy.percentile(
@@ -4384,5 +4468,205 @@ def gradcam_example4(validation_image_dict, normalization_dict,
 
         figure_object.suptitle(
             'Class-activation map for layer "{0:s}"'.format(this_layer_name)
+        )
+        pyplot.show()
+
+
+def _register_guided_backprop():
+    """Registers guided-backprop method with TensorFlow backend."""
+
+    if (BACKPROP_FUNCTION_NAME not in
+            tensorflow_ops._gradient_registry._registry):
+
+        @tensorflow_ops.RegisterGradient(BACKPROP_FUNCTION_NAME)
+        def _GuidedBackProp(operation, gradient_tensor):
+            input_type = operation.inputs[0].dtype
+
+            return (
+                gradient_tensor *
+                tensorflow.cast(gradient_tensor > 0., input_type) *
+                tensorflow.cast(operation.inputs[0] > 0., input_type)
+            )
+
+
+def _change_backprop_function(model_object):
+    """Changes backpropagation function for Keras model.
+
+    :param model_object: Instance of `keras.models.Model` or
+        `keras.models.Sequential`.
+    :return: new_model_object: Same as `model_object` but with new backprop
+        function.
+    """
+
+    # TODO(thunderhoser): I know that "Relu" is a valid operation name, but I
+    # have no clue about the last three.
+    orig_to_new_operation_dict = {
+        'Relu': BACKPROP_FUNCTION_NAME,
+        'LeakyRelu': BACKPROP_FUNCTION_NAME,
+        'Elu': BACKPROP_FUNCTION_NAME,
+        'Selu': BACKPROP_FUNCTION_NAME
+    }
+
+    graph_object = tensorflow.get_default_graph()
+
+    with graph_object.gradient_override_map(orig_to_new_operation_dict):
+        new_model_object = keras.models.clone_model(model_object)
+        new_model_object.set_weights(model_object.get_weights())
+        new_model_object.summary()
+
+    return new_model_object
+
+
+def _make_saliency_function(model_object, layer_name):
+    """Creates saliency function.
+
+    :param model_object: Instance of `keras.models.Model` or
+        `keras.models.Sequential`.
+    :param layer_name: Saliency will be computed with respect to activations in
+        this layer.
+    :return: saliency_function: Instance of `keras.backend.function`.
+    """
+
+    output_tensor = model_object.get_layer(name=layer_name).output
+    filter_maxxed_output_tensor = K.max(output_tensor, axis=-1)
+
+    if isinstance(model_object.input, list):
+        list_of_input_tensors = model_object.input
+    else:
+        list_of_input_tensors = [model_object.input]
+
+    list_of_saliency_tensors = K.gradients(
+        K.sum(filter_maxxed_output_tensor), list_of_input_tensors)
+
+    return K.function(
+        list_of_input_tensors + [K.learning_phase()],
+        list_of_saliency_tensors
+    )
+
+
+def _normalize_guided_gradcam_output(gradient_matrix):
+    """Normalizes image produced by guided Grad-CAM.
+
+    :param gradient_matrix: numpy array with output of guided Grad-CAM.
+    :return: gradient_matrix: Normalized version of input.  If the first axis
+        had length 1, it has been removed ("squeezed out").
+    """
+
+    if gradient_matrix.shape[0] == 1:
+        gradient_matrix = gradient_matrix[0, ...]
+
+    # Standardize.
+    gradient_matrix -= numpy.mean(gradient_matrix)
+    gradient_matrix /= (numpy.std(gradient_matrix, ddof=0) + K.epsilon())
+
+    # Force standard deviation of 0.1 and mean of 0.5.
+    gradient_matrix = 0.5 + gradient_matrix * 0.1
+    gradient_matrix[gradient_matrix < 0.] = 0.
+    gradient_matrix[gradient_matrix > 1.] = 1.
+
+    return gradient_matrix
+
+
+def run_guided_gradcam(model_object, list_of_input_matrices, target_layer_name,
+                       class_activation_matrix):
+    """Runs guided Grad-CAM.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    C = number of channels
+
+    :param model_object: See doc for `run_gradcam`.
+    :param list_of_input_matrices: Same.
+    :param target_layer_name: Same.
+    :param class_activation_matrix: Matrix created by `run_gradcam`.
+    :return: gradient_matrix: M-by-N-by-C numpy array of gradients.
+    """
+
+    _register_guided_backprop()
+
+    new_model_object = _change_backprop_function(model_object=model_object)
+    saliency_function = _make_saliency_function(
+        model_object=new_model_object, layer_name=target_layer_name)
+
+    saliency_matrix = saliency_function(list_of_input_matrices + [0])[0]
+    gradient_matrix = saliency_matrix * class_activation_matrix[
+        ..., numpy.newaxis]
+    return _normalize_guided_gradcam_output(gradient_matrix)
+
+
+def guided_gradcam_example3(validation_image_dict, normalization_dict,
+                            cnn_model_object):
+    """Runs Grad-CAM for extreme example wrt positive-class probability.
+
+    :param validation_image_dict: Dictionary created by `read_many_image_files`.
+    :param normalization_dict: Dictionary created by
+        `get_image_normalization_params`.
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    """
+
+    target_matrix_s01 = validation_image_dict[TARGET_MATRIX_KEY]
+    example_index = numpy.unravel_index(
+        numpy.argmax(target_matrix_s01), target_matrix_s01.shape
+    )[0]
+
+    predictor_matrix = validation_image_dict[PREDICTOR_MATRIX_KEY][
+        example_index, ...]
+    predictor_names = validation_image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix_norm, _ = normalize_images(
+        predictor_matrix=predictor_matrix + 0.,
+        predictor_names=predictor_names, normalization_dict=normalization_dict)
+    predictor_matrix_norm = numpy.expand_dims(predictor_matrix_norm, axis=0)
+
+    target_layer_names = [
+        'batch_normalization_1', 'batch_normalization_2',
+        'batch_normalization_3', 'batch_normalization_4'
+    ]
+
+    for this_layer_name in target_layer_names:
+        class_activation_matrix = run_gradcam(
+            model_object=cnn_model_object,
+            list_of_input_matrices=[predictor_matrix_norm],
+            target_class=1, target_layer_name=this_layer_name)
+
+        gradient_matrix = run_guided_gradcam(
+            model_object=cnn_model_object,
+            list_of_input_matrices=[predictor_matrix_norm],
+            target_layer_name=this_layer_name,
+            class_activation_matrix=class_activation_matrix)
+
+        temperature_index = predictor_names.index(TEMPERATURE_NAME)
+        min_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 1)
+        max_colour_temp_kelvins = numpy.percentile(
+            predictor_matrix[..., temperature_index], 99)
+
+        wind_indices = numpy.array([
+            predictor_names.index(U_WIND_NAME),
+            predictor_names.index(V_WIND_NAME)
+        ], dtype=int)
+
+        max_colour_wind_speed_m_s01 = numpy.percentile(
+            numpy.absolute(predictor_matrix[..., wind_indices]), 99)
+
+        figure_object, axes_objects_2d_list = plot_many_predictors_sans_barbs(
+            predictor_matrix=predictor_matrix, predictor_names=predictor_names,
+            min_colour_temp_kelvins=min_colour_temp_kelvins,
+            max_colour_temp_kelvins=max_colour_temp_kelvins,
+            max_colour_wind_speed_m_s01=max_colour_wind_speed_m_s01)
+
+        max_absolute_contour_level = numpy.percentile(
+            numpy.absolute(gradient_matrix), 99)
+        contour_interval = max_absolute_contour_level / 10
+
+        plot_many_saliency_maps(
+            saliency_matrix=gradient_matrix,
+            axes_objects_2d_list=axes_objects_2d_list,
+            colour_map_object=SALIENCY_COLOUR_MAP_OBJECT,
+            max_absolute_contour_level=max_absolute_contour_level,
+            contour_interval=contour_interval)
+
+        figure_object.suptitle(
+            'Guided Grad-CAM for layer "{0:s}"'.format(this_layer_name)
         )
         pyplot.show()
