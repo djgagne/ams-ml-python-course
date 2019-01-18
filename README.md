@@ -32,8 +32,31 @@ The data for the course are stored online. The `download_data.py` script will do
 * [Module 3: Deep Learning with Keras](https://drive.google.com/open?id=1tOPGC71Yx8ygvnRzws5KLuRW20-bSTq8)
 * [Module 4: Model Interpretation](https://drive.google.com/open?id=1NUxdreKkUXAevZhT0eSJTm5Z2JuqV3Ry)
 
-# Setting up GPU-enabled short course Jupyter hub containers
+## Setup Instructions (Local Install; CPU Only)
+These instructions assume you have a bash shell running or the Windows command prompt. Conda environments do not work in csh. 
+1. Install the [miniconda](https://conda.io/miniconda.html) Python distribution.
+2. Create a separate conda environment for the short course: `conda create -n mlpy python=3.6`
+3. Activate the enviornment by running `source activate mlpy` (bash in linux or mac) or `activate mlpy` (Windows)
+4. Install the required base libraries: `conda install pip numpy scipy matplotlib scikit-learn netcdf4 xarray pandas ipython jupyter ipywidgets shapely descartes`
+5. Install tensorflow and keras: `pip install tensorflow; pip install keras`
+6. Clone the short course repository: `git clone https://github.com/djgagne/ams-ml-python-course.git`
+7. Change into the ams-ml-python-course directory.
+8. Download the course data to your local machine: `python download_data.py`
+9. Start Jupyter lab: `jupyter lab`
+10. Each module is in a separate folder. Open the Jupyter notebook in each folder and follow instructions. If you have problems, please create an issue on the Github repository site.
 
+## Setup Instructions (Docker)
+These instructions are for those who want to run the short course Docker image either on their local machine (requires Docker to be installed) or on a single cloud VM. 
+1. Install [Docker](https://www.docker.com/get-started).
+2. From the command line, pull the appropriate short course Docker container:
+    * CPU only: `docker pull djgagne/ams-ml-python-course:cpu`
+    * GPU (requires NVIDIA GPU, CUDA and nvidia-docker): `docker pull djgagne/ams-ml-python-course:gpu`
+3. To start the container: `docker run -p 8888:8888 djgagne/ams-ml-python-course:cpu` or `:gpu` if you are using the CPU or GPU version.
+4. To access jupyter lab, open a web browser to localhost:8888 and paste in the token string from the command line.
+5. If you are running on a remote server, you will need to forward port 8888 to your local machine. You can do this over ssh if it is a remote server or through the web if you are running on a cloud server with port 8888 opened.
+
+# **Optional** Setting up GPU-enabled short course Jupyter hub containers
+These instructions are for creating and managing your own short course managed by Jupyterhub on Kubernetes with everything in a Docker container. You do not need to follow these instructions if you are just trying to run the short course modules locally.
 ## Requirements for architecture
 * Docker
 * Google Compute Engine
