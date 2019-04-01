@@ -196,6 +196,7 @@ def plot_roc_curve(
         max_colour_value=1., orientation_string='vertical',
         extend_min=False, extend_max=False)
 
+    print(colour_bar_object)
     colour_bar_object.set_label('Peirce score')
 
     random_x_coords = numpy.array([0., 1.])
