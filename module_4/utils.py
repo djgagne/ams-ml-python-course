@@ -8,12 +8,17 @@ import os.path
 import time
 import calendar
 import json
+import pickle
+import netCDF4
 import numpy
 import keras
-import netCDF4
+from keras import backend as K
+import tensorflow
+from scipy.interpolate import (
+    UnivariateSpline, RectBivariateSpline, RegularGridInterpolator)
 import matplotlib.colors
 import matplotlib.pyplot as pyplot
-from sklearn.metrics import auc as scikit_learn_auc
+import sklearn.metrics
 from module_4 import keras_metrics
 from module_4 import roc_curves
 from module_4 import performance_diagrams
@@ -1524,7 +1529,8 @@ def evaluate_cnn(
         observed_labels=target_values,
         forecast_probabilities=forecast_probabilities)
 
-    area_under_roc_curve = scikit_learn_auc(pofd_by_threshold, pod_by_threshold)
+    area_under_roc_curve = sklearn.metrics.auc(
+        x=pofd_by_threshold, y=pod_by_threshold)
     title_string = 'Area under ROC curve: {0:.4f}'.format(area_under_roc_curve)
 
     pyplot.title(title_string)
@@ -1560,3 +1566,664 @@ def evaluate_cnn(
     print('Saving figure to: "{0:s}"...'.format(attr_diagram_file_name))
     pyplot.savefig(attr_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
+
+
+def _negative_auc_function(target_values, class_probabilities):
+    """Computes negative AUC (area under ROC curve).
+
+    E = number of examples
+
+    :param target_values: length-E numpy array of true values (integers in
+        0...1).
+    :param class_probabilities: length-E numpy array of forecast probabilities.
+    :return: negative_auc: Negative AUC.
+    """
+
+    return -1 * sklearn.metrics.roc_auc_score(
+        y_true=target_values, y_score=class_probabilities
+    )
+
+
+def permutation_test_for_cnn(
+        cnn_model_object, image_dict, cnn_metadata_dict,
+        output_pickle_file_name, cost_function=_negative_auc_function):
+    """Runs permutation test on CNN (convolutional neural net).
+
+    E = number of examples (storm objects)
+    C = number of channels (predictor variables)
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param image_dict: Dictionary created by `read_image_file` or
+        `read_many_image_files`.  Should contain validation data (rather than
+        training data), but this is not enforced.
+    :param cnn_metadata_dict: Dictionary created by `train_cnn`.  This will
+        ensure that data in `image_dict` are processed the exact same way as the
+        training data for `cnn_model_object`.
+    :param output_pickle_file_name: Path to output file.  `result_dict` (the
+        output variable) will be saved here.
+
+    :param cost_function: Cost function (used to evaluate model predictions).
+        Must be negatively oriented (lower values are better).  Must have the
+        following inputs and outputs.
+    Input: target_values: length-E numpy array of target values (integer class
+        labels).
+    Input: forecast_probabilities: length-E numpy array with predicted
+        probabilities of positive class (target value = 1).
+    Output: cost: Scalar value.
+
+    :return: result_dict: Dictionary with the following keys.
+    result_dict['permuted_predictor_name_by_step']: length-C list with name of
+        predictor permuted at each step.
+    result_dict['highest_cost_by_step']: length-C numpy array with corresponding
+        cost at each step.  highest_cost_by_step[m] = cost after permuting
+        permuted_predictor_name_by_step[m].
+    result_dict['original_cost']: Original cost (before any permutation).
+    result_dict['predictor_names_step1']: length-C list of predictor names.
+    result_dict['costs_step1']: length-C numpy array of corresponding costs.
+        costs_step1[m] = cost after permuting only predictor_names_step1[m].
+        This key and "predictor_names_step1" correspond to the Breiman version
+        of the permutation test, while "permuted_predictor_name_by_step" and
+        "highest_cost_by_step" correspond to the Lakshmanan version.
+    """
+
+    predictor_names = image_dict[PREDICTOR_NAMES_KEY]
+
+    predictor_matrix, _ = normalize_images(
+        predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
+        predictor_names=image_dict[PREDICTOR_NAMES_KEY],
+        normalization_dict=cnn_metadata_dict[NORMALIZATION_DICT_KEY])
+    predictor_matrix = predictor_matrix.astype('float32')
+
+    target_values = binarize_target_images(
+        target_matrix=image_dict[TARGET_MATRIX_KEY],
+        binarization_threshold=cnn_metadata_dict[BINARIZATION_THRESHOLD_KEY])
+
+    # Get original cost (before permutation).
+    these_probabilities = _apply_cnn(cnn_model_object=cnn_model_object,
+                                     predictor_matrix=predictor_matrix)
+    print(MINOR_SEPARATOR_STRING)
+
+    original_cost = cost_function(target_values, these_probabilities)
+    print('Original cost (no permutation): {0:.4e}\n'.format(original_cost))
+
+    num_examples = len(target_values)
+    remaining_predictor_names = predictor_names + []
+    current_step_num = 0
+
+    permuted_predictor_name_by_step = []
+    highest_cost_by_step = []
+    predictor_names_step1 = []
+    costs_step1 = []
+
+    while len(remaining_predictor_names) > 0:
+        current_step_num += 1
+
+        highest_cost = -numpy.inf
+        best_predictor_name = None
+        best_predictor_permuted_values = None
+
+        for this_predictor_name in remaining_predictor_names:
+            print(
+                ('Trying predictor "{0:s}" at step {1:d} of permutation test...'
+                 ).format(this_predictor_name, current_step_num)
+            )
+
+            this_predictor_index = predictor_names.index(this_predictor_name)
+            this_predictor_matrix = predictor_matrix + 0.
+
+            this_predictor_matrix[..., this_predictor_index] = numpy.take(
+                this_predictor_matrix[..., this_predictor_index],
+                indices=numpy.random.permutation(
+                    this_predictor_matrix.shape[0]),
+                axis=0
+            )
+
+            print(MINOR_SEPARATOR_STRING)
+            these_probabilities = _apply_cnn(
+                cnn_model_object=cnn_model_object,
+                predictor_matrix=this_predictor_matrix)
+            print(MINOR_SEPARATOR_STRING)
+
+            this_cost = cost_function(target_values, these_probabilities)
+            print('Resulting cost = {0:.4e}'.format(this_cost))
+
+            if current_step_num == 1:
+                predictor_names_step1.append(this_predictor_name)
+                costs_step1.append(this_cost)
+
+            if this_cost < highest_cost:
+                continue
+
+            highest_cost = this_cost + 0.
+            best_predictor_name = this_predictor_name + ''
+            best_predictor_permuted_values = this_predictor_matrix[
+                ..., this_predictor_index]
+
+        permuted_predictor_name_by_step.append(best_predictor_name)
+        highest_cost_by_step.append(highest_cost)
+
+        # Remove best predictor from list.
+        remaining_predictor_names.remove(best_predictor_name)
+
+        # Leave values of best predictor permuted.
+        this_predictor_index = predictor_names.index(best_predictor_name)
+        predictor_matrix[
+            ..., this_predictor_index] = best_predictor_permuted_values
+
+        print('\nBest predictor = "{0:s}" ... new cost = {1:.4e}\n'.format(
+            best_predictor_name, highest_cost))
+
+    result_dict = {
+        PERMUTED_PREDICTORS_KEY: permuted_predictor_name_by_step,
+        HIGHEST_COSTS_KEY: numpy.array(highest_cost_by_step),
+        ORIGINAL_COST_KEY: original_cost,
+        STEP1_PREDICTORS_KEY: predictor_names_step1,
+        STEP1_COSTS_KEY: numpy.array(costs_step1)
+    }
+
+    _create_directory(file_name=output_pickle_file_name)
+
+    print('Writing results to: "{0:s}"...'.format(output_pickle_file_name))
+    file_handle = open(output_pickle_file_name, 'wb')
+    pickle.dump(result_dict, file_handle)
+    file_handle.close()
+
+    return result_dict
+
+
+def _label_bars_in_graph(axes_object, y_coords, y_strings):
+    """Labels bars in graph.
+
+    J = number of bars
+
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :param y_coords: length-J numpy array with y-coordinates of bars.
+    :param y_strings: length-J list of labels.
+    """
+
+    x_min, x_max = pyplot.xlim()
+    x_coord_for_text = x_max - 0.01 * (x_max - x_min)
+
+    for j in range(len(y_coords)):
+        axes_object.text(
+            x_coord_for_text, y_coords[j], y_strings[j], color='k',
+            horizontalalignment='right', verticalalignment='center',
+            fontsize=FONT_SIZE, fontweight='bold')
+
+
+def plot_breiman_results(
+        result_dict, output_file_name, plot_percent_increase=False):
+    """Plots results of Breiman (single-pass) permutation test.
+
+    :param result_dict: Dictionary created by `permutation_test_for_cnn`.
+    :param output_file_name: Path to output file.  Figure will be saved here.
+    :param plot_percent_increase: Boolean flag.  If True, x-axis will be
+        percentage of original cost (before permutation).  If False, will be
+        actual cost.
+    """
+
+    cost_values = result_dict[STEP1_COSTS_KEY]
+    predictor_names = result_dict[STEP1_PREDICTORS_KEY]
+
+    sort_indices = numpy.argsort(cost_values)
+    cost_values = cost_values[sort_indices]
+    predictor_names = [predictor_names[k] for k in sort_indices]
+
+    x_coords = numpy.concatenate((
+        numpy.array([result_dict[ORIGINAL_COST_KEY]]), cost_values
+    ))
+
+    if plot_percent_increase:
+        x_coords = 100 * x_coords / x_coords[0]
+
+    y_strings = ['No permutation'] + predictor_names
+    y_coords = numpy.linspace(
+        0, len(y_strings) - 1, num=len(y_strings), dtype=float
+    )
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, x_coords, color=BAR_GRAPH_FACE_COLOUR,
+        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
+
+    pyplot.yticks([], [])
+    pyplot.ylabel('Predictor permuted')
+
+    if plot_percent_increase:
+        pyplot.xlabel('Cost (percentage of original)')
+    else:
+        pyplot.xlabel('Cost')
+
+    _label_bars_in_graph(
+        axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
+    pyplot.show()
+
+    _create_directory(file_name=output_file_name)
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
+    pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+
+def plot_lakshmanan_results(
+        result_dict, output_file_name, plot_percent_increase=False):
+    """Plots results of Lakshmanan (multi-pass) permutation test.
+
+    :param result_dict: See doc for `plot_breiman_results`.
+    :param output_file_name: Same.
+    :param plot_percent_increase: Same.
+    """
+
+    x_coords = numpy.concatenate((
+        numpy.array([result_dict[ORIGINAL_COST_KEY]]),
+        result_dict[HIGHEST_COSTS_KEY]
+    ))
+
+    if plot_percent_increase:
+        x_coords = 100 * x_coords / x_coords[0]
+
+    y_strings = ['No permutation'] + result_dict[PERMUTED_PREDICTORS_KEY]
+    y_coords = numpy.linspace(
+        0, len(y_strings) - 1, num=len(y_strings), dtype=float
+    )[::-1]
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, x_coords, color=BAR_GRAPH_FACE_COLOUR,
+        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
+
+    pyplot.yticks([], [])
+    pyplot.ylabel('Predictor permuted')
+
+    if plot_percent_increase:
+        pyplot.xlabel('Cost (percentage of original)')
+    else:
+        pyplot.xlabel('Cost')
+
+    _label_bars_in_graph(
+        axes_object=axes_object, y_coords=y_coords, y_strings=y_strings)
+    pyplot.show()
+
+    _create_directory(file_name=output_file_name)
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
+    pyplot.savefig(output_file_name, dpi=FIGURE_RESOLUTION_DPI)
+    pyplot.close()
+
+
+def _do_saliency_calculations(
+        cnn_model_object, loss_tensor, list_of_input_matrices):
+    """Does the nitty-gritty part of computing saliency maps.
+
+    T = number of input tensors to the model
+    E = number of examples (storm objects)
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param loss_tensor: Keras tensor defining the loss function.
+    :param list_of_input_matrices: length-T list of numpy arrays, comprising one
+        or more examples (storm objects).  list_of_input_matrices[i] must have
+        the same dimensions as the [i]th input tensor to the model.
+    :return: list_of_saliency_matrices: length-T list of numpy arrays,
+        comprising the saliency map for each example.
+        list_of_saliency_matrices[i] has the same dimensions as
+        list_of_input_matrices[i] and defines the "saliency" of each value x,
+        which is the gradient of the loss function with respect to x.
+    """
+
+    if isinstance(cnn_model_object.input, list):
+        list_of_input_tensors = cnn_model_object.input
+    else:
+        list_of_input_tensors = [cnn_model_object.input]
+
+    list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
+    num_input_tensors = len(list_of_input_tensors)
+
+    for i in range(num_input_tensors):
+        list_of_gradient_tensors[i] /= K.maximum(
+            K.std(list_of_gradient_tensors[i]), K.epsilon()
+        )
+
+    inputs_to_gradients_function = K.function(
+        list_of_input_tensors + [K.learning_phase()],
+        list_of_gradient_tensors
+    )
+
+    list_of_saliency_matrices = inputs_to_gradients_function(
+        list_of_input_matrices + [0]
+    )
+
+    for i in range(num_input_tensors):
+        list_of_saliency_matrices[i] *= -1
+
+    return list_of_saliency_matrices
+
+
+def get_saliency_for_class(cnn_model_object, target_class,
+                           list_of_input_matrices):
+    """For each input example, creates saliency map for prob of given class.
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param target_class: Saliency maps will be created for probability of this
+        class.
+    :param list_of_input_matrices: See doc for `_do_saliency_calculations`.
+    :return: list_of_saliency_matrices: Same.
+    """
+
+    target_class = int(numpy.round(target_class))
+    assert target_class >= 0
+
+    num_output_neurons = (
+        cnn_model_object.layers[-1].output.get_shape().as_list()[-1]
+    )
+
+    if num_output_neurons == 1:
+        assert target_class <= 1
+
+        if target_class == 1:
+            loss_tensor = K.mean(
+                (cnn_model_object.layers[-1].output[..., 0] - 1) ** 2
+            )
+        else:
+            loss_tensor = K.mean(
+                cnn_model_object.layers[-1].output[..., 0] ** 2
+            )
+    else:
+        assert target_class < num_output_neurons
+
+        loss_tensor = K.mean(
+            (cnn_model_object.layers[-1].output[..., target_class] - 1) ** 2
+        )
+
+    return _do_saliency_calculations(
+        cnn_model_object=cnn_model_object, loss_tensor=loss_tensor,
+        list_of_input_matrices=list_of_input_matrices)
+
+
+def plot_saliency_2d(
+        saliency_matrix, axes_object, colour_map_object,
+        max_absolute_contour_level, contour_interval, line_width=2):
+    """Plots saliency map over 2-D grid (for one predictor).
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param saliency_matrix: M-by-N numpy array of saliency values.
+    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
+        Will plot on these axes.
+    :param colour_map_object: Colour scheme (instance of
+        `matplotlib.pyplot.cm`).
+    :param max_absolute_contour_level: Max saliency to plot.  The minimum
+        saliency plotted will be `-1 * max_absolute_contour_level`.
+    :param max_absolute_contour_level: Max absolute saliency value to plot.  The
+        min and max values, respectively, will be
+        `-1 * max_absolute_contour_level` and `max_absolute_contour_level`.
+    :param contour_interval: Saliency interval between successive contours.
+    :param line_width: Width of contour lines.
+    """
+
+    num_grid_rows = saliency_matrix.shape[0]
+    num_grid_columns = saliency_matrix.shape[1]
+
+    x_coords_unique = numpy.linspace(
+        0, num_grid_columns, num=num_grid_columns + 1, dtype=float)
+    x_coords_unique = x_coords_unique[:-1]
+    x_coords_unique = x_coords_unique + numpy.diff(x_coords_unique[:2]) / 2
+
+    y_coords_unique = numpy.linspace(
+        0, num_grid_rows, num=num_grid_rows + 1, dtype=float)
+    y_coords_unique = y_coords_unique[:-1]
+    y_coords_unique = y_coords_unique + numpy.diff(y_coords_unique[:2]) / 2
+
+    x_coord_matrix, y_coord_matrix = numpy.meshgrid(x_coords_unique,
+                                                    y_coords_unique)
+
+    half_num_contours = int(numpy.round(
+        1 + max_absolute_contour_level / contour_interval
+    ))
+
+    # Plot positive values.
+    these_contour_levels = numpy.linspace(
+        0., max_absolute_contour_level, num=half_num_contours)
+
+    axes_object.contour(
+        x_coord_matrix, y_coord_matrix, saliency_matrix,
+        these_contour_levels, cmap=colour_map_object,
+        vmin=numpy.min(these_contour_levels),
+        vmax=numpy.max(these_contour_levels), linewidths=line_width,
+        linestyles='solid', zorder=1e6)
+
+    # Plot negative values.
+    these_contour_levels = these_contour_levels[1:]
+
+    axes_object.contour(
+        x_coord_matrix, y_coord_matrix, -saliency_matrix,
+        these_contour_levels, cmap=colour_map_object,
+        vmin=numpy.min(these_contour_levels),
+        vmax=numpy.max(these_contour_levels), linewidths=line_width,
+        linestyles='dashed', zorder=1e6)
+
+
+def plot_many_saliency_maps(
+        saliency_matrix, axes_objects_2d_list, colour_map_object,
+        max_absolute_contour_level, contour_interval, line_width=2):
+    """Plots 2-D saliency map for each predictor.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    C = number of predictors
+
+    :param saliency_matrix: M-by-N-by-C numpy array of saliency values.
+    :param axes_objects_2d_list: See doc for `_init_figure_panels`.
+    :param colour_map_object: See doc for `plot_saliency_2d`.
+    :param max_absolute_contour_level: Same.
+    :param max_absolute_contour_level: Same.
+    :param contour_interval: Same.
+    :param line_width: Same.
+    """
+
+    num_predictors = saliency_matrix.shape[-1]
+    num_panel_rows = len(axes_objects_2d_list)
+    num_panel_columns = len(axes_objects_2d_list[0])
+
+    for m in range(num_predictors):
+        this_panel_row, this_panel_column = numpy.unravel_index(
+            m, (num_panel_rows, num_panel_columns)
+        )
+
+        plot_saliency_2d(
+            saliency_matrix=saliency_matrix[..., m],
+            axes_object=axes_objects_2d_list[this_panel_row][this_panel_column],
+            colour_map_object=colour_map_object,
+            max_absolute_contour_level=max_absolute_contour_level,
+            contour_interval=contour_interval, line_width=line_width)
+
+
+def _compute_gradients(loss_tensor, list_of_input_tensors):
+    """Computes gradient of each input tensor with respect to loss tensor.
+
+    :param loss_tensor: Loss tensor.
+    :param list_of_input_tensors: 1-D list of input tensors.
+    :return: list_of_gradient_tensors: 1-D list of gradient tensors.
+    """
+
+    list_of_gradient_tensors = tensorflow.gradients(
+        loss_tensor, list_of_input_tensors)
+
+    for i in range(len(list_of_gradient_tensors)):
+        if list_of_gradient_tensors[i] is not None:
+            continue
+
+        list_of_gradient_tensors[i] = tensorflow.zeros_like(
+            list_of_input_tensors[i])
+
+    return list_of_gradient_tensors
+
+
+def _normalize_tensor(input_tensor):
+    """Normalizes tensor by its L2 norm.
+
+    :param input_tensor: Unnormalized tensor.
+    :return: output_tensor: Normalized tensor.
+    """
+
+    rms_tensor = K.sqrt(K.mean(K.square(input_tensor)))
+    return input_tensor / (rms_tensor + K.epsilon())
+
+
+def _upsample_cam(class_activation_matrix, new_dimensions):
+    """Upsamples class-activation matrix (CAM).
+
+    CAM may be 1-D, 2-D, or 3-D.
+
+    :param class_activation_matrix: numpy array containing 1-D, 2-D, or 3-D
+        class-activation matrix.
+    :param new_dimensions: numpy array of new dimensions.  If matrix is
+        {1D, 2D, 3D}, this must be a length-{1, 2, 3} array, respectively.
+    :return: class_activation_matrix: Upsampled version of input.
+    """
+
+    num_rows_new = new_dimensions[0]
+    row_indices_new = numpy.linspace(
+        1, num_rows_new, num=num_rows_new, dtype=float)
+    row_indices_orig = numpy.linspace(
+        1, num_rows_new, num=class_activation_matrix.shape[0], dtype=float)
+
+    if len(new_dimensions) == 1:
+        interp_object = UnivariateSpline(
+            x=row_indices_orig, y=numpy.ravel(class_activation_matrix),
+            k=1, s=0
+        )
+
+        return interp_object(row_indices_new)
+
+    num_columns_new = new_dimensions[1]
+    column_indices_new = numpy.linspace(
+        1, num_columns_new, num=num_columns_new, dtype=float)
+    column_indices_orig = numpy.linspace(
+        1, num_columns_new, num=class_activation_matrix.shape[1],
+        dtype=float
+    )
+
+    if len(new_dimensions) == 2:
+        interp_object = RectBivariateSpline(
+            x=row_indices_orig, y=column_indices_orig,
+            z=class_activation_matrix, kx=1, ky=1, s=0)
+
+        return interp_object(x=row_indices_new, y=column_indices_new, grid=True)
+
+    num_heights_new = new_dimensions[2]
+    height_indices_new = numpy.linspace(
+        1, num_heights_new, num=num_heights_new, dtype=float)
+    height_indices_orig = numpy.linspace(
+        1, num_heights_new, num=class_activation_matrix.shape[2],
+        dtype=float)
+
+    interp_object = RegularGridInterpolator(
+        points=(row_indices_orig, column_indices_orig, height_indices_orig),
+        values=class_activation_matrix, method='linear'
+    )
+
+    row_index_matrix, column_index_matrix, height_index_matrix = (
+        numpy.meshgrid(row_indices_new, column_indices_new, height_indices_new)
+    )
+    query_point_matrix = numpy.stack(
+        (row_index_matrix, column_index_matrix, height_index_matrix), axis=-1
+    )
+
+    return interp_object(query_point_matrix)
+
+
+def run_gradcam(model_object, list_of_input_matrices, target_class,
+                target_layer_name):
+    """Runs Grad-CAM.
+
+    T = number of input tensors to the model
+
+    :param model_object: Trained instance of `keras.models.Model` or
+        `keras.models.Sequential`.
+    :param list_of_input_matrices: length-T list of numpy arrays, containing
+        only one example (storm object).  list_of_input_matrices[i] must have
+        the same dimensions as the [i]th input tensor to the model.
+    :param target_class: Activation maps will be created for this class.  Must
+        be an integer in 0...(K - 1), where K = number of classes.
+    :param target_layer_name: Name of target layer.  Neuron-importance weights
+        will be based on activations in this layer.
+    :return: class_activation_matrix: Class-activation matrix.  Dimensions of
+        this numpy array will be the spatial dimensions of whichever input
+        tensor feeds into the target layer.  For example, if the given input
+        tensor is 2-dimensional with M rows and N columns, this array will be
+        M x N.
+    """
+
+    for q in range(len(list_of_input_matrices)):
+        if list_of_input_matrices[q].shape[0] != 1:
+            list_of_input_matrices[q] = numpy.expand_dims(
+                list_of_input_matrices[q], axis=0)
+
+    # Create loss tensor.
+    output_layer_object = model_object.layers[-1].output
+    num_output_neurons = output_layer_object.get_shape().as_list()[-1]
+
+    if num_output_neurons == 1:
+        if target_class == 1:
+            # loss_tensor = model_object.layers[-1].output[..., 0]
+            loss_tensor = model_object.layers[-1].input[..., 0]
+        else:
+            # loss_tensor = -1 * model_object.layers[-1].output[..., 0]
+            loss_tensor = -1 * model_object.layers[-1].input[..., 0]
+    else:
+        # loss_tensor = model_object.layers[-1].output[..., target_class]
+        loss_tensor = model_object.layers[-1].input[..., target_class]
+
+    # Create gradient function.
+    target_layer_activation_tensor = model_object.get_layer(
+        name=target_layer_name
+    ).output
+
+    gradient_tensor = _compute_gradients(
+        loss_tensor, [target_layer_activation_tensor]
+    )[0]
+    gradient_tensor = _normalize_tensor(gradient_tensor)
+
+    if isinstance(model_object.input, list):
+        list_of_input_tensors = model_object.input
+    else:
+        list_of_input_tensors = [model_object.input]
+
+    gradient_function = K.function(
+        list_of_input_tensors, [target_layer_activation_tensor, gradient_tensor]
+    )
+
+    # Evaluate gradient function.
+    target_layer_activation_matrix, gradient_matrix = gradient_function(
+        list_of_input_matrices)
+    target_layer_activation_matrix = target_layer_activation_matrix[0, ...]
+    gradient_matrix = gradient_matrix[0, ...]
+
+    # Compute class-activation matrix.
+    mean_weight_by_filter = numpy.mean(gradient_matrix, axis=(0, 1))
+    class_activation_matrix = numpy.ones(
+        target_layer_activation_matrix.shape[:-1])
+
+    num_filters = len(mean_weight_by_filter)
+    for m in range(num_filters):
+        class_activation_matrix += (
+            mean_weight_by_filter[m] * target_layer_activation_matrix[..., m]
+        )
+
+    spatial_dimensions = numpy.array(
+        list_of_input_matrices[0].shape[1:-1], dtype=int)
+    class_activation_matrix = _upsample_cam(
+        class_activation_matrix=class_activation_matrix,
+        new_dimensions=spatial_dimensions)
+
+    class_activation_matrix[class_activation_matrix < 0.] = 0.
+    # denominator = numpy.maximum(numpy.max(class_activation_matrix), K.epsilon())
+    # return class_activation_matrix / denominator
+
+    return class_activation_matrix
