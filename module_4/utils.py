@@ -1646,7 +1646,6 @@ def permutation_test_for_cnn(
     original_cost = cost_function(target_values, these_probabilities)
     print('Original cost (no permutation): {0:.4e}\n'.format(original_cost))
 
-    num_examples = len(target_values)
     remaining_predictor_names = predictor_names + []
     current_step_num = 0
 
@@ -2227,3 +2226,141 @@ def run_gradcam(model_object, list_of_input_matrices, target_class,
     # return class_activation_matrix / denominator
 
     return class_activation_matrix
+
+
+def _gradient_descent_for_bwo(
+        cnn_model_object, loss_tensor, init_function_or_matrices,
+        num_iterations, learning_rate):
+    """Does gradient descent (the nitty-gritty part) for backwards optimization.
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param loss_tensor: Keras tensor, defining the loss function to be
+        minimized.
+    :param init_function_or_matrices: Either a function or list of numpy arrays.
+
+    If function, will be used to initialize input matrices.  See
+    `create_gaussian_initializer` for an example.
+
+    If list of numpy arrays, these are the input matrices themselves.  Matrices
+    should be processed in the exact same way that training data were processed
+    (e.g., normalization method).  Matrices must also be in the same order as
+    training matrices, and the [q]th matrix in this list must have the same
+    shape as the [q]th training matrix.
+
+    :param num_iterations: Number of gradient-descent iterations (number of
+        times that the input matrices are adjusted).
+    :param learning_rate: Learning rate.  At each iteration, each input value x
+        will be decremented by `learning_rate * gradient`, where `gradient` is
+        the gradient of the loss function with respect to x.
+    :return: list_of_optimized_input_matrices: length-T list of optimized input
+        matrices (numpy arrays), where T = number of input tensors to the model.
+        If the input arg `init_function_or_matrices` is a list of numpy arrays
+        (rather than a function), `list_of_optimized_input_matrices` will have
+        the exact same shape, just with different values.
+    """
+
+    if isinstance(cnn_model_object.input, list):
+        list_of_input_tensors = cnn_model_object.input
+    else:
+        list_of_input_tensors = [cnn_model_object.input]
+
+    num_input_tensors = len(list_of_input_tensors)
+    list_of_gradient_tensors = K.gradients(loss_tensor, list_of_input_tensors)
+
+    for i in range(num_input_tensors):
+        list_of_gradient_tensors[i] /= K.maximum(
+            K.sqrt(K.mean(list_of_gradient_tensors[i] ** 2)),
+            K.epsilon()
+        )
+
+    inputs_to_loss_and_gradients = K.function(
+        list_of_input_tensors + [K.learning_phase()],
+        ([loss_tensor] + list_of_gradient_tensors)
+    )
+
+    if isinstance(init_function_or_matrices, list):
+        list_of_optimized_input_matrices = copy.deepcopy(
+            init_function_or_matrices)
+    else:
+        list_of_optimized_input_matrices = [None] * num_input_tensors
+
+        for i in range(num_input_tensors):
+            these_dimensions = numpy.array(
+                [1] + list_of_input_tensors[i].get_shape().as_list()[1:],
+                dtype=int
+            )
+
+            list_of_optimized_input_matrices[i] = init_function_or_matrices(
+                these_dimensions)
+
+    for j in range(num_iterations):
+        these_outputs = inputs_to_loss_and_gradients(
+            list_of_optimized_input_matrices + [0]
+        )
+
+        if numpy.mod(j, 100) == 0:
+            print('Loss after {0:d} of {1:d} iterations: {2:.2e}'.format(
+                j, num_iterations, these_outputs[0]
+            ))
+
+        for i in range(num_input_tensors):
+            list_of_optimized_input_matrices[i] -= (
+                these_outputs[i + 1] * learning_rate
+            )
+
+    print('Loss after {0:d} iterations: {1:.2e}'.format(
+        num_iterations, these_outputs[0]
+    ))
+
+    return list_of_optimized_input_matrices
+
+
+def bwo_for_class(
+        cnn_model_object, target_class, init_function_or_matrices,
+        num_iterations=DEFAULT_NUM_BWO_ITERATIONS,
+        learning_rate=DEFAULT_BWO_LEARNING_RATE):
+    """Does backwards optimization to maximize probability of target class.
+
+    :param cnn_model_object: Trained instance of `keras.models.Model`.
+    :param target_class: Synthetic input data will be created to maximize
+        probability of this class.
+    :param init_function_or_matrices: See doc for `_gradient_descent_for_bwo`.
+    :param num_iterations: Same.
+    :param learning_rate: Same.
+    :return: list_of_optimized_input_matrices: Same.
+    """
+
+    target_class = int(numpy.round(target_class))
+    num_iterations = int(numpy.round(num_iterations))
+
+    assert target_class >= 0
+    assert num_iterations > 0
+    assert learning_rate > 0.
+    assert learning_rate < 1.
+
+    num_output_neurons = (
+        cnn_model_object.layers[-1].output.get_shape().as_list()[-1]
+    )
+
+    if num_output_neurons == 1:
+        assert target_class <= 1
+
+        if target_class == 1:
+            loss_tensor = K.mean(
+                (cnn_model_object.layers[-1].output[..., 0] - 1) ** 2
+            )
+        else:
+            loss_tensor = K.mean(
+                cnn_model_object.layers[-1].output[..., 0] ** 2
+            )
+    else:
+        assert target_class < num_output_neurons
+
+        loss_tensor = K.mean(
+            (cnn_model_object.layers[-1].output[..., target_class] - 1) ** 2
+        )
+
+    return _gradient_descent_for_bwo(
+        cnn_model_object=cnn_model_object, loss_tensor=loss_tensor,
+        init_function_or_matrices=init_function_or_matrices,
+        num_iterations=num_iterations, learning_rate=learning_rate)
