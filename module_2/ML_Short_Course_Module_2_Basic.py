@@ -145,3 +145,236 @@ def binarization_example(training_file_names):
         '\nBinarized target values the first few storm objects:\n{0:s}'
     ).format(str(these_target_values))
     print(message_string)
+
+
+def linear_regression_example(training_file_names, validation_file_names):
+    """Trains linear-regression model.
+    
+    :param training_file_names: 1-D list of paths to training files.
+    :param validation_file_names: 1-D list of paths to validation files.
+    """
+
+    training_predictor_table, training_target_table = (
+        utils.read_many_feature_files(training_file_names)[1:]
+    )
+    print(MINOR_SEPARATOR_STRING)
+
+    validation_predictor_table, validation_target_table = (
+        utils.read_many_feature_files(validation_file_names)[1:]
+    )
+    print(MINOR_SEPARATOR_STRING)
+
+    linreg_model_object = utils.setup_linear_regression(lambda1=0., lambda2=0.)
+    utils.train_linear_regression(
+        model_object=linreg_model_object,
+        training_predictor_table=training_predictor_table,
+        training_target_table=training_target_table)
+
+    training_predictions = linreg_model_object.predict(
+        training_predictor_table.as_matrix()
+    )
+    mean_training_target_value = numpy.mean(
+        training_target_table[utils.TARGET_NAME].values
+    )
+
+    _ = utils.evaluate_regression(
+        target_values=training_target_table[utils.TARGET_NAME].values,
+        predicted_target_values=training_predictions,
+        mean_training_target_value=mean_training_target_value,
+        dataset_name='training')
+    print(MINOR_SEPARATOR_STRING)
+
+    validation_predictions = linreg_model_object.predict(
+        validation_predictor_table.as_matrix()
+    )
+
+    _ = utils.evaluate_regression(
+        target_values=validation_target_table[utils.TARGET_NAME].values,
+        predicted_target_values=validation_predictions,
+        mean_training_target_value=mean_training_target_value,
+        dataset_name='validation')
+
+
+def plot_linear_regression_coeffs(linreg_model_object,
+                                  training_predictor_table):
+    """Plots linear-regression coefficients.
+
+    :param linreg_model_object: Trained instance of `sklearn.linear_model`.
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    """
+
+    utils.plot_model_coefficients(
+        model_object=linreg_model_object,
+        predictor_names=list(training_predictor_table)
+    )
+
+
+def ridge_regression_example(
+        training_predictor_table, training_target_table,
+        validation_predictor_table, validation_target_table):
+    """Trains ridge-regression model.
+
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    :param training_target_table: Same.
+    :param validation_predictor_table: Same.
+    :param validation_target_table: Same.
+    """
+
+    ridge_model_object = utils.setup_linear_regression(
+        lambda1=0., lambda2=0.001)
+
+    utils.train_linear_regression(
+        model_object=ridge_model_object,
+        training_predictor_table=training_predictor_table,
+        training_target_table=training_target_table)
+
+    training_predictions = ridge_model_object.predict(
+        training_predictor_table.as_matrix()
+    )
+    mean_training_target_value = numpy.mean(
+        training_target_table[utils.TARGET_NAME].values
+    )
+
+    _ = utils.evaluate_regression(
+        target_values=training_target_table[utils.TARGET_NAME].values,
+        predicted_target_values=training_predictions,
+        mean_training_target_value=mean_training_target_value,
+        dataset_name='training')
+    print(MINOR_SEPARATOR_STRING)
+
+    validation_predictions = ridge_model_object.predict(
+        validation_predictor_table.as_matrix()
+    )
+
+    _ = utils.evaluate_regression(
+        target_values=validation_target_table[utils.TARGET_NAME].values,
+        predicted_target_values=validation_predictions,
+        mean_training_target_value=mean_training_target_value,
+        dataset_name='validation')
+
+
+def plot_ridge_regression_coeffs(ridge_model_object, training_predictor_table):
+    """Plots ridge-regression coefficients.
+
+    :param ridge_model_object: Trained instance of `sklearn.linear_model`.
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    """
+
+    utils.plot_model_coefficients(
+        model_object=ridge_model_object,
+        predictor_names=list(training_predictor_table)
+    )
+
+
+def lasso_regression_example(
+        training_predictor_table, training_target_table,
+        validation_predictor_table, validation_target_table):
+    """Trains lasso-regression model.
+
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    :param training_target_table: Same.
+    :param validation_predictor_table: Same.
+    :param validation_target_table: Same.
+    """
+
+    lasso_model_object = utils.setup_linear_regression(
+        lambda1=0.001, lambda2=0.)
+
+    utils.train_linear_regression(
+        model_object=lasso_model_object,
+        training_predictor_table=training_predictor_table,
+        training_target_table=training_target_table)
+
+    training_predictions = lasso_model_object.predict(
+        training_predictor_table.as_matrix()
+    )
+    mean_training_target_value = numpy.mean(
+        training_target_table[utils.TARGET_NAME].values
+    )
+
+    _ = utils.evaluate_regression(
+        target_values=training_target_table[utils.TARGET_NAME].values,
+        predicted_target_values=training_predictions,
+        mean_training_target_value=mean_training_target_value,
+        dataset_name='training')
+    print(MINOR_SEPARATOR_STRING)
+
+    validation_predictions = lasso_model_object.predict(
+        validation_predictor_table.as_matrix()
+    )
+
+    _ = utils.evaluate_regression(
+        target_values=validation_target_table[utils.TARGET_NAME].values,
+        predicted_target_values=validation_predictions,
+        mean_training_target_value=mean_training_target_value,
+        dataset_name='validation')
+
+
+def plot_lasso_regression_coeffs(lasso_model_object, training_predictor_table):
+    """Plots lasso-regression coefficients.
+
+    :param lasso_model_object: Trained instance of `sklearn.linear_model`.
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    """
+
+    utils.plot_model_coefficients(
+        model_object=lasso_model_object,
+        predictor_names=list(training_predictor_table)
+    )
+
+
+def elastic_net_example(
+        training_predictor_table, training_target_table,
+        validation_predictor_table, validation_target_table):
+    """Trains elastic-net model.
+
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    :param training_target_table: Same.
+    :param validation_predictor_table: Same.
+    :param validation_target_table: Same.
+    """
+
+    elastic_net_model_object = utils.setup_linear_regression(
+        lambda1=1e-5, lambda2=1e-3)
+
+    utils.train_linear_regression(
+        model_object=elastic_net_model_object,
+        training_predictor_table=training_predictor_table,
+        training_target_table=training_target_table)
+
+    training_predictions = elastic_net_model_object.predict(
+        training_predictor_table.as_matrix()
+    )
+    mean_training_target_value = numpy.mean(
+        training_target_table[utils.TARGET_NAME].values
+    )
+
+    _ = utils.evaluate_regression(
+        target_values=training_target_table[utils.TARGET_NAME].values,
+        predicted_target_values=training_predictions,
+        mean_training_target_value=mean_training_target_value,
+        dataset_name='training')
+    print(MINOR_SEPARATOR_STRING)
+
+    validation_predictions = elastic_net_model_object.predict(
+        validation_predictor_table.as_matrix()
+    )
+
+    _ = utils.evaluate_regression(
+        target_values=validation_target_table[utils.TARGET_NAME].values,
+        predicted_target_values=validation_predictions,
+        mean_training_target_value=mean_training_target_value,
+        dataset_name='validation')
+
+
+def plot_elastic_net_coeffs(elastic_net_model_object, training_predictor_table):
+    """Plots elastic-net coefficients.
+
+    :param elastic_net_model_object: Trained instance of `sklearn.linear_model`.
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    """
+
+    utils.plot_model_coefficients(
+        model_object=elastic_net_model_object,
+        predictor_names=list(training_predictor_table)
+    )

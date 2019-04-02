@@ -1,11 +1,15 @@
 """Helper methods for Module 2."""
 
+import errno
 import glob
 import os.path
+import pickle
 import time
 import calendar
 import numpy
 import pandas
+import matplotlib.pyplot as pyplot
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 
 # Directories.
 MODULE4_DIR_NAME = '.'
@@ -32,9 +36,38 @@ NUM_VALUES_KEY = 'num_values'
 MEAN_VALUE_KEY = 'mean_value'
 MEAN_OF_SQUARES_KEY = 'mean_of_squares'
 
+MAE_KEY = 'mean_absolute_error'
+MSE_KEY = 'mean_squared_error'
+MEAN_BIAS_KEY = 'mean_bias'
+MAE_SKILL_SCORE_KEY = 'mae_skill_score'
+MSE_SKILL_SCORE_KEY = 'mse_skill_score'
+
+# Plotting constants.
+FIGURE_WIDTH_INCHES = 15
+FIGURE_HEIGHT_INCHES = 15
+FIGURE_RESOLUTION_DPI = 300
+
+BAR_GRAPH_FACE_COLOUR = numpy.array([27, 158, 119], dtype=float) / 255
+BAR_GRAPH_EDGE_COLOUR = numpy.full(3, 0.)
+BAR_GRAPH_EDGE_WIDTH = 2
+BAR_GRAPH_FONT_SIZE = 16
+BAR_GRAPH_FONT_COLOUR = numpy.array([217, 95, 2], dtype=float) / 255
+
+FONT_SIZE = 30
+pyplot.rc('font', size=FONT_SIZE)
+pyplot.rc('axes', titlesize=FONT_SIZE)
+pyplot.rc('axes', labelsize=FONT_SIZE)
+pyplot.rc('xtick', labelsize=FONT_SIZE)
+pyplot.rc('ytick', labelsize=FONT_SIZE)
+pyplot.rc('legend', fontsize=FONT_SIZE)
+pyplot.rc('figure', titlesize=FONT_SIZE)
+
 # Misc constants.
 DATE_FORMAT = '%Y%m%d'
 DATE_FORMAT_REGEX = '[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]'
+
+RANDOM_SEED = 6695
+LAMBDA_TOLERANCE = 1e-10
 
 
 def time_string_to_unix(time_string, time_format):
@@ -420,3 +453,207 @@ def binarize_target_values(target_values, binarization_threshold):
     """
 
     return (target_values >= binarization_threshold).astype(int)
+
+
+def _lambdas_to_sklearn_inputs(lambda1, lambda2):
+    """Converts lambdas to input arguments for scikit-learn.
+
+    :param lambda1: L1-regularization weight.
+    :param lambda2: L2-regularization weight.
+    :return: alpha: Input arg for scikit-learn model.
+    :return: l1_ratio: Input arg for scikit-learn model.
+    """
+
+    return lambda1 + lambda2, lambda1 / (lambda1 + lambda2)
+
+
+def setup_linear_regression(lambda1=0., lambda2=0.):
+    """Sets up (but does not train) linear-regression model.
+
+    :param lambda1: L1-regularization weight.
+    :param lambda2: L2-regularization weight.
+    :return: model_object: Instance of `sklearn.linear_model`.
+    """
+
+    assert lambda1 >= 0
+    assert lambda2 >= 0
+
+    if lambda1 < LAMBDA_TOLERANCE and lambda2 < LAMBDA_TOLERANCE:
+        return LinearRegression(fit_intercept=True, normalize=False)
+
+    if lambda1 < LAMBDA_TOLERANCE:
+        return Ridge(alpha=lambda2, fit_intercept=True, normalize=False,
+                     random_state=RANDOM_SEED)
+
+    if lambda2 < LAMBDA_TOLERANCE:
+        return Lasso(alpha=lambda1, fit_intercept=True, normalize=False,
+                     random_state=RANDOM_SEED)
+
+    alpha, l1_ratio = _lambdas_to_sklearn_inputs(
+        lambda1=lambda1, lambda2=lambda2)
+
+    return ElasticNet(alpha=alpha, l1_ratio=l1_ratio, fit_intercept=True,
+                      normalize=False, random_state=RANDOM_SEED)
+
+
+def train_linear_regression(model_object, training_predictor_table,
+                            training_target_table):
+    """Trains linear-regression model.
+
+    :param model_object: Untrained model created by `setup_linear_regression`.
+    :param training_predictor_table: See doc for `read_feature_file`.
+    :param training_target_table: Same.
+    :return: model_object: Trained version of input.
+    """
+
+    model_object.fit(
+        X=training_predictor_table.as_matrix(),
+        y=training_target_table[TARGET_NAME].values
+    )
+
+    return model_object
+
+
+def _create_directory(directory_name=None, file_name=None):
+    """Creates directory (along with parents if necessary).
+
+    This method creates directories only when necessary, so you don't have to
+    worry about it overwriting anything.
+
+    :param directory_name: Name of desired directory.
+    :param file_name: [used only if `directory_name is None`]
+        Path to desired file.  All directories in path will be created.
+    """
+
+    if directory_name is None:
+        directory_name = os.path.split(file_name)[0]
+
+    try:
+        os.makedirs(directory_name)
+    except OSError as this_error:
+        if this_error.errno == errno.EEXIST and os.path.isdir(directory_name):
+            pass
+        else:
+            raise
+
+
+def write_model(model_object, pickle_file_name):
+    """Writes model to Pickle file.
+
+    :param model_object: Trained model (instance of `sklearn.linear_model`, for
+        example).
+    :param pickle_file_name: Path to output file.
+    """
+
+    print('Writing model to: "{0:s}"...'.format(pickle_file_name))
+    _create_directory(file_name=pickle_file_name)
+
+    file_handle = open(pickle_file_name, 'wb')
+    pickle.dump(model_object, file_handle)
+    file_handle.close()
+
+
+def evaluate_regression(target_values, predicted_target_values,
+                        mean_training_target_value, dataset_name):
+    """Evaluates regression model.
+
+    E = number of examples
+
+    :param target_values: length-E numpy array of actual target values.
+    :param predicted_target_values: length-E numpy array of predictions.
+    :param mean_training_target_value: Mean target value in training data.
+    :param dataset_name: Name of dataset (e.g., "validation").
+    :return: evaluation_dict: Dictionary with the following keys.
+    evaluation_dict['mean_absolute_error']: Mean absolute error (MAE).
+    evaluation_dict['mean_squared_error']: Mean squared error (MSE).
+    evaluation_dict['mean_bias']: Mean bias (signed error).
+    evaluation_dict['mae_skill_score']: MAE skill score (fractional improvement
+        over climatology, in range -1...1).
+    evaluation_dict['mse_skill_score']: MSE skill score (fractional improvement
+        over climatology, in range -1...1).
+    """
+
+    signed_errors = predicted_target_values - target_values
+    mean_bias = numpy.mean(signed_errors)
+    mean_absolute_error = numpy.mean(numpy.absolute(signed_errors))
+    mean_squared_error = numpy.mean(signed_errors ** 2)
+
+    climo_signed_errors = mean_training_target_value - target_values
+    climo_mae = numpy.mean(numpy.absolute(climo_signed_errors))
+    climo_mse = numpy.mean(climo_signed_errors ** 2)
+
+    mae_skill_score = (climo_mae - mean_absolute_error) / climo_mae
+    mse_skill_score = (climo_mse - mean_squared_error) / climo_mse
+
+    evaluation_dict = {
+        MAE_KEY: mean_absolute_error,
+        MSE_KEY: mean_squared_error,
+        MEAN_BIAS_KEY: mean_bias,
+        MAE_SKILL_SCORE_KEY: mae_skill_score,
+        MSE_SKILL_SCORE_KEY: mse_skill_score
+    }
+
+    dataset_name = dataset_name[0].upper() + dataset_name[1:]
+
+    print('{0:s} MAE (mean absolute error) = {1:.3e} s^-1'.format(
+        dataset_name, evaluation_dict[MAE_KEY]
+    ))
+    print('{0:s} MSE (mean squared error) = {1:.3e} s^-2'.format(
+        dataset_name, evaluation_dict[MSE_KEY]
+    ))
+    print('{0:s} bias (mean signed error) = {1:.3e} s^-1'.format(
+        dataset_name, evaluation_dict[MEAN_BIAS_KEY]
+    ))
+
+    message_string = (
+        '{0:s} MAE skill score (improvement over climatology) = {1:.3f}'
+    ).format(dataset_name, evaluation_dict[MAE_SKILL_SCORE_KEY])
+    print(message_string)
+
+    message_string = (
+        '{0:s} MSE skill score (improvement over climatology) = {1:.3f}'
+    ).format(dataset_name, evaluation_dict[MSE_SKILL_SCORE_KEY])
+    print(message_string)
+
+    return evaluation_dict
+
+
+def plot_model_coefficients(model_object, predictor_names):
+    """Plots coefficients for linear- or logistic-regression model.
+
+    :param model_object: Trained instance of `sklearn.linear_model`.
+    :param predictor_names: 1-D list of predictor names, in the same order used
+        to train the model.
+    """
+
+    coefficients = model_object.coef_
+    num_predictors = len(predictor_names)
+    y_coords = numpy.linspace(
+        0, num_predictors - 1, num=num_predictors, dtype=float)
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, coefficients, color=BAR_GRAPH_FACE_COLOUR,
+        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
+
+    pyplot.xlabel('Coefficient')
+    pyplot.ylabel('Predictor variable')
+
+    pyplot.yticks([], [])
+    x_tick_values, _ = pyplot.xticks()
+    pyplot.xticks(x_tick_values, rotation=90)
+
+    x_min = numpy.percentile(coefficients, 1.)
+    x_max = numpy.percentile(coefficients, 99.)
+    pyplot.xlim([x_min, x_max])
+
+    for j in range(num_predictors):
+        axes_object.text(
+            0, y_coords[j], predictor_names[j], color=BAR_GRAPH_FONT_COLOUR,
+            horizontalalignment='center', verticalalignment='center',
+            fontsize=BAR_GRAPH_FONT_SIZE)
+
+    pyplot.show()
