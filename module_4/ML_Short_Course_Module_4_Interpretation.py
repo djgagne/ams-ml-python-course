@@ -168,7 +168,7 @@ def norm_and_denorm(training_file_names):
     print(message_string)
 
 
-def binarization(training_file_names):
+def binarization_example(training_file_names):
     """Finds and applies binarization threshold.
 
     :param training_file_names: 1-D list of paths to input files.
@@ -1175,6 +1175,8 @@ def novelty_detection_example(
 
     test_indices = numpy.argsort(-1 * max_target_by_example_s01)[:100]
     baseline_indices = numpy.argsort(-1 * max_target_by_example_s01)[100:]
+
+    numpy.random.seed(6695)
     numpy.random.shuffle(baseline_indices)
     baseline_indices = baseline_indices[:100]
 

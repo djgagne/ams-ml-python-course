@@ -194,7 +194,7 @@ METRIC_FUNCTION_DICT = {
 DEFAULT_NUM_BWO_ITERATIONS = 200
 DEFAULT_BWO_LEARNING_RATE = 0.01
 
-# Machine-learning constants.
+# Misc constants.
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
 
