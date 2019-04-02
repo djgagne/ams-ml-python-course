@@ -8,11 +8,17 @@ import time
 import calendar
 import numpy
 import pandas
+import matplotlib.colors
 import matplotlib.pyplot as pyplot
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+import sklearn.metrics
+import sklearn.linear_model
+import sklearn.tree
+from module_4 import roc_curves
+from module_4 import performance_diagrams as perf_diagrams
+from module_4 import attributes_diagrams as attr_diagrams
 
 # Directories.
-MODULE4_DIR_NAME = '.'
+MODULE2_DIR_NAME = '.'
 SHORT_COURSE_DIR_NAME = '..'
 DEFAULT_FEATURE_DIR_NAME = (
     '{0:s}/data/track_data_ncar_ams_3km_csv_small'
@@ -31,6 +37,7 @@ EXTRANEOUS_COLUMNS = [
 ]
 
 TARGET_NAME = 'RVORT1_MAX-future_max'
+BINARIZED_TARGET_NAME = 'strong_future_rotation_flag'
 
 NUM_VALUES_KEY = 'num_values'
 MEAN_VALUE_KEY = 'mean_value'
@@ -479,21 +486,25 @@ def setup_linear_regression(lambda1=0., lambda2=0.):
     assert lambda2 >= 0
 
     if lambda1 < LAMBDA_TOLERANCE and lambda2 < LAMBDA_TOLERANCE:
-        return LinearRegression(fit_intercept=True, normalize=False)
+        return sklearn.linear_model.LinearRegression(
+            fit_intercept=True, normalize=False)
 
     if lambda1 < LAMBDA_TOLERANCE:
-        return Ridge(alpha=lambda2, fit_intercept=True, normalize=False,
-                     random_state=RANDOM_SEED)
+        return sklearn.linear_model.Ridge(
+            alpha=lambda2, fit_intercept=True, normalize=False,
+            random_state=RANDOM_SEED)
 
     if lambda2 < LAMBDA_TOLERANCE:
-        return Lasso(alpha=lambda1, fit_intercept=True, normalize=False,
-                     random_state=RANDOM_SEED)
+        return sklearn.linear_model.Lasso(
+            alpha=lambda1, fit_intercept=True, normalize=False,
+            random_state=RANDOM_SEED)
 
     alpha, l1_ratio = _lambdas_to_sklearn_inputs(
         lambda1=lambda1, lambda2=lambda2)
 
-    return ElasticNet(alpha=alpha, l1_ratio=l1_ratio, fit_intercept=True,
-                      normalize=False, random_state=RANDOM_SEED)
+    return sklearn.linear_model.ElasticNet(
+        alpha=alpha, l1_ratio=l1_ratio, fit_intercept=True, normalize=False,
+        random_state=RANDOM_SEED)
 
 
 def train_linear_regression(model_object, training_predictor_table,
@@ -553,8 +564,9 @@ def write_model(model_object, pickle_file_name):
     file_handle.close()
 
 
-def evaluate_regression(target_values, predicted_target_values,
-                        mean_training_target_value, dataset_name):
+def evaluate_regression(
+        target_values, predicted_target_values, mean_training_target_value,
+        verbose=True, dataset_name=None):
     """Evaluates regression model.
 
     E = number of examples
@@ -562,7 +574,10 @@ def evaluate_regression(target_values, predicted_target_values,
     :param target_values: length-E numpy array of actual target values.
     :param predicted_target_values: length-E numpy array of predictions.
     :param mean_training_target_value: Mean target value in training data.
-    :param dataset_name: Name of dataset (e.g., "validation").
+    :param verbose: Boolean flag.  If True, will print results to command
+        window.
+    :param dataset_name: Dataset name (e.g., "validation").  Used only if
+        `verbose == True`, to print results to command window.
     :return: evaluation_dict: Dictionary with the following keys.
     evaluation_dict['mean_absolute_error']: Mean absolute error (MAE).
     evaluation_dict['mean_squared_error']: Mean squared error (MSE).
@@ -592,6 +607,9 @@ def evaluate_regression(target_values, predicted_target_values,
         MAE_SKILL_SCORE_KEY: mae_skill_score,
         MSE_SKILL_SCORE_KEY: mse_skill_score
     }
+
+    if not verbose:
+        return evaluation_dict
 
     dataset_name = dataset_name[0].upper() + dataset_name[1:]
 
@@ -627,6 +645,10 @@ def plot_model_coefficients(model_object, predictor_names):
     """
 
     coefficients = model_object.coef_
+    num_dimensions = len(coefficients.shape)
+    if num_dimensions > 1:
+        coefficients = coefficients[0, ...]
+
     num_predictors = len(predictor_names)
     y_coords = numpy.linspace(
         0, num_predictors - 1, num=num_predictors, dtype=float)
@@ -656,4 +678,254 @@ def plot_model_coefficients(model_object, predictor_names):
             horizontalalignment='center', verticalalignment='center',
             fontsize=BAR_GRAPH_FONT_SIZE)
 
+
+def _add_colour_bar(
+        axes_object, colour_map_object, values_to_colour, min_colour_value,
+        max_colour_value, colour_norm_object=None,
+        orientation_string='vertical', extend_min=True, extend_max=True):
+    """Adds colour bar to existing axes.
+
+    :param axes_object: Existing axes (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).
+    :param colour_map_object: Colour scheme (instance of
+        `matplotlib.pyplot.cm`).
+    :param values_to_colour: numpy array of values to colour.
+    :param min_colour_value: Minimum value in colour scheme.
+    :param max_colour_value: Max value in colour scheme.
+    :param colour_norm_object: Instance of `matplotlib.colors.BoundaryNorm`,
+        defining the scale of the colour map.  If `colour_norm_object is None`,
+        will assume that scale is linear.
+    :param orientation_string: Orientation of colour bar ("vertical" or
+        "horizontal").
+    :param extend_min: Boolean flag.  If True, the bottom of the colour bar will
+        have an arrow.  If False, it will be a flat line, suggesting that lower
+        values are not possible.
+    :param extend_max: Same but for top of colour bar.
+    :return: colour_bar_object: Colour bar (instance of
+        `matplotlib.pyplot.colorbar`) created by this method.
+    """
+
+    if colour_norm_object is None:
+        colour_norm_object = matplotlib.colors.Normalize(
+            vmin=min_colour_value, vmax=max_colour_value, clip=False)
+
+    scalar_mappable_object = pyplot.cm.ScalarMappable(
+        cmap=colour_map_object, norm=colour_norm_object)
+    scalar_mappable_object.set_array(values_to_colour)
+
+    if extend_min and extend_max:
+        extend_string = 'both'
+    elif extend_min:
+        extend_string = 'min'
+    elif extend_max:
+        extend_string = 'max'
+    else:
+        extend_string = 'neither'
+
+    if orientation_string == 'horizontal':
+        padding = 0.075
+    else:
+        padding = 0.05
+
+    colour_bar_object = pyplot.colorbar(
+        ax=axes_object, mappable=scalar_mappable_object,
+        orientation=orientation_string, pad=padding, extend=extend_string,
+        shrink=0.8)
+
+    colour_bar_object.ax.tick_params(labelsize=FONT_SIZE)
+    return colour_bar_object
+
+
+def plot_scores_2d(
+        score_matrix, min_colour_value, max_colour_value, x_tick_labels,
+        y_tick_labels, colour_map_object=pyplot.cm.plasma):
+    """Plots scores on 2-D grid.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param score_matrix: M-by-N numpy array of scores.
+    :param min_colour_value: Minimum value in colour scheme.
+    :param max_colour_value: Max value in colour scheme.
+    :param x_tick_labels: length-N numpy array of tick values.
+    :param y_tick_labels: length-M numpy array of tick values.
+    :param colour_map_object: Colour scheme (instance of
+        `matplotlib.pyplot.cm`).
+    """
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    pyplot.imshow(
+        score_matrix, cmap=colour_map_object, origin='lower',
+        vmin=min_colour_value, vmax=max_colour_value)
+
+    x_tick_values = numpy.linspace(
+        0, score_matrix.shape[1] - 1, num=score_matrix.shape[1], dtype=float
+    )
+    y_tick_values = numpy.linspace(
+        0, score_matrix.shape[0] - 1, num=score_matrix.shape[0], dtype=float
+    )
+
+    pyplot.xticks(x_tick_values, x_tick_labels)
+    pyplot.yticks(y_tick_values, y_tick_labels)
+
+    _add_colour_bar(
+        axes_object=axes_object, colour_map_object=colour_map_object,
+        values_to_colour=score_matrix, min_colour_value=min_colour_value,
+        max_colour_value=max_colour_value)
+
+
+def setup_logistic_regression(lambda1=0., lambda2=0.):
+    """Sets up (but does not train) logistic-regression model.
+
+    :param lambda1: L1-regularization weight.
+    :param lambda2: L2-regularization weight.
+    :return: model_object: Instance of `sklearn.linear_model.SGDClassifier`.
+    """
+
+    assert lambda1 >= 0
+    assert lambda2 >= 0
+
+    if lambda1 < LAMBDA_TOLERANCE and lambda2 < LAMBDA_TOLERANCE:
+        return sklearn.linear_model.SGDClassifier(
+            loss='log', penalty='none', fit_intercept=True, verbose=0,
+            random_state=RANDOM_SEED)
+
+    if lambda1 < LAMBDA_TOLERANCE:
+        return sklearn.linear_model.SGDClassifier(
+            loss='log', penalty='l2', alpha=lambda2, fit_intercept=True,
+            verbose=0, random_state=RANDOM_SEED)
+
+    if lambda2 < LAMBDA_TOLERANCE:
+        return sklearn.linear_model.SGDClassifier(
+            loss='log', penalty='l1', alpha=lambda1, fit_intercept=True,
+            verbose=0, random_state=RANDOM_SEED)
+
+    alpha, l1_ratio = _lambdas_to_sklearn_inputs(
+        lambda1=lambda1, lambda2=lambda2)
+
+    return sklearn.linear_model.SGDClassifier(
+        loss='log', penalty='elasticnet', alpha=alpha, l1_ratio=l1_ratio,
+        fit_intercept=True, verbose=0, random_state=RANDOM_SEED)
+
+
+def train_logistic_regression(model_object, training_predictor_table,
+                              training_target_table):
+    """Trains logistic-regression model.
+
+    :param model_object: Untrained model created by `setup_logistic_regression`.
+    :param training_predictor_table: See doc for `read_feature_file`.
+    :param training_target_table: Same.
+    :return: model_object: Trained version of input.
+    """
+
+    model_object.fit(
+        X=training_predictor_table.as_matrix(),
+        y=training_target_table[BINARIZED_TARGET_NAME].values
+    )
+
+    return model_object
+
+
+def eval_binary_classifn(observed_labels, forecast_probabilities,
+                         training_event_frequency, dataset_name):
+    """Evaluates binary-classification model.
+
+    E = number of examples
+
+    :param observed_labels: length-E numpy array of observed labels (integers in
+        0...1, where 1 means that event occurred).
+    :param forecast_probabilities: length-E numpy array with forecast
+        probabilities of event (positive class).
+    :param training_event_frequency: Frequency of event in training data.
+    :param dataset_name: Name of dataset (e.g., "validation").
+    """
+
+    pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
+        observed_labels=observed_labels,
+        forecast_probabilities=forecast_probabilities)
+
+    area_under_roc_curve = sklearn.metrics.auc(
+        x=pofd_by_threshold, y=pod_by_threshold)
+
+    dataset_name = dataset_name[0].upper() + dataset_name[1:]
+    title_string = '{0:s} ROC curve (area under curve = {1:.3f})'.format(
+        dataset_name, area_under_roc_curve)
+
+    pyplot.title(title_string)
     pyplot.show()
+
+    perf_diagrams.plot_performance_diagram(
+        observed_labels=observed_labels,
+        forecast_probabilities=forecast_probabilities)
+
+    pyplot.title('{0:s} performance diagram'.format(dataset_name))
+    pyplot.show()
+
+    mean_forecast_by_bin, event_freq_by_bin, num_examples_by_bin = (
+        attr_diagrams.plot_attributes_diagram(
+            observed_labels=observed_labels,
+            forecast_probabilities=forecast_probabilities, num_bins=20)
+    )
+
+    uncertainty = training_event_frequency * (1. - training_event_frequency)
+
+    this_numerator = numpy.nansum(
+        num_examples_by_bin *
+        (mean_forecast_by_bin - event_freq_by_bin) ** 2
+    )
+    reliability = this_numerator / numpy.sum(num_examples_by_bin)
+
+    this_numerator = numpy.nansum(
+        num_examples_by_bin *
+        (event_freq_by_bin - training_event_frequency) ** 2
+    )
+    resolution = this_numerator / numpy.sum(num_examples_by_bin)
+
+    # brier_score = uncertainty + reliability - resolution
+    brier_skill_score = (resolution - reliability) / uncertainty
+
+    title_string = (
+        '{0:s} attributes diagram (Brier skill score = {1:.3f})'
+    ).format(dataset_name, brier_skill_score)
+
+    # pyplot.text(
+    #     0.5, 0.95, title_string, color='k', horizontalalignment='center',
+    #     verticalalignment='center', fontsize=FONT_SIZE)
+
+    pyplot.suptitle(title_string)
+    pyplot.show()
+
+
+def setup_classification_tree(min_examples_at_split=30,
+                              min_examples_at_leaf=30):
+    """Sets up (but does not train) decision tree for classification.
+
+    :param min_examples_at_split: Minimum number of examples at split node.
+    :param min_examples_at_leaf: Minimum number of examples at leaf node.
+    :return: model_object: Instance of `sklearn.tree.DecisionTreeClassifier`.
+    """
+
+    return sklearn.tree.DecisionTreeClassifier(
+        criterion='entropy', min_samples_split=min_examples_at_split,
+        min_samples_leaf=min_examples_at_leaf, random_state=RANDOM_SEED)
+
+
+def train_classification_tree(model_object, training_predictor_table,
+                              training_target_table):
+    """Trains decision tree for classification.
+
+    :param model_object: Untrained model created by `setup_classification_tree`.
+    :param training_predictor_table: See doc for `read_feature_file`.
+    :param training_target_table: Same.
+    :return: model_object: Trained version of input.
+    """
+
+    model_object.fit(
+        X=training_predictor_table.as_matrix(),
+        y=training_target_table[BINARIZED_TARGET_NAME].values
+    )
+
+    return model_object
