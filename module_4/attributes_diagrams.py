@@ -30,10 +30,10 @@ HISTOGRAM_HEIGHT = 0.3
 HISTOGRAM_X_TICK_VALUES = numpy.linspace(0, 1, num=6, dtype=float)
 HISTOGRAM_Y_TICK_SPACING = 0.1
 
-FIGURE_WIDTH_INCHES = 15
-FIGURE_HEIGHT_INCHES = 15
+FIGURE_WIDTH_INCHES = 10
+FIGURE_HEIGHT_INCHES = 10
 
-FONT_SIZE = 30
+FONT_SIZE = 20
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
 pyplot.rc('axes', labelsize=FONT_SIZE)
@@ -270,8 +270,9 @@ def plot_reliability_curve(
     :param forecast_probabilities: length-E numpy array with forecast
         probabilities of label = 1.
     :param num_bins: Number of bins for forecast probability.
-    :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
-        Will plot on these axes.
+    :param axes_object: Will plot on these axes (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).  If `axes_object is None`,
+        will create new axes.
     :return: mean_forecast_probs: See doc for `_get_points_in_relia_curve`.
     :return: mean_event_frequencies: Same.
     :return: num_examples_by_bin: Same.
@@ -312,12 +313,17 @@ def plot_reliability_curve(
 
 
 def plot_attributes_diagram(
-        observed_labels, forecast_probabilities, num_bins=DEFAULT_NUM_BINS):
+        observed_labels, forecast_probabilities, num_bins=DEFAULT_NUM_BINS,
+        figure_object=None, axes_object=None):
     """Plots attributes diagram.
 
     :param observed_labels: See doc for `plot_reliability_curve`.
     :param forecast_probabilities: Same.
     :param num_bins: Same.
+    :param figure_object: Will plot on this figure (instance of
+        `matplotlib.figure.Figure`).  If `figure_object is None`, will create a
+        new one.
+    :param axes_object: See doc for `plot_reliability_curve`.
     :return: mean_forecast_probs: See doc for `_get_points_in_relia_curve`.
     :return: mean_event_frequencies: Same.
     :return: num_examples_by_bin: Same.
@@ -329,9 +335,10 @@ def plot_attributes_diagram(
             forecast_probabilities=forecast_probabilities, num_bins=num_bins)
     )
 
-    figure_object, axes_object = pyplot.subplots(
-        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-    )
+    if figure_object is None or axes_object is None:
+        figure_object, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
 
     _plot_background(axes_object=axes_object, observed_labels=observed_labels)
     _plot_forecast_histogram(figure_object=figure_object,

@@ -1,13 +1,12 @@
 """Non-notebook version of Module 2 for AMS 2019 short course."""
 
 import copy
+import warnings
 import numpy
 import matplotlib.pyplot as pyplot
-import sklearn.tree
-from sklearn.externals.six import StringIO
-import pydotplus
-from IPython.display import Image
 from module_2 import utils
+
+warnings.filterwarnings('ignore')
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
@@ -100,7 +99,7 @@ def normalize_tvt_data(
     these_predictor_values = (
         training_predictor_table_denorm[predictor_names[0]].values[:10]
     )
-    
+
     message_string = (
         'Original values of "{0:s}" for the first training examples:\n{1:s}'
     ).format(predictor_names[0], str(these_predictor_values))
@@ -143,10 +142,10 @@ def normalize_tvt_data(
         normalization_dict=normalization_dict)
 
 
-def linear_regression_example(
+def train_linear_regression(
         training_predictor_table, training_target_table,
         validation_predictor_table, validation_target_table):
-    """Trains linear-regression model.
+    """Trains plain linear regression.
 
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     :param training_target_table: Same.
@@ -154,15 +153,15 @@ def linear_regression_example(
     :param validation_target_table: Same.
     """
 
-    plain_linear_model_object = utils.setup_linear_regression(
+    linreg_model_object = utils.setup_linear_regression(
         lambda1=0., lambda2=0.)
 
     _ = utils.train_linear_regression(
-        model_object=plain_linear_model_object,
+        model_object=linreg_model_object,
         training_predictor_table=training_predictor_table,
         training_target_table=training_target_table)
 
-    training_predictions = plain_linear_model_object.predict(
+    training_predictions = linreg_model_object.predict(
         training_predictor_table.as_matrix()
     )
     mean_training_target_value = numpy.mean(
@@ -176,7 +175,7 @@ def linear_regression_example(
         dataset_name='training')
     print(MINOR_SEPARATOR_STRING)
 
-    validation_predictions = plain_linear_model_object.predict(
+    validation_predictions = linreg_model_object.predict(
         validation_predictor_table.as_matrix()
     )
 
@@ -187,26 +186,26 @@ def linear_regression_example(
         dataset_name='validation')
 
 
-def plot_linear_regression_coeffs(plain_linear_model_object,
+def plot_linear_regression_coeffs(linreg_model_object,
                                   training_predictor_table):
-    """Plots linear-regression coefficients.
+    """Plots coefficients for plain linear regression.
 
-    :param plain_linear_model_object: Trained instance of `sklearn.linear_model`.
+    :param linreg_model_object: Trained instance of `sklearn.linear_model`.
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     """
 
     utils.plot_model_coefficients(
-        model_object=plain_linear_model_object,
+        model_object=linreg_model_object,
         predictor_names=list(training_predictor_table)
     )
 
     pyplot.show()
 
 
-def ridge_regression_example(
+def train_linear_ridge(
         training_predictor_table, training_target_table,
         validation_predictor_table, validation_target_table):
-    """Trains ridge-regression model.
+    """Trains linear regression with ridge penalty.
 
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     :param training_target_table: Same.
@@ -214,15 +213,15 @@ def ridge_regression_example(
     :param validation_target_table: Same.
     """
 
-    ridge_model_object = utils.setup_linear_regression(
-        lambda1=0., lambda2=1.)
+    linear_ridge_model_object = utils.setup_linear_regression(
+        lambda1=0., lambda2=1e5)
 
     _ = utils.train_linear_regression(
-        model_object=ridge_model_object,
+        model_object=linear_ridge_model_object,
         training_predictor_table=training_predictor_table,
         training_target_table=training_target_table)
 
-    training_predictions = ridge_model_object.predict(
+    training_predictions = linear_ridge_model_object.predict(
         training_predictor_table.as_matrix()
     )
     mean_training_target_value = numpy.mean(
@@ -236,7 +235,7 @@ def ridge_regression_example(
         dataset_name='training')
     print(MINOR_SEPARATOR_STRING)
 
-    validation_predictions = ridge_model_object.predict(
+    validation_predictions = linear_ridge_model_object.predict(
         validation_predictor_table.as_matrix()
     )
 
@@ -247,25 +246,27 @@ def ridge_regression_example(
         dataset_name='validation')
 
 
-def plot_ridge_regression_coeffs(ridge_model_object, training_predictor_table):
-    """Plots ridge-regression coefficients.
+def plot_linear_ridge_coeffs(linear_ridge_model_object,
+                             training_predictor_table):
+    """Plots coefficients for linear regression with ridge penalty.
 
-    :param ridge_model_object: Trained instance of `sklearn.linear_model`.
+    :param linear_ridge_model_object: Trained instance of
+        `sklearn.linear_model`.
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     """
 
     utils.plot_model_coefficients(
-        model_object=ridge_model_object,
+        model_object=linear_ridge_model_object,
         predictor_names=list(training_predictor_table)
     )
 
     pyplot.show()
 
 
-def lasso_regression_example(
+def train_linear_lasso(
         training_predictor_table, training_target_table,
         validation_predictor_table, validation_target_table):
-    """Trains lasso-regression model.
+    """Trains linear regression with lasso penalty.
 
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     :param training_target_table: Same.
@@ -273,15 +274,15 @@ def lasso_regression_example(
     :param validation_target_table: Same.
     """
 
-    lasso_model_object = utils.setup_linear_regression(
-        lambda1=1e-6, lambda2=0.)
+    linear_lasso_model_object = utils.setup_linear_regression(
+        lambda1=1e-5, lambda2=0.)
 
     _ = utils.train_linear_regression(
-        model_object=lasso_model_object,
+        model_object=linear_lasso_model_object,
         training_predictor_table=training_predictor_table,
         training_target_table=training_target_table)
 
-    training_predictions = lasso_model_object.predict(
+    training_predictions = linear_lasso_model_object.predict(
         training_predictor_table.as_matrix()
     )
     mean_training_target_value = numpy.mean(
@@ -295,7 +296,7 @@ def lasso_regression_example(
         dataset_name='training')
     print(MINOR_SEPARATOR_STRING)
 
-    validation_predictions = lasso_model_object.predict(
+    validation_predictions = linear_lasso_model_object.predict(
         validation_predictor_table.as_matrix()
     )
 
@@ -306,25 +307,26 @@ def lasso_regression_example(
         dataset_name='validation')
 
 
-def plot_lasso_regression_coeffs(lasso_model_object, training_predictor_table):
-    """Plots lasso-regression coefficients.
+def plot_linear_lasso_coeffs(linear_lasso_model_object,
+                             training_predictor_table):
+    """Plots coefficients for linear regression with lasso penalty.
 
-    :param lasso_model_object: Trained instance of `sklearn.linear_model`.
+    :param linear_lasso_model_object: Trained instance of `sklearn.linear_model`.
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     """
 
     utils.plot_model_coefficients(
-        model_object=lasso_model_object,
+        model_object=linear_lasso_model_object,
         predictor_names=list(training_predictor_table)
     )
 
     pyplot.show()
 
 
-def elastic_net_example(
+def train_linear_elastic_net(
         training_predictor_table, training_target_table,
         validation_predictor_table, validation_target_table):
-    """Trains elastic-net model.
+    """Trains linear regression with elastic-net penalty.
 
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     :param training_target_table: Same.
@@ -332,15 +334,15 @@ def elastic_net_example(
     :param validation_target_table: Same.
     """
 
-    elastic_net_model_object = utils.setup_linear_regression(
-        lambda1=1e-6, lambda2=1.)
+    linear_en_model_object = utils.setup_linear_regression(
+        lambda1=1e-5, lambda2=5.)
 
     _ = utils.train_linear_regression(
-        model_object=elastic_net_model_object,
+        model_object=linear_en_model_object,
         training_predictor_table=training_predictor_table,
         training_target_table=training_target_table)
 
-    training_predictions = elastic_net_model_object.predict(
+    training_predictions = linear_en_model_object.predict(
         training_predictor_table.as_matrix()
     )
     mean_training_target_value = numpy.mean(
@@ -354,7 +356,7 @@ def elastic_net_example(
         dataset_name='training')
     print(MINOR_SEPARATOR_STRING)
 
-    validation_predictions = elastic_net_model_object.predict(
+    validation_predictions = linear_en_model_object.predict(
         validation_predictor_table.as_matrix()
     )
 
@@ -365,25 +367,25 @@ def elastic_net_example(
         dataset_name='validation')
 
 
-def plot_elastic_net_coeffs(elastic_net_model_object, training_predictor_table):
-    """Plots elastic-net coefficients.
+def plot_linear_en_coeffs(linear_en_model_object, training_predictor_table):
+    """Plots coefficients for linear regression with elastic-net penalty.
 
-    :param elastic_net_model_object: Trained instance of `sklearn.linear_model`.
+    :param linear_en_model_object: Trained instance of `sklearn.linear_model`.
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     """
 
     utils.plot_model_coefficients(
-        model_object=elastic_net_model_object,
+        model_object=linear_en_model_object,
         predictor_names=list(training_predictor_table)
     )
 
     pyplot.show()
 
 
-def train_for_linear_l1l2_experiment(
+def l1l2_experiment_training(
         training_predictor_table, training_target_table,
         validation_predictor_table, validation_target_table):
-    """Trains model for linear-model experiment with L1 and L2 regularization.
+    """Trains models for hyperparameter experiment with L1/L2 regularization.
 
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     :param training_target_table: Same.
@@ -392,7 +394,7 @@ def train_for_linear_l1l2_experiment(
     """
 
     lambda1_values = numpy.logspace(-8, -4, num=9)
-    lambda2_values = numpy.logspace(-8, -4, num=9)
+    lambda2_values = numpy.logspace(-4, 1, num=11)
 
     num_lambda1 = len(lambda1_values)
     num_lambda2 = len(lambda2_values)
@@ -454,11 +456,11 @@ def train_for_linear_l1l2_experiment(
                 utils.MSE_SKILL_SCORE_KEY]
 
 
-def plot_linear_l1l2_experiment(
+def l1l2_experiment_validation(
         lambda1_values, lambda2_values, validation_mae_matrix_s01,
         validation_mse_matrix_s02, validation_mae_skill_matrix,
         validation_mse_skill_matrix):
-    """Plots results of linear-model experiment with L1 and L2 regularization.
+    """Validates models for hyperparameter experiment with L1/L2 regularization.
 
     M = number of lambda_1 values
     N = number of lambda_2 values
@@ -509,7 +511,7 @@ def plot_linear_l1l2_experiment(
 
     pyplot.xlabel(r'log$_{10}$ of ridge coefficient ($\lambda_2$)')
     pyplot.ylabel(r'log$_{10}$ of lasso coefficient ($\lambda_1$)')
-    pyplot.title(r'MAE (mean absolute error) skill score on validation data')
+    pyplot.title(r'MAE skill score on validation data')
 
     utils.plot_scores_2d(
         score_matrix=validation_mse_skill_matrix,
@@ -521,14 +523,14 @@ def plot_linear_l1l2_experiment(
 
     pyplot.xlabel(r'log$_{10}$ of ridge coefficient ($\lambda_2$)')
     pyplot.ylabel(r'log$_{10}$ of lasso coefficient ($\lambda_1$)')
-    pyplot.title(r'MSE (mean squared error) skill score on validation data')
+    pyplot.title(r'MSE skill score on validation data')
 
 
-def finish_linear_l1l2_experiment(
+def l1l2_experiment_testing(
         lambda1_values, lambda2_values, validation_mae_skill_matrix,
         training_predictor_table, training_target_table,
         testing_predictor_table, testing_target_table):
-    """Finishes linear-model experiment with L1 and L2 regularization.
+    """Selects and tests model for experiment with L1/L2 regularization.
 
     :param lambda1_values: See doc for `plot_linear_l1l2_experiment`.
     :param lambda2_values: Same.
@@ -642,10 +644,10 @@ def binarize_tvt_data(training_file_names, training_target_table,
     )
 
 
-def logistic_regression_example(
+def train_logistic_model(
         training_predictor_table, training_target_table,
         validation_predictor_table, validation_target_table):
-    """Trains logistic-regression model.
+    """Trains plain logistic-regression model.
 
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     :param training_target_table: Same.
@@ -689,7 +691,7 @@ def logistic_regression_example(
 
 def plot_logistic_regression_coeffs(plain_log_model_object,
                                     training_predictor_table):
-    """Plots logistic-regression coefficients.
+    """Plots coefficients for plain logistic regression.
 
     :param plain_log_model_object: Trained instance of
         `sklearn.linear_model.SGDClassifier`.
@@ -704,7 +706,7 @@ def plot_logistic_regression_coeffs(plain_log_model_object,
     pyplot.show()
 
 
-def elastic_net_log_example(
+def train_logistic_elastic_net(
         training_predictor_table, training_target_table,
         validation_predictor_table, validation_target_table):
     """Trains logistic regression with elastic-net penalty.
@@ -715,15 +717,15 @@ def elastic_net_log_example(
     :param validation_target_table: Same.
     """
 
-    en_logistic_model_object = utils.setup_logistic_regression(
+    logistic_en_model_object = utils.setup_logistic_regression(
         lambda1=1e-3, lambda2=1e-3)
 
     _ = utils.train_logistic_regression(
-        model_object=en_logistic_model_object,
+        model_object=logistic_en_model_object,
         training_predictor_table=training_predictor_table,
         training_target_table=training_target_table)
 
-    validation_probabilities = en_logistic_model_object.predict_proba(
+    validation_probabilities = logistic_en_model_object.predict_proba(
         validation_predictor_table.as_matrix()
     )[:, 1]
     training_event_frequency = numpy.mean(
@@ -738,23 +740,23 @@ def elastic_net_log_example(
         dataset_name='validation')
 
 
-def plot_en_log_coeffs(en_logistic_model_object, training_predictor_table):
-    """Plots logistic-regression coefficients.
+def plot_logistic_en_coeffs(logistic_en_model_object, training_predictor_table):
+    """Plots coefficients for logistic regression with elastic-net penalty.
 
-    :param en_logistic_model_object: Trained instance of
+    :param logistic_en_model_object: Trained instance of
         `sklearn.linear_model.SGDClassifier`.
     :param training_predictor_table: See doc for `utils.read_feature_file`.
     """
 
     utils.plot_model_coefficients(
-        model_object=en_logistic_model_object,
+        model_object=logistic_en_model_object,
         predictor_names=list(training_predictor_table)
     )
 
     pyplot.show()
 
 
-def train_tree_example1(
+def train_tree_default(
         training_predictor_table, training_target_table,
         validation_predictor_table, validation_target_table):
     """Trains decision tree with default params.
@@ -765,14 +767,15 @@ def train_tree_example1(
     :param validation_target_table: Same.
     """
 
-    model_object = utils.setup_classification_tree()
+    default_tree_model_object = utils.setup_classification_tree(
+        min_examples_at_split=30, min_examples_at_leaf=30)
 
     _ = utils.train_classification_tree(
-        model_object=model_object,
+        model_object=default_tree_model_object,
         training_predictor_table=training_predictor_table,
         training_target_table=training_target_table)
 
-    validation_probabilities = model_object.predict_proba(
+    validation_probabilities = default_tree_model_object.predict_proba(
         validation_predictor_table.as_matrix()
     )[:, 1]
     training_event_frequency = numpy.mean(
@@ -785,22 +788,3 @@ def train_tree_example1(
         forecast_probabilities=validation_probabilities,
         training_event_frequency=training_event_frequency,
         dataset_name='validation')
-
-
-def plot_decision_tree(model_object):
-    """Plots decision tree.
-
-    :param model_object: Trained decision tree (instance of
-        `sklearn.tree.DecisionTreeClassifier`).
-    """
-
-    io_handle = StringIO()
-
-    sklearn.tree.export_graphviz(
-        model_object, out_file=io_handle,
-        filled=True, rounded=True, special_characters=True)
-
-    graph_object = pydotplus.graph_from_dot_data(io_handle.getvalue())
-    Image(graph_object.create_png())
-
-

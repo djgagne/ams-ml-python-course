@@ -50,17 +50,18 @@ MAE_SKILL_SCORE_KEY = 'mae_skill_score'
 MSE_SKILL_SCORE_KEY = 'mse_skill_score'
 
 # Plotting constants.
-FIGURE_WIDTH_INCHES = 15
-FIGURE_HEIGHT_INCHES = 15
+DEFAULT_FIG_WIDTH_INCHES = 10
+DEFAULT_FIG_HEIGHT_INCHES = 10
+SMALL_FIG_WIDTH_INCHES = 10
+SMALL_FIG_HEIGHT_INCHES = 10
 FIGURE_RESOLUTION_DPI = 300
 
-BAR_GRAPH_FACE_COLOUR = numpy.array([27, 158, 119], dtype=float) / 255
-BAR_GRAPH_EDGE_COLOUR = numpy.full(3, 0.)
+BAR_GRAPH_COLOUR = numpy.array([27, 158, 119], dtype=float) / 255
 BAR_GRAPH_EDGE_WIDTH = 2
-BAR_GRAPH_FONT_SIZE = 16
+BAR_GRAPH_FONT_SIZE = 14
 BAR_GRAPH_FONT_COLOUR = numpy.array([217, 95, 2], dtype=float) / 255
 
-FONT_SIZE = 30
+FONT_SIZE = 20
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
 pyplot.rc('axes', labelsize=FONT_SIZE)
@@ -654,12 +655,12 @@ def plot_model_coefficients(model_object, predictor_names):
         0, num_predictors - 1, num=num_predictors, dtype=float)
 
     _, axes_object = pyplot.subplots(
-        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        1, 1, figsize=(DEFAULT_FIG_WIDTH_INCHES, DEFAULT_FIG_HEIGHT_INCHES)
     )
 
     axes_object.barh(
-        y_coords, coefficients, color=BAR_GRAPH_FACE_COLOUR,
-        edgecolor=BAR_GRAPH_EDGE_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
+        y_coords, coefficients, color=BAR_GRAPH_COLOUR,
+        edgecolor=BAR_GRAPH_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH)
 
     pyplot.xlabel('Coefficient')
     pyplot.ylabel('Predictor variable')
@@ -754,7 +755,7 @@ def plot_scores_2d(
     """
 
     _, axes_object = pyplot.subplots(
-        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        1, 1, figsize=(DEFAULT_FIG_WIDTH_INCHES, DEFAULT_FIG_HEIGHT_INCHES)
     )
 
     pyplot.imshow(
@@ -843,9 +844,14 @@ def eval_binary_classifn(observed_labels, forecast_probabilities,
     :param dataset_name: Name of dataset (e.g., "validation").
     """
 
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    )
+
     pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
         observed_labels=observed_labels,
-        forecast_probabilities=forecast_probabilities)
+        forecast_probabilities=forecast_probabilities,
+        axes_object=axes_object)
 
     area_under_roc_curve = sklearn.metrics.auc(
         x=pofd_by_threshold, y=pod_by_threshold)
@@ -857,17 +863,27 @@ def eval_binary_classifn(observed_labels, forecast_probabilities,
     pyplot.title(title_string)
     pyplot.show()
 
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    )
+
     perf_diagrams.plot_performance_diagram(
         observed_labels=observed_labels,
-        forecast_probabilities=forecast_probabilities)
+        forecast_probabilities=forecast_probabilities,
+        axes_object=axes_object)
 
     pyplot.title('{0:s} performance diagram'.format(dataset_name))
     pyplot.show()
 
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    )
+
     mean_forecast_by_bin, event_freq_by_bin, num_examples_by_bin = (
         attr_diagrams.plot_attributes_diagram(
             observed_labels=observed_labels,
-            forecast_probabilities=forecast_probabilities, num_bins=20)
+            forecast_probabilities=forecast_probabilities, num_bins=20,
+            figure_object=figure_object, axes_object=axes_object)
     )
 
     uncertainty = training_event_frequency * (1. - training_event_frequency)
@@ -891,11 +907,7 @@ def eval_binary_classifn(observed_labels, forecast_probabilities,
         '{0:s} attributes diagram (Brier skill score = {1:.3f})'
     ).format(dataset_name, brier_skill_score)
 
-    # pyplot.text(
-    #     0.5, 0.95, title_string, color='k', horizontalalignment='center',
-    #     verticalalignment='center', fontsize=FONT_SIZE)
-
-    pyplot.suptitle(title_string)
+    axes_object.set_title(title_string)
     pyplot.show()
 
 

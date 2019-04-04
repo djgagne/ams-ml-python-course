@@ -12,10 +12,10 @@ DEFAULT_RANDOM_LINE_WIDTH = 2
 
 LEVELS_FOR_PEIRCE_CONTOURS = numpy.linspace(0, 1, num=11, dtype=float)
 
-FIGURE_WIDTH_INCHES = 15
-FIGURE_HEIGHT_INCHES = 15
+FIGURE_WIDTH_INCHES = 10
+FIGURE_HEIGHT_INCHES = 10
 
-FONT_SIZE = 30
+FONT_SIZE = 20
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
 pyplot.rc('axes', labelsize=FONT_SIZE)
@@ -151,7 +151,7 @@ def plot_roc_curve(
         observed_labels, forecast_probabilities,
         line_colour=DEFAULT_LINE_COLOUR, line_width=DEFAULT_LINE_WIDTH,
         random_line_colour=DEFAULT_RANDOM_LINE_COLOUR,
-        random_line_width=DEFAULT_RANDOM_LINE_WIDTH):
+        random_line_width=DEFAULT_RANDOM_LINE_WIDTH, axes_object=None):
     """Plots ROC curve.
 
     E = number of examples
@@ -166,6 +166,9 @@ def plot_roc_curve(
         predictor).
     :param random_line_width: Width of reference line (ROC curve for random
         predictor).
+    :param axes_object: Will plot on these axes (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).  If `axes_object is None`,
+        will create new axes.
     :return: pofd_by_threshold: See doc for `_get_points_in_roc_curve`.
     :return: pod_by_threshold: Same.
     """
@@ -174,9 +177,10 @@ def plot_roc_curve(
         observed_labels=observed_labels,
         forecast_probabilities=forecast_probabilities)
 
-    _, axes_object = pyplot.subplots(
-        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-    )
+    if axes_object is None:
+        _, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
 
     pofd_matrix, pod_matrix = _get_pofd_pod_grid()
     peirce_score_matrix = pod_matrix - pofd_matrix
