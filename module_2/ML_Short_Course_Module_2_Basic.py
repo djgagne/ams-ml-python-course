@@ -444,7 +444,7 @@ def l1l2_experiment_training(
                 target_values=validation_target_table[utils.TARGET_NAME].values,
                 predicted_target_values=these_validation_predictions,
                 mean_training_target_value=mean_training_target_value,
-                verbose=False)
+                verbose=False, create_plots=False)
 
             validation_mae_matrix_s01[i, j] = this_evaluation_dict[
                 utils.MAE_KEY]

@@ -27,7 +27,13 @@ HISTOGRAM_BOTTOM_EDGE_COORD = 0.175
 HISTOGRAM_WIDTH = 0.3
 HISTOGRAM_HEIGHT = 0.3
 
+HIST_LEFT_EDGE_FOR_REGRESSION = 0.575
+HIST_WIDTH_FOR_REGRESSION = 0.3
+HIST_BOTTOM_EDGE_FOR_REGRESSION = 0.225
+HIST_HEIGHT_FOR_REGRESSION = 0.25
+
 HISTOGRAM_X_TICK_VALUES = numpy.linspace(0, 1, num=6, dtype=float)
+HISTOGRAM_X_TICKS_FOR_REGRESSION = numpy.linspace(0, 0.02, num=11)
 HISTOGRAM_Y_TICK_SPACING = 0.1
 
 FIGURE_WIDTH_INCHES = 10
@@ -59,8 +65,10 @@ def _get_histogram(input_values, num_bins, min_value, max_value):
     """
 
     bin_cutoffs = numpy.linspace(min_value, max_value, num=num_bins + 1)
+
     inputs_to_bins = numpy.digitize(
-        input_values, bin_cutoffs, right=False) - 1
+        input_values, bin_cutoffs, right=False
+    ) - 1
 
     inputs_to_bins[inputs_to_bins < 0] = 0
     inputs_to_bins[inputs_to_bins > num_bins - 1] = num_bins - 1
@@ -82,8 +90,11 @@ def _vertices_to_polygon_object(x_vertices, y_vertices):
     """
 
     list_of_vertices = []
+
     for i in range(len(x_vertices)):
-        list_of_vertices.append((x_vertices[i], y_vertices[i]))
+        list_of_vertices.append(
+            (x_vertices[i], y_vertices[i])
+        )
 
     return shapely.geometry.Polygon(shell=list_of_vertices)
 
@@ -114,9 +125,11 @@ def _plot_background(axes_object, observed_labels):
     axes_object.add_patch(left_polygon_patch)
 
     x_vertices_right = numpy.array(
-        [climatology, 1, 1, climatology, climatology])
+        [climatology, 1, 1, climatology, climatology]
+    )
     y_vertices_right = numpy.array(
-        [climatology, (1 + climatology) / 2, 1, 1, climatology])
+        [climatology, (1 + climatology) / 2, 1, 1, climatology]
+    )
 
     right_polygon_object = _vertices_to_polygon_object(
         x_vertices=x_vertices_right, y_vertices=y_vertices_right)
@@ -201,6 +214,98 @@ def _plot_forecast_histogram(figure_object, num_examples_by_bin):
 
     inset_axes_object.set_xlim(0, 1)
     inset_axes_object.set_ylim(0, 1.05 * numpy.max(bin_frequencies))
+
+
+def _plot_forecast_hist_for_regression(
+        figure_object, mean_forecast_by_bin, num_examples_by_bin):
+    """Plots forecast histogram for regression.
+
+    B = number of bins
+
+    :param figure_object: Will plot histogram as inset in this figure (instance
+        of `matplotlib.figure.Figure`).
+    :param mean_forecast_by_bin: length-B numpy array of mean forecast values.
+    :param num_examples_by_bin: length-B numpy array of example counts.
+    """
+
+    bin_frequencies = (
+        num_examples_by_bin.astype(float) / numpy.sum(num_examples_by_bin)
+    )
+
+    num_bins = len(num_examples_by_bin)
+    forecast_bin_width = (
+        (numpy.max(mean_forecast_by_bin) - numpy.min(mean_forecast_by_bin)) /
+        (num_bins - 1)
+    )
+
+    inset_axes_object = figure_object.add_axes([
+        HIST_LEFT_EDGE_FOR_REGRESSION, HIST_BOTTOM_EDGE_FOR_REGRESSION,
+        HIST_WIDTH_FOR_REGRESSION, HIST_HEIGHT_FOR_REGRESSION
+    ])
+
+    inset_axes_object.bar(
+        mean_forecast_by_bin, bin_frequencies, forecast_bin_width,
+        color=HISTOGRAM_FACE_COLOUR, edgecolor=HISTOGRAM_EDGE_COLOUR,
+        linewidth=HISTOGRAM_EDGE_WIDTH)
+
+    max_y_tick_value = _floor_to_nearest(
+        1.05 * numpy.max(bin_frequencies), HISTOGRAM_Y_TICK_SPACING
+    )
+    num_y_ticks = 1 + int(numpy.round(
+        max_y_tick_value / HISTOGRAM_Y_TICK_SPACING
+    ))
+
+    y_tick_values = numpy.linspace(0, max_y_tick_value, num=num_y_ticks)
+    pyplot.yticks(y_tick_values, axes=inset_axes_object)
+    pyplot.xticks(HISTOGRAM_X_TICKS_FOR_REGRESSION, axes=inset_axes_object,
+                  rotation=90.)
+
+    inset_axes_object.set_xlim(
+        0, numpy.max(mean_forecast_by_bin) + forecast_bin_width
+    )
+    inset_axes_object.set_ylim(0, 1.05 * numpy.max(bin_frequencies))
+
+
+def _get_points_in_regression_relia_curve(observed_values, forecast_values,
+                                          num_bins):
+    """Creates points for regression-based reliability curve.
+
+    E = number of examples
+    B = number of bins
+
+    :param observed_values: length-E numpy array of observed target values.
+    :param forecast_values: length-E numpy array of forecast target values.
+    :param num_bins: Number of bins for forecast value.
+    :return: mean_forecast_by_bin: length-B numpy array of mean forecast values.
+    :return: mean_observation_by_bin: length-B numpy array of mean observed
+        values.
+    :return: num_examples_by_bin: length-B numpy array with number of examples
+        in each forecast bin.
+    """
+
+    inputs_to_bins = _get_histogram(
+        input_values=forecast_values, num_bins=num_bins,
+        min_value=numpy.min(forecast_values),
+        max_value=numpy.max(forecast_values)
+    )
+
+    mean_forecast_by_bin = numpy.full(num_bins, numpy.nan)
+    mean_observation_by_bin = numpy.full(num_bins, numpy.nan)
+    num_examples_by_bin = numpy.full(num_bins, -1, dtype=int)
+
+    for k in range(num_bins):
+        these_example_indices = numpy.where(inputs_to_bins == k)[0]
+        num_examples_by_bin[k] = len(these_example_indices)
+
+        mean_forecast_by_bin[k] = numpy.mean(
+            forecast_values[these_example_indices]
+        )
+
+        mean_observation_by_bin[k] = numpy.mean(
+            observed_values[these_example_indices]
+        )
+
+    return mean_forecast_by_bin, mean_observation_by_bin, num_examples_by_bin
 
 
 def get_points_in_relia_curve(
@@ -310,6 +415,59 @@ def plot_reliability_curve(
     axes_object.set_ylim(0., 1.)
 
     return mean_forecast_probs, mean_event_frequencies, num_examples_by_bin
+
+
+def plot_regression_relia_curve(
+        observed_values, forecast_values, num_bins=DEFAULT_NUM_BINS,
+        figure_object=None, axes_object=None):
+    """Plots reliability curve for regression.
+
+    :param observed_values: See doc for `get_points_in_regression_relia_curve`.
+    :param forecast_values: Same.
+    :param num_bins: Same.
+    :param figure_object: See doc for `plot_attributes_diagram`.
+    :param axes_object: Same.
+    """
+
+    mean_forecast_by_bin, mean_observation_by_bin, num_examples_by_bin = (
+        _get_points_in_regression_relia_curve(
+            observed_values=observed_values, forecast_values=forecast_values,
+            num_bins=num_bins)
+    )
+
+    if figure_object is None or axes_object is None:
+        figure_object, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
+
+    _plot_forecast_hist_for_regression(
+        figure_object=figure_object, mean_forecast_by_bin=mean_forecast_by_bin,
+        num_examples_by_bin=num_examples_by_bin)
+
+    max_forecast_or_observed = max([
+        numpy.max(forecast_values), numpy.max(observed_values)
+    ])
+
+    perfect_x_coords = numpy.array([0., max_forecast_or_observed])
+    perfect_y_coords = perfect_x_coords + 0.
+    axes_object.plot(
+        perfect_x_coords, perfect_y_coords, color=PERFECT_LINE_COLOUR,
+        linestyle='dashed', linewidth=PERFECT_LINE_WIDTH)
+
+    real_indices = numpy.where(numpy.invert(numpy.logical_or(
+        numpy.isnan(mean_forecast_by_bin), numpy.isnan(mean_observation_by_bin)
+    )))[0]
+
+    axes_object.plot(
+        mean_forecast_by_bin[real_indices],
+        mean_observation_by_bin[real_indices],
+        color=RELIABILITY_LINE_COLOUR,
+        linestyle='solid', linewidth=RELIABILITY_LINE_WIDTH)
+
+    axes_object.set_xlabel('Forecast value')
+    axes_object.set_ylabel('Conditional mean observation')
+    axes_object.set_xlim(0., max_forecast_or_observed)
+    axes_object.set_ylim(0., max_forecast_or_observed)
 
 
 def plot_attributes_diagram(

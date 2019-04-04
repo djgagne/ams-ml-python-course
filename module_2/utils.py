@@ -574,7 +574,7 @@ def write_model(model_object, pickle_file_name):
 
 def evaluate_regression(
         target_values, predicted_target_values, mean_training_target_value,
-        verbose=True, dataset_name=None):
+        verbose=True, create_plots=True, dataset_name=None):
     """Evaluates regression model.
 
     E = number of examples
@@ -584,8 +584,9 @@ def evaluate_regression(
     :param mean_training_target_value: Mean target value in training data.
     :param verbose: Boolean flag.  If True, will print results to command
         window.
+    :param create_plots: Boolean flag.  If True, will create plots.
     :param dataset_name: Dataset name (e.g., "validation").  Used only if
-        `verbose == True`, to print results to command window.
+        `create_plots == True or verbose == True`.
     :return: evaluation_dict: Dictionary with the following keys.
     evaluation_dict['mean_absolute_error']: Mean absolute error (MAE).
     evaluation_dict['mean_squared_error']: Mean squared error (MSE).
@@ -616,30 +617,48 @@ def evaluate_regression(
         MSE_SKILL_SCORE_KEY: mse_skill_score
     }
 
-    if not verbose:
+    if verbose or create_plots:
+        dataset_name = dataset_name[0].upper() + dataset_name[1:]
+
+    if verbose:
+        print('{0:s} MAE (mean absolute error) = {1:.3e} s^-1'.format(
+            dataset_name, evaluation_dict[MAE_KEY]
+        ))
+        print('{0:s} MSE (mean squared error) = {1:.3e} s^-2'.format(
+            dataset_name, evaluation_dict[MSE_KEY]
+        ))
+        print('{0:s} bias (mean signed error) = {1:.3e} s^-1'.format(
+            dataset_name, evaluation_dict[MEAN_BIAS_KEY]
+        ))
+
+        message_string = (
+            '{0:s} MAE skill score (improvement over climatology) = {1:.3f}'
+        ).format(dataset_name, evaluation_dict[MAE_SKILL_SCORE_KEY])
+        print(message_string)
+
+        message_string = (
+            '{0:s} MSE skill score (improvement over climatology) = {1:.3f}'
+        ).format(dataset_name, evaluation_dict[MSE_SKILL_SCORE_KEY])
+        print(message_string)
+
+    if not create_plots:
         return evaluation_dict
 
-    dataset_name = dataset_name[0].upper() + dataset_name[1:]
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    )
 
-    print('{0:s} MAE (mean absolute error) = {1:.3e} s^-1'.format(
-        dataset_name, evaluation_dict[MAE_KEY]
-    ))
-    print('{0:s} MSE (mean squared error) = {1:.3e} s^-2'.format(
-        dataset_name, evaluation_dict[MSE_KEY]
-    ))
-    print('{0:s} bias (mean signed error) = {1:.3e} s^-1'.format(
-        dataset_name, evaluation_dict[MEAN_BIAS_KEY]
-    ))
+    attr_diagrams.plot_regression_relia_curve(
+        observed_values=target_values, forecast_values=predicted_target_values,
+        num_bins=20, figure_object=figure_object, axes_object=axes_object)
 
-    message_string = (
-        '{0:s} MAE skill score (improvement over climatology) = {1:.3f}'
-    ).format(dataset_name, evaluation_dict[MAE_SKILL_SCORE_KEY])
-    print(message_string)
+    axes_object.set_xlabel(r'Forecast value (s$^{-1}$)')
+    axes_object.set_ylabel(r'Conditional mean observation (s$^{-1}$)')
 
-    message_string = (
-        '{0:s} MSE skill score (improvement over climatology) = {1:.3f}'
-    ).format(dataset_name, evaluation_dict[MSE_SKILL_SCORE_KEY])
-    print(message_string)
+    title_string = '{0:s} reliability curve for max future vorticity'.format(
+        dataset_name)
+    axes_object.set_title(title_string)
+    pyplot.show()
 
     return evaluation_dict
 
@@ -978,6 +997,8 @@ def eval_binary_classifn(
 
     axes_object.set_title(title_string)
     pyplot.show()
+
+    return evaluation_dict
 
 
 def setup_classification_tree(min_examples_at_split=30,
