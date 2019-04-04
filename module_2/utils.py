@@ -49,6 +49,12 @@ MEAN_BIAS_KEY = 'mean_bias'
 MAE_SKILL_SCORE_KEY = 'mae_skill_score'
 MSE_SKILL_SCORE_KEY = 'mse_skill_score'
 
+MAX_PEIRCE_SCORE_KEY = 'max_peirce_score'
+AUC_KEY = 'area_under_roc_curve'
+MAX_CSI_KEY = 'max_csi'
+BRIER_SCORE_KEY = 'brier_score'
+BRIER_SKILL_SCORE_KEY = 'brier_skill_score'
+
 # Plotting constants.
 DEFAULT_FIG_WIDTH_INCHES = 10
 DEFAULT_FIG_HEIGHT_INCHES = 10
@@ -830,8 +836,9 @@ def train_logistic_regression(model_object, training_predictor_table,
     return model_object
 
 
-def eval_binary_classifn(observed_labels, forecast_probabilities,
-                         training_event_frequency, dataset_name):
+def eval_binary_classifn(
+        observed_labels, forecast_probabilities, training_event_frequency,
+        dataset_name, create_plots=True, verbose=True):
     """Evaluates binary-classification model.
 
     E = number of examples
@@ -841,49 +848,35 @@ def eval_binary_classifn(observed_labels, forecast_probabilities,
     :param forecast_probabilities: length-E numpy array with forecast
         probabilities of event (positive class).
     :param training_event_frequency: Frequency of event in training data.
-    :param dataset_name: Name of dataset (e.g., "validation").
+    :param dataset_name: Dataset name (e.g., "validation").
+    :param create_plots: Boolean flag.  If True, will create plots.
+    :param verbose: Boolean flag.  If True, will print results to command
+        window.
     """
 
-    _, axes_object = pyplot.subplots(
-        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
-    )
-
-    pofd_by_threshold, pod_by_threshold = roc_curves.plot_roc_curve(
+    pofd_by_threshold, pod_by_threshold = roc_curves.get_points_in_roc_curve(
         observed_labels=observed_labels,
-        forecast_probabilities=forecast_probabilities,
-        axes_object=axes_object)
+        forecast_probabilities=forecast_probabilities)
 
+    max_peirce_score = numpy.nanmax(pod_by_threshold - pofd_by_threshold)
     area_under_roc_curve = sklearn.metrics.auc(
         x=pofd_by_threshold, y=pod_by_threshold)
 
-    dataset_name = dataset_name[0].upper() + dataset_name[1:]
-    title_string = '{0:s} ROC curve (area under curve = {1:.3f})'.format(
-        dataset_name, area_under_roc_curve)
-
-    pyplot.title(title_string)
-    pyplot.show()
-
-    _, axes_object = pyplot.subplots(
-        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    pod_by_threshold, success_ratio_by_threshold = (
+        perf_diagrams.get_points_in_perf_diagram(
+            observed_labels=observed_labels,
+            forecast_probabilities=forecast_probabilities)
     )
 
-    perf_diagrams.plot_performance_diagram(
-        observed_labels=observed_labels,
-        forecast_probabilities=forecast_probabilities,
-        axes_object=axes_object)
-
-    pyplot.title('{0:s} performance diagram'.format(dataset_name))
-    pyplot.show()
-
-    figure_object, axes_object = pyplot.subplots(
-        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    csi_by_threshold = (
+        (pod_by_threshold ** -1 + success_ratio_by_threshold ** -1 - 1) ** -1
     )
+    max_csi = numpy.nanmax(csi_by_threshold)
 
     mean_forecast_by_bin, event_freq_by_bin, num_examples_by_bin = (
-        attr_diagrams.plot_attributes_diagram(
+        attr_diagrams.get_points_in_relia_curve(
             observed_labels=observed_labels,
-            forecast_probabilities=forecast_probabilities, num_bins=20,
-            figure_object=figure_object, axes_object=axes_object)
+            forecast_probabilities=forecast_probabilities, num_bins=20)
     )
 
     uncertainty = training_event_frequency * (1. - training_event_frequency)
@@ -900,12 +893,85 @@ def eval_binary_classifn(observed_labels, forecast_probabilities,
     )
     resolution = this_numerator / numpy.sum(num_examples_by_bin)
 
-    # brier_score = uncertainty + reliability - resolution
+    brier_score = uncertainty + reliability - resolution
     brier_skill_score = (resolution - reliability) / uncertainty
+
+    evaluation_dict = {
+        MAX_PEIRCE_SCORE_KEY: max_peirce_score,
+        AUC_KEY: area_under_roc_curve,
+        MAX_CSI_KEY: max_csi,
+        BRIER_SCORE_KEY: brier_score,
+        BRIER_SKILL_SCORE_KEY: brier_skill_score
+    }
+
+    dataset_name = dataset_name[0].upper() + dataset_name[1:]
+
+    if verbose:
+        print('{0:s} Max Peirce score (POD - POFD) = {1:.3f}'.format(
+            dataset_name, evaluation_dict[MAX_PEIRCE_SCORE_KEY]
+        ))
+        print('{0:s} AUC (area under ROC curve) = {1:.3f}'.format(
+            dataset_name, evaluation_dict[AUC_KEY]
+        ))
+        print('{0:s} Max CSI (critical success index) = {1:.3f}'.format(
+            dataset_name, evaluation_dict[MAX_CSI_KEY]
+        ))
+        print('{0:s} Brier score = {1:.3f}'.format(
+            dataset_name, evaluation_dict[BRIER_SCORE_KEY]
+        ))
+
+        message_string = (
+            '{0:s} Brier skill score (improvement over climatology) = {1:.3f}'
+        ).format(dataset_name, evaluation_dict[BRIER_SKILL_SCORE_KEY])
+        print(message_string)
+
+    if not create_plots:
+        return evaluation_dict
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    )
+
+    roc_curves.plot_roc_curve(
+        observed_labels=observed_labels,
+        forecast_probabilities=forecast_probabilities,
+        axes_object=axes_object)
+
+    title_string = '{0:s} ROC curve (AUC = {1:.3f})'.format(
+        dataset_name, evaluation_dict[AUC_KEY]
+    )
+
+    pyplot.title(title_string)
+    pyplot.show()
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    )
+
+    perf_diagrams.plot_performance_diagram(
+        observed_labels=observed_labels,
+        forecast_probabilities=forecast_probabilities,
+        axes_object=axes_object)
+
+    title_string = '{0:s} performance diagram (max CSI = {1:.3f})'.format(
+        dataset_name, evaluation_dict[MAX_CSI_KEY]
+    )
+
+    pyplot.title(title_string)
+    pyplot.show()
+
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(SMALL_FIG_WIDTH_INCHES, SMALL_FIG_HEIGHT_INCHES)
+    )
+
+    attr_diagrams.plot_attributes_diagram(
+        observed_labels=observed_labels,
+        forecast_probabilities=forecast_probabilities, num_bins=20,
+        figure_object=figure_object, axes_object=axes_object)
 
     title_string = (
         '{0:s} attributes diagram (Brier skill score = {1:.3f})'
-    ).format(dataset_name, brier_skill_score)
+    ).format(dataset_name, evaluation_dict[BRIER_SKILL_SCORE_KEY])
 
     axes_object.set_title(title_string)
     pyplot.show()

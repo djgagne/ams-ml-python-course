@@ -74,7 +74,7 @@ def _get_peirce_colour_scheme():
     return colour_map_object, colour_norm_object
 
 
-def _get_points_in_roc_curve(observed_labels, forecast_probabilities):
+def get_points_in_roc_curve(observed_labels, forecast_probabilities):
     """Creates points for ROC curve.
 
     E = number of examples
@@ -169,11 +169,11 @@ def plot_roc_curve(
     :param axes_object: Will plot on these axes (instance of
         `matplotlib.axes._subplots.AxesSubplot`).  If `axes_object is None`,
         will create new axes.
-    :return: pofd_by_threshold: See doc for `_get_points_in_roc_curve`.
+    :return: pofd_by_threshold: See doc for `get_points_in_roc_curve`.
     :return: pod_by_threshold: Same.
     """
 
-    pofd_by_threshold, pod_by_threshold = _get_points_in_roc_curve(
+    pofd_by_threshold, pod_by_threshold = get_points_in_roc_curve(
         observed_labels=observed_labels,
         forecast_probabilities=forecast_probabilities)
 

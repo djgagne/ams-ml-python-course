@@ -68,61 +68,6 @@ def _get_histogram(input_values, num_bins, min_value, max_value):
     return inputs_to_bins
 
 
-def _get_points_in_relia_curve(
-        observed_labels, forecast_probabilities, num_bins):
-    """Creates points for reliability curve.
-
-    The reliability curve is the main component of the attributes diagram.
-
-    E = number of examples
-    B = number of bins
-
-    :param observed_labels: length-E numpy array of class labels (integers in
-        0...1).
-    :param forecast_probabilities: length-E numpy array with forecast
-        probabilities of label = 1.
-    :param num_bins: Number of bins for forecast probability.
-    :return: mean_forecast_probs: length-B numpy array of mean forecast
-        probabilities.
-    :return: mean_event_frequencies: length-B numpy array of conditional mean
-        event frequencies.  mean_event_frequencies[j] = frequency of label 1
-        when forecast probability is in the [j]th bin.
-    :return: num_examples_by_bin: length-B numpy array with number of examples
-        in each forecast bin.
-    """
-
-    assert numpy.all(numpy.logical_or(
-        observed_labels == 0, observed_labels == 1
-    ))
-
-    assert numpy.all(numpy.logical_and(
-        forecast_probabilities >= 0, forecast_probabilities <= 1
-    ))
-
-    assert num_bins > 1
-
-    inputs_to_bins = _get_histogram(
-        input_values=forecast_probabilities, num_bins=num_bins, min_value=0.,
-        max_value=1.)
-
-    mean_forecast_probs = numpy.full(num_bins, numpy.nan)
-    mean_event_frequencies = numpy.full(num_bins, numpy.nan)
-    num_examples_by_bin = numpy.full(num_bins, -1, dtype=int)
-
-    for k in range(num_bins):
-        these_example_indices = numpy.where(inputs_to_bins == k)[0]
-        num_examples_by_bin[k] = len(these_example_indices)
-
-        mean_forecast_probs[k] = numpy.mean(
-            forecast_probabilities[these_example_indices])
-
-        mean_event_frequencies[k] = numpy.mean(
-            observed_labels[these_example_indices].astype(float)
-        )
-
-    return mean_forecast_probs, mean_event_frequencies, num_examples_by_bin
-
-
 def _vertices_to_polygon_object(x_vertices, y_vertices):
     """Converts two arrays of vertices to `shapely.geometry.Polygon` object.
 
@@ -258,6 +203,61 @@ def _plot_forecast_histogram(figure_object, num_examples_by_bin):
     inset_axes_object.set_ylim(0, 1.05 * numpy.max(bin_frequencies))
 
 
+def get_points_in_relia_curve(
+        observed_labels, forecast_probabilities, num_bins):
+    """Creates points for reliability curve.
+
+    The reliability curve is the main component of the attributes diagram.
+
+    E = number of examples
+    B = number of bins
+
+    :param observed_labels: length-E numpy array of class labels (integers in
+        0...1).
+    :param forecast_probabilities: length-E numpy array with forecast
+        probabilities of label = 1.
+    :param num_bins: Number of bins for forecast probability.
+    :return: mean_forecast_probs: length-B numpy array of mean forecast
+        probabilities.
+    :return: mean_event_frequencies: length-B numpy array of conditional mean
+        event frequencies.  mean_event_frequencies[j] = frequency of label 1
+        when forecast probability is in the [j]th bin.
+    :return: num_examples_by_bin: length-B numpy array with number of examples
+        in each forecast bin.
+    """
+
+    assert numpy.all(numpy.logical_or(
+        observed_labels == 0, observed_labels == 1
+    ))
+
+    assert numpy.all(numpy.logical_and(
+        forecast_probabilities >= 0, forecast_probabilities <= 1
+    ))
+
+    assert num_bins > 1
+
+    inputs_to_bins = _get_histogram(
+        input_values=forecast_probabilities, num_bins=num_bins, min_value=0.,
+        max_value=1.)
+
+    mean_forecast_probs = numpy.full(num_bins, numpy.nan)
+    mean_event_frequencies = numpy.full(num_bins, numpy.nan)
+    num_examples_by_bin = numpy.full(num_bins, -1, dtype=int)
+
+    for k in range(num_bins):
+        these_example_indices = numpy.where(inputs_to_bins == k)[0]
+        num_examples_by_bin[k] = len(these_example_indices)
+
+        mean_forecast_probs[k] = numpy.mean(
+            forecast_probabilities[these_example_indices])
+
+        mean_event_frequencies[k] = numpy.mean(
+            observed_labels[these_example_indices].astype(float)
+        )
+
+    return mean_forecast_probs, mean_event_frequencies, num_examples_by_bin
+
+
 def plot_reliability_curve(
         observed_labels, forecast_probabilities, num_bins=DEFAULT_NUM_BINS,
         axes_object=None):
@@ -273,13 +273,13 @@ def plot_reliability_curve(
     :param axes_object: Will plot on these axes (instance of
         `matplotlib.axes._subplots.AxesSubplot`).  If `axes_object is None`,
         will create new axes.
-    :return: mean_forecast_probs: See doc for `_get_points_in_relia_curve`.
+    :return: mean_forecast_probs: See doc for `get_points_in_relia_curve`.
     :return: mean_event_frequencies: Same.
     :return: num_examples_by_bin: Same.
     """
 
     mean_forecast_probs, mean_event_frequencies, num_examples_by_bin = (
-        _get_points_in_relia_curve(
+        get_points_in_relia_curve(
             observed_labels=observed_labels,
             forecast_probabilities=forecast_probabilities, num_bins=num_bins)
     )
@@ -324,13 +324,13 @@ def plot_attributes_diagram(
         `matplotlib.figure.Figure`).  If `figure_object is None`, will create a
         new one.
     :param axes_object: See doc for `plot_reliability_curve`.
-    :return: mean_forecast_probs: See doc for `_get_points_in_relia_curve`.
+    :return: mean_forecast_probs: See doc for `get_points_in_relia_curve`.
     :return: mean_event_frequencies: Same.
     :return: num_examples_by_bin: Same.
     """
 
     mean_forecast_probs, mean_event_frequencies, num_examples_by_bin = (
-        _get_points_in_relia_curve(
+        get_points_in_relia_curve(
             observed_labels=observed_labels,
             forecast_probabilities=forecast_probabilities, num_bins=num_bins)
     )
