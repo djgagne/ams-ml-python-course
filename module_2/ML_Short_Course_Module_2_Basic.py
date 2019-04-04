@@ -532,7 +532,7 @@ def l1l2_experiment_testing(
         testing_predictor_table, testing_target_table):
     """Selects and tests model for experiment with L1/L2 regularization.
 
-    :param lambda1_values: See doc for `plot_linear_l1l2_experiment`.
+    :param lambda1_values: See doc for `l1l2_experiment_validation`.
     :param lambda2_values: Same.
     :param validation_mae_skill_matrix: Same.
     :param training_predictor_table: See doc for `utils.read_feature_file`.
@@ -775,12 +775,329 @@ def train_tree_default(
         training_predictor_table=training_predictor_table,
         training_target_table=training_target_table)
 
-    validation_probabilities = default_tree_model_object.predict_proba(
-        validation_predictor_table.as_matrix()
+    training_probabilities = default_tree_model_object.predict_proba(
+        training_predictor_table.as_matrix()
     )[:, 1]
     training_event_frequency = numpy.mean(
         training_target_table[utils.BINARIZED_TARGET_NAME].values
     )
+
+    utils.eval_binary_classifn(
+        observed_labels=training_target_table[
+            utils.BINARIZED_TARGET_NAME].values,
+        forecast_probabilities=training_probabilities,
+        training_event_frequency=training_event_frequency,
+        dataset_name='training')
+
+    validation_probabilities = default_tree_model_object.predict_proba(
+        validation_predictor_table.as_matrix()
+    )[:, 1]
+
+    utils.eval_binary_classifn(
+        observed_labels=validation_target_table[
+            utils.BINARIZED_TARGET_NAME].values,
+        forecast_probabilities=validation_probabilities,
+        training_event_frequency=training_event_frequency,
+        dataset_name='validation')
+
+
+def tree_experiment_training(
+        training_predictor_table, training_target_table,
+        validation_predictor_table, validation_target_table):
+    """Trains decision trees for experiment with min examples per split/leaf.
+
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    :param training_target_table: Same.
+    :param validation_predictor_table: Same.
+    :param validation_target_table: Same.
+    """
+
+    min_per_split_values = numpy.array(
+        [2, 5, 10, 20, 30, 40, 50, 100, 200, 500], dtype=int)
+    min_per_leaf_values = numpy.array(
+        [1, 5, 10, 20, 30, 40, 50, 100, 200, 500], dtype=int)
+
+    num_min_per_split_values = len(min_per_split_values)
+    num_min_per_leaf_values = len(min_per_leaf_values)
+
+    validation_auc_matrix = numpy.full(
+        (num_min_per_split_values, num_min_per_leaf_values), numpy.nan
+    )
+
+    validation_max_csi_matrix = validation_auc_matrix + 0.
+    validation_bs_matrix = validation_auc_matrix + 0.
+    validation_bss_matrix = validation_auc_matrix + 0.
+
+    training_event_frequency = numpy.mean(
+        training_target_table[utils.BINARIZED_TARGET_NAME].values
+    )
+
+    for i in range(num_min_per_split_values):
+        for j in range(num_min_per_leaf_values):
+            if min_per_leaf_values[j] >= min_per_split_values[i]:
+                continue
+            
+            this_message_string = (
+                'Training model with minima of {0:d} examples per split node, '
+                '{1:d} per leaf node...'
+            ).format(min_per_split_values[i], min_per_leaf_values[j])
+
+            print(this_message_string)
+
+            this_model_object = utils.setup_classification_tree(
+                min_examples_at_split=min_per_split_values[i],
+                min_examples_at_leaf=min_per_leaf_values[j]
+            )
+
+            _ = utils.train_classification_tree(
+                model_object=this_model_object,
+                training_predictor_table=training_predictor_table,
+                training_target_table=training_target_table)
+
+            these_validation_predictions = this_model_object.predict_proba(
+                validation_predictor_table.as_matrix()
+            )[:, 1]
+
+            this_evaluation_dict = utils.eval_binary_classifn(
+                observed_labels=validation_target_table[
+                    utils.BINARIZED_TARGET_NAME].values,
+                forecast_probabilities=these_validation_predictions,
+                training_event_frequency=training_event_frequency,
+                create_plots=False, verbose=False)
+
+            validation_auc_matrix[i, j] = this_evaluation_dict[utils.AUC_KEY]
+            validation_max_csi_matrix[i, j] = this_evaluation_dict[
+                utils.MAX_CSI_KEY]
+            validation_bs_matrix[i, j] = this_evaluation_dict[
+                utils.BRIER_SCORE_KEY]
+            validation_bss_matrix[i, j] = this_evaluation_dict[
+                utils.BRIER_SKILL_SCORE_KEY]
+
+
+def tree_experiment_validation(
+        min_per_split_values, min_per_leaf_values, validation_auc_matrix,
+        validation_max_csi_matrix, validation_bs_matrix,
+        validation_bss_matrix):
+    """Validates decision trees for experiment with min examples per split/leaf.
+
+    M = number of min-per-split values
+    N = number of min-per-leaf values
+
+    :param min_per_split_values: length-M numpy array of minimum example counts
+        per split node.
+    :param min_per_leaf_values: length-N numpy array of minimum example counts
+        per leaf node.
+    :param validation_auc_matrix: M-by-N numpy array of areas under ROC curve on
+        validation data.
+    :param validation_max_csi_matrix: M-by-N numpy array of maximum CSIs on
+        validation data.
+    :param validation_bs_matrix: M-by-N numpy array of Brier scores on
+        validation data.
+    :param validation_bss_matrix: M-by-N numpy array of Brier skill scores on
+        validation data.
+    """
+
+    utils.plot_scores_2d(
+        score_matrix=validation_auc_matrix,
+        min_colour_value=numpy.nanpercentile(validation_auc_matrix, 1.),
+        max_colour_value=numpy.nanpercentile(validation_auc_matrix, 99.),
+        x_tick_labels=min_per_leaf_values,
+        y_tick_labels=min_per_split_values
+    )
+
+    pyplot.xlabel('Min num examples at leaf node')
+    pyplot.ylabel('Min num examples at split node')
+    pyplot.title('AUC (area under ROC curve) on validation data')
+
+    utils.plot_scores_2d(
+        score_matrix=validation_max_csi_matrix,
+        min_colour_value=numpy.nanpercentile(validation_max_csi_matrix, 1.),
+        max_colour_value=numpy.nanpercentile(validation_max_csi_matrix, 99.),
+        x_tick_labels=min_per_leaf_values,
+        y_tick_labels=min_per_split_values
+    )
+
+    pyplot.xlabel('Min num examples at leaf node')
+    pyplot.ylabel('Min num examples at split node')
+    pyplot.title('Max CSI (critical success index) on validation data')
+
+    utils.plot_scores_2d(
+        score_matrix=validation_bs_matrix,
+        min_colour_value=numpy.nanpercentile(validation_bs_matrix, 1.),
+        max_colour_value=numpy.nanpercentile(validation_bs_matrix, 99.),
+        x_tick_labels=min_per_leaf_values,
+        y_tick_labels=min_per_split_values
+    )
+
+    pyplot.xlabel('Min num examples at leaf node')
+    pyplot.ylabel('Min num examples at split node')
+    pyplot.title('Brier score on validation data')
+
+    utils.plot_scores_2d(
+        score_matrix=validation_bss_matrix,
+        min_colour_value=numpy.nanpercentile(validation_bss_matrix, 1.),
+        max_colour_value=numpy.nanpercentile(validation_bss_matrix, 99.),
+        x_tick_labels=min_per_leaf_values,
+        y_tick_labels=min_per_split_values
+    )
+
+    pyplot.xlabel('Min num examples at leaf node')
+    pyplot.ylabel('Min num examples at split node')
+    pyplot.title('Brier skill score on validation data')
+
+
+def tree_experiment_testing(
+        min_per_split_values, min_per_leaf_values, validation_bss_matrix,
+        training_predictor_table, training_target_table,
+        testing_predictor_table, testing_target_table):
+    """Selects and tests tree for experiment with min examples per split/leaf.
+
+    :param min_per_split_values: See doc for `tree_experiment_validation`.
+    :param min_per_leaf_values: Same.
+    :param validation_bss_matrix: Same.
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    :param training_target_table: Same.
+    :param testing_predictor_table: Same.
+    :param testing_target_table: Same.
+    """
+
+    best_linear_index = numpy.nanargmax(numpy.ravel(validation_bss_matrix))
+
+    best_split_index, best_leaf_index = numpy.unravel_index(
+        best_linear_index, validation_bss_matrix.shape)
+
+    best_min_examples_per_split = min_per_split_values[best_split_index]
+    best_min_examples_per_leaf = min_per_leaf_values[best_leaf_index]
+    best_validation_bss = numpy.nanmax(validation_bss_matrix)
+
+    message_string = (
+        'Best validation BSS = {0:.3f} ... corresponding min examples per split'
+        ' node = {1:d} ... min examples per leaf node = {2:d}'
+    ).format(
+        best_validation_bss, best_min_examples_per_split,
+        best_min_examples_per_leaf
+    )
+
+    print(message_string)
+
+    final_model_object = utils.setup_classification_tree(
+        min_examples_at_split=best_min_examples_per_split,
+        min_examples_at_leaf=best_min_examples_per_leaf
+    )
+
+    _ = utils.train_classification_tree(
+        model_object=final_model_object,
+        training_predictor_table=training_predictor_table,
+        training_target_table=training_target_table)
+
+    testing_predictions = final_model_object.predict_proba(
+        testing_predictor_table.as_matrix()
+    )[:, 1]
+    training_event_frequency = numpy.mean(
+        training_target_table[utils.BINARIZED_TARGET_NAME].values
+    )
+
+    _ = utils.eval_binary_classifn(
+        observed_labels=testing_target_table[
+            utils.BINARIZED_TARGET_NAME].values,
+        forecast_probabilities=testing_predictions,
+        training_event_frequency=training_event_frequency,
+        create_plots=True, verbose=True, dataset_name='testing')
+
+
+def train_random_forest(
+        training_predictor_table, training_target_table,
+        validation_predictor_table, validation_target_table):
+    """Trains random forest.
+
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    :param training_target_table: Same.
+    :param validation_predictor_table: Same.
+    :param validation_target_table: Same.
+    """
+
+    num_predictors = len(list(training_predictor_table))
+    max_predictors_per_split = int(numpy.round(
+        numpy.sqrt(num_predictors)
+    ))
+
+    random_forest_model_object = utils.setup_classification_forest(
+        max_predictors_per_split=max_predictors_per_split,
+        min_examples_at_split=500, min_examples_at_leaf=200)
+
+    _ = utils.train_classification_forest(
+        model_object=random_forest_model_object,
+        training_predictor_table=training_predictor_table,
+        training_target_table=training_target_table)
+
+    training_probabilities = random_forest_model_object.predict_proba(
+        training_predictor_table.as_matrix()
+    )[:, 1]
+    training_event_frequency = numpy.mean(
+        training_target_table[utils.BINARIZED_TARGET_NAME].values
+    )
+
+    utils.eval_binary_classifn(
+        observed_labels=training_target_table[
+            utils.BINARIZED_TARGET_NAME].values,
+        forecast_probabilities=training_probabilities,
+        training_event_frequency=training_event_frequency,
+        dataset_name='training')
+
+    validation_probabilities = random_forest_model_object.predict_proba(
+        validation_predictor_table.as_matrix()
+    )[:, 1]
+
+    utils.eval_binary_classifn(
+        observed_labels=validation_target_table[
+            utils.BINARIZED_TARGET_NAME].values,
+        forecast_probabilities=validation_probabilities,
+        training_event_frequency=training_event_frequency,
+        dataset_name='validation')
+
+
+def train_gradient_boosted_trees(
+        training_predictor_table, training_target_table,
+        validation_predictor_table, validation_target_table):
+    """Trains gradient-boosted trees.
+
+    :param training_predictor_table: See doc for `utils.read_feature_file`.
+    :param training_target_table: Same.
+    :param validation_predictor_table: Same.
+    :param validation_target_table: Same.
+    """
+
+    num_predictors = len(list(training_predictor_table))
+    # max_predictors_per_split = int(numpy.round(
+    #     numpy.sqrt(num_predictors)
+    # ))
+
+    gbt_model_object = utils.setup_classification_forest(
+        max_predictors_per_split=num_predictors,
+        min_examples_at_split=500, min_examples_at_leaf=200)
+
+    _ = utils.train_classification_gbt(
+        model_object=gbt_model_object,
+        training_predictor_table=training_predictor_table,
+        training_target_table=training_target_table)
+
+    training_probabilities = gbt_model_object.predict_proba(
+        training_predictor_table.as_matrix()
+    )[:, 1]
+    training_event_frequency = numpy.mean(
+        training_target_table[utils.BINARIZED_TARGET_NAME].values
+    )
+
+    utils.eval_binary_classifn(
+        observed_labels=training_target_table[
+            utils.BINARIZED_TARGET_NAME].values,
+        forecast_probabilities=training_probabilities,
+        training_event_frequency=training_event_frequency,
+        dataset_name='training')
+
+    validation_probabilities = gbt_model_object.predict_proba(
+        validation_predictor_table.as_matrix()
+    )[:, 1]
 
     utils.eval_binary_classifn(
         observed_labels=validation_target_table[

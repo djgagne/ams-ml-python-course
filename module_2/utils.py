@@ -13,6 +13,7 @@ import matplotlib.pyplot as pyplot
 import sklearn.metrics
 import sklearn.linear_model
 import sklearn.tree
+import sklearn.ensemble
 from module_4 import roc_curves
 from module_4 import performance_diagrams as perf_diagrams
 from module_4 import attributes_diagrams as attr_diagrams
@@ -838,7 +839,7 @@ def train_logistic_regression(model_object, training_predictor_table,
 
 def eval_binary_classifn(
         observed_labels, forecast_probabilities, training_event_frequency,
-        dataset_name, create_plots=True, verbose=True):
+        verbose=True, create_plots=True, dataset_name=None):
     """Evaluates binary-classification model.
 
     E = number of examples
@@ -848,10 +849,11 @@ def eval_binary_classifn(
     :param forecast_probabilities: length-E numpy array with forecast
         probabilities of event (positive class).
     :param training_event_frequency: Frequency of event in training data.
-    :param dataset_name: Dataset name (e.g., "validation").
-    :param create_plots: Boolean flag.  If True, will create plots.
     :param verbose: Boolean flag.  If True, will print results to command
         window.
+    :param create_plots: Boolean flag.  If True, will create plots.
+    :param dataset_name: Dataset name (e.g., "validation").  Used only if
+        `create_plots == True or verbose == True`.
     """
 
     pofd_by_threshold, pod_by_threshold = roc_curves.get_points_in_roc_curve(
@@ -904,7 +906,8 @@ def eval_binary_classifn(
         BRIER_SKILL_SCORE_KEY: brier_skill_score
     }
 
-    dataset_name = dataset_name[0].upper() + dataset_name[1:]
+    if verbose or create_plots:
+        dataset_name = dataset_name[0].upper() + dataset_name[1:]
 
     if verbose:
         print('{0:s} Max Peirce score (POD - POFD) = {1:.3f}'.format(
@@ -996,6 +999,88 @@ def train_classification_tree(model_object, training_predictor_table,
     """Trains decision tree for classification.
 
     :param model_object: Untrained model created by `setup_classification_tree`.
+    :param training_predictor_table: See doc for `read_feature_file`.
+    :param training_target_table: Same.
+    :return: model_object: Trained version of input.
+    """
+
+    model_object.fit(
+        X=training_predictor_table.as_matrix(),
+        y=training_target_table[BINARIZED_TARGET_NAME].values
+    )
+
+    return model_object
+
+
+def setup_classification_forest(
+        max_predictors_per_split, num_trees=100, min_examples_at_split=30,
+        min_examples_at_leaf=30):
+    """Sets up (but does not train) random forest for classification.
+
+    :param max_predictors_per_split: Max number of predictors to try at each
+        split.
+    :param num_trees: Number of trees.
+    :param min_examples_at_split: Minimum number of examples at split node.
+    :param min_examples_at_leaf: Minimum number of examples at leaf node.
+    :return: model_object: Instance of
+        `sklearn.ensemble.RandomForestClassifier`.
+    """
+
+    return sklearn.ensemble.RandomForestClassifier(
+        n_estimators=num_trees, min_samples_split=min_examples_at_split,
+        min_samples_leaf=min_examples_at_leaf,
+        max_features=max_predictors_per_split, bootstrap=True,
+        random_state=RANDOM_SEED, verbose=2)
+
+
+def train_classification_forest(model_object, training_predictor_table,
+                                training_target_table):
+    """Trains random forest for classification.
+
+    :param model_object: Untrained model created by
+        `setup_classification_forest`.
+    :param training_predictor_table: See doc for `read_feature_file`.
+    :param training_target_table: Same.
+    :return: model_object: Trained version of input.
+    """
+
+    model_object.fit(
+        X=training_predictor_table.as_matrix(),
+        y=training_target_table[BINARIZED_TARGET_NAME].values
+    )
+
+    return model_object
+
+
+def setup_classification_gbt(
+        max_predictors_per_split, num_trees=100, learning_rate=0.1,
+        min_examples_at_split=30, min_examples_at_leaf=30):
+    """Sets up (but does not train) gradient-boosted trees for classification.
+
+    :param max_predictors_per_split: Max number of predictors to try at each
+        split.
+    :param num_trees: Number of trees.
+    :param learning_rate: Learning rate.
+    :param min_examples_at_split: Minimum number of examples at split node.
+    :param min_examples_at_leaf: Minimum number of examples at leaf node.
+    :return: model_object: Instance of
+        `sklearn.ensemble.GradientBoostingClassifier`.
+    """
+
+    return sklearn.ensemble.GradientBoostingClassifier(
+        loss='exponential', learning_rate=learning_rate, n_estimators=num_trees,
+        min_samples_split=min_examples_at_split,
+        min_samples_leaf=min_examples_at_leaf,
+        max_features=max_predictors_per_split, random_state=RANDOM_SEED,
+        verbose=2)
+
+
+def train_classification_gbt(model_object, training_predictor_table,
+                             training_target_table):
+    """Trains gradient-boosted trees for classification.
+
+    :param model_object: Untrained model created by
+        `setup_classification_gbt`.
     :param training_predictor_table: See doc for `read_feature_file`.
     :param training_target_table: Same.
     :return: model_object: Trained version of input.
