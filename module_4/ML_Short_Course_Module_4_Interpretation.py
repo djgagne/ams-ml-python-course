@@ -1,11 +1,19 @@
 """Code for AMS 2019 short course."""
 
 import numpy
+import tensorflow
+import keras.backend as K
 import matplotlib.pyplot as pyplot
 from module_4 import utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 MINOR_SEPARATOR_STRING = '\n\n' + '-' * 50 + '\n\n'
+
+config_object = tensorflow.ConfigProto()
+config_object.gpu_options.allow_growth = True
+session_object = tensorflow.Session(config=config_object)
+
+K.set_session(session_object)
 
 
 def find_training_and_validation():
