@@ -101,8 +101,8 @@ NOVEL_IMAGES_UPCONV_KEY = 'novel_image_matrix_upconv'
 NOVEL_IMAGES_UPCONV_SVD_KEY = 'novel_image_matrix_upconv_svd'
 
 # Plotting constants.
-FIGURE_WIDTH_INCHES = 15
-FIGURE_HEIGHT_INCHES = 15
+FIGURE_WIDTH_INCHES = 10
+FIGURE_HEIGHT_INCHES = 10
 FIGURE_RESOLUTION_DPI = 300
 
 BAR_GRAPH_FACE_COLOUR = numpy.array([166, 206, 227], dtype=float) / 255
@@ -111,7 +111,7 @@ BAR_GRAPH_EDGE_WIDTH = 2.
 
 SALIENCY_COLOUR_MAP_OBJECT = pyplot.cm.Greys
 
-FONT_SIZE = 30
+FONT_SIZE = 20
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
 pyplot.rc('axes', labelsize=FONT_SIZE)
@@ -1514,12 +1514,15 @@ def evaluate_cnn(
     predictor_matrix, _ = normalize_images(
         predictor_matrix=image_dict[PREDICTOR_MATRIX_KEY] + 0.,
         predictor_names=image_dict[PREDICTOR_NAMES_KEY],
-        normalization_dict=cnn_metadata_dict[NORMALIZATION_DICT_KEY])
+        normalization_dict=cnn_metadata_dict[NORMALIZATION_DICT_KEY]
+    )
+
     predictor_matrix = predictor_matrix.astype('float32')
 
     target_values = binarize_target_images(
         target_matrix=image_dict[TARGET_MATRIX_KEY],
-        binarization_threshold=cnn_metadata_dict[BINARIZATION_THRESHOLD_KEY])
+        binarization_threshold=cnn_metadata_dict[BINARIZATION_THRESHOLD_KEY]
+    )
 
     forecast_probabilities = apply_cnn(cnn_model_object=cnn_model_object,
                                        predictor_matrix=predictor_matrix)
@@ -1531,8 +1534,8 @@ def evaluate_cnn(
 
     area_under_roc_curve = sklearn.metrics.auc(
         x=pofd_by_threshold, y=pod_by_threshold)
-    title_string = 'Area under ROC curve: {0:.4f}'.format(area_under_roc_curve)
 
+    title_string = 'ROC curve (AUC = {0:.3f})'.format(area_under_roc_curve)
     pyplot.title(title_string)
     pyplot.show()
 
@@ -1543,9 +1546,19 @@ def evaluate_cnn(
     pyplot.savefig(roc_curve_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
-    performance_diagrams.plot_performance_diagram(
-        observed_labels=target_values,
-        forecast_probabilities=forecast_probabilities)
+    pod_by_threshold, success_ratio_by_threshold = (
+        performance_diagrams.plot_performance_diagram(
+            observed_labels=target_values,
+            forecast_probabilities=forecast_probabilities)
+    )
+
+    csi_by_threshold = (
+        (pod_by_threshold ** -1 + success_ratio_by_threshold ** -1 - 1) ** -1
+    )
+    max_csi = numpy.nanmax(csi_by_threshold)
+
+    title_string = 'Performance diagram (max CSI = {0:.3f})'.format(max_csi)
+    pyplot.title(title_string)
     pyplot.show()
 
     perf_diagram_file_name = '{0:s}/performance_diagram.jpg'.format(
@@ -1555,9 +1568,36 @@ def evaluate_cnn(
     pyplot.savefig(perf_diagram_file_name, dpi=FIGURE_RESOLUTION_DPI)
     pyplot.close()
 
-    attributes_diagrams.plot_attributes_diagram(
-        observed_labels=target_values,
-        forecast_probabilities=forecast_probabilities, num_bins=20)
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    mean_forecast_by_bin, event_freq_by_bin, num_examples_by_bin = (
+        attributes_diagrams.plot_attributes_diagram(
+            observed_labels=target_values,
+            forecast_probabilities=forecast_probabilities, num_bins=20,
+            figure_object=figure_object, axes_object=axes_object)
+    )
+
+    event_frequency = numpy.mean(target_values)
+    uncertainty = event_frequency * (1. - event_frequency)
+
+    this_numerator = numpy.nansum(
+        num_examples_by_bin * (mean_forecast_by_bin - event_freq_by_bin) ** 2
+    )
+    reliability = this_numerator / numpy.sum(num_examples_by_bin)
+
+    this_numerator = numpy.nansum(
+        num_examples_by_bin * (event_freq_by_bin - event_frequency) ** 2
+    )
+    resolution = this_numerator / numpy.sum(num_examples_by_bin)
+
+    # brier_score = uncertainty + reliability - resolution
+    brier_skill_score = (resolution - reliability) / uncertainty
+
+    title_string = 'Attributes diagram (Brier skill score = {0:.3f})'.format(
+        brier_skill_score)
+    axes_object.set_title(title_string)
     pyplot.show()
 
     attr_diagram_file_name = '{0:s}/attributes_diagram.jpg'.format(
