@@ -16,10 +16,10 @@ LEVELS_FOR_BIAS_CONTOURS = numpy.array(
 BIAS_STRING_FORMAT = '%.2f'
 BIAS_LABEL_PADDING_PX = 10
 
-FIGURE_WIDTH_INCHES = 15
-FIGURE_HEIGHT_INCHES = 15
+FIGURE_WIDTH_INCHES = 10
+FIGURE_HEIGHT_INCHES = 10
 
-FONT_SIZE = 30
+FONT_SIZE = 20
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
 pyplot.rc('axes', labelsize=FONT_SIZE)
@@ -167,7 +167,7 @@ def _add_colour_bar(
     return colour_bar_object
 
 
-def _get_points_in_perf_diagram(observed_labels, forecast_probabilities):
+def get_points_in_perf_diagram(observed_labels, forecast_probabilities):
     """Creates points for performance diagram.
 
     E = number of examples
@@ -240,7 +240,7 @@ def plot_performance_diagram(
         observed_labels, forecast_probabilities,
         line_colour=DEFAULT_LINE_COLOUR, line_width=DEFAULT_LINE_WIDTH,
         bias_line_colour=DEFAULT_BIAS_LINE_COLOUR,
-        bias_line_width=DEFAULT_BIAS_LINE_WIDTH):
+        bias_line_width=DEFAULT_BIAS_LINE_WIDTH, axes_object=None):
     """Plots performance diagram.
 
     E = number of examples
@@ -253,18 +253,22 @@ def plot_performance_diagram(
     :param line_width: Line width (real positive number).
     :param bias_line_colour: Colour of contour lines for frequency bias.
     :param bias_line_width: Width of contour lines for frequency bias.
-    :return: pod_by_threshold: See doc for `_get_points_in_perf_diagram`.
+    :param axes_object: Will plot on these axes (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).  If `axes_object is None`,
+        will create new axes.
+    :return: pod_by_threshold: See doc for `get_points_in_perf_diagram`.
         detection) values.
     :return: success_ratio_by_threshold: Same.
     """
 
-    pod_by_threshold, success_ratio_by_threshold = _get_points_in_perf_diagram(
+    pod_by_threshold, success_ratio_by_threshold = get_points_in_perf_diagram(
         observed_labels=observed_labels,
         forecast_probabilities=forecast_probabilities)
 
-    _, axes_object = pyplot.subplots(
-        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-    )
+    if axes_object is None:
+        _, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
 
     success_ratio_matrix, pod_matrix = _get_sr_pod_grid()
     csi_matrix = _csi_from_sr_and_pod(success_ratio_matrix, pod_matrix)

@@ -1,17 +1,21 @@
 """Methods for plotting ROC (receiver operating characteristic) curve."""
 
 import numpy
+import matplotlib.colors
 import matplotlib.pyplot as pyplot
+from module_4 import performance_diagrams
 
 DEFAULT_LINE_COLOUR = numpy.array([228, 26, 28], dtype=float) / 255
 DEFAULT_LINE_WIDTH = 3
 DEFAULT_RANDOM_LINE_COLOUR = numpy.full(3, 152. / 255)
 DEFAULT_RANDOM_LINE_WIDTH = 2
 
-FIGURE_WIDTH_INCHES = 15
-FIGURE_HEIGHT_INCHES = 15
+LEVELS_FOR_PEIRCE_CONTOURS = numpy.linspace(0, 1, num=11, dtype=float)
 
-FONT_SIZE = 30
+FIGURE_WIDTH_INCHES = 10
+FIGURE_HEIGHT_INCHES = 10
+
+FONT_SIZE = 20
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
 pyplot.rc('axes', labelsize=FONT_SIZE)
@@ -21,7 +25,56 @@ pyplot.rc('legend', fontsize=FONT_SIZE)
 pyplot.rc('figure', titlesize=FONT_SIZE)
 
 
-def _get_points_in_roc_curve(observed_labels, forecast_probabilities):
+def _get_pofd_pod_grid(pofd_spacing=0.01, pod_spacing=0.01):
+    """Creates grid in POFD-POD space.
+
+    M = number of rows (unique POD values) in grid
+    N = number of columns (unique POFD values) in grid
+
+    :param pofd_spacing: Spacing between grid cells in adjacent columns.
+    :param pod_spacing: Spacing between grid cells in adjacent rows.
+    :return: pofd_matrix: M-by-N numpy array of POFD values.
+    :return: pod_matrix: M-by-N numpy array of POD values.
+    """
+
+    num_pofd_values = 1 + int(numpy.ceil(1. / pofd_spacing))
+    num_pod_values = 1 + int(numpy.ceil(1. / pod_spacing))
+
+    unique_pofd_values = numpy.linspace(0., 1., num=num_pofd_values)
+    unique_pod_values = numpy.linspace(0., 1., num=num_pod_values)[::-1]
+    return numpy.meshgrid(unique_pofd_values, unique_pod_values)
+
+
+def _get_peirce_colour_scheme():
+    """Returns colour scheme for Peirce score.
+
+    :return: colour_map_object: Colour scheme (instance of
+        `matplotlib.colors.ListedColormap`).
+    :return: colour_norm_object: Instance of `matplotlib.colors.BoundaryNorm`,
+        defining the scale of the colour map.
+    """
+
+    this_colour_map_object = pyplot.cm.Blues
+    this_colour_norm_object = matplotlib.colors.BoundaryNorm(
+        LEVELS_FOR_PEIRCE_CONTOURS, this_colour_map_object.N)
+
+    rgba_matrix = this_colour_map_object(this_colour_norm_object(
+        LEVELS_FOR_PEIRCE_CONTOURS
+    ))
+
+    colour_list = [
+        rgba_matrix[i, ..., :-1] for i in range(rgba_matrix.shape[0])
+    ]
+
+    colour_map_object = matplotlib.colors.ListedColormap(colour_list)
+    colour_map_object.set_under(numpy.array([1, 1, 1]))
+    colour_norm_object = matplotlib.colors.BoundaryNorm(
+        LEVELS_FOR_PEIRCE_CONTOURS, colour_map_object.N)
+
+    return colour_map_object, colour_norm_object
+
+
+def get_points_in_roc_curve(observed_labels, forecast_probabilities):
     """Creates points for ROC curve.
 
     E = number of examples
@@ -98,7 +151,7 @@ def plot_roc_curve(
         observed_labels, forecast_probabilities,
         line_colour=DEFAULT_LINE_COLOUR, line_width=DEFAULT_LINE_WIDTH,
         random_line_colour=DEFAULT_RANDOM_LINE_COLOUR,
-        random_line_width=DEFAULT_RANDOM_LINE_WIDTH):
+        random_line_width=DEFAULT_RANDOM_LINE_WIDTH, axes_object=None):
     """Plots ROC curve.
 
     E = number of examples
@@ -113,17 +166,42 @@ def plot_roc_curve(
         predictor).
     :param random_line_width: Width of reference line (ROC curve for random
         predictor).
-    :return: pofd_by_threshold: See doc for `_get_points_in_roc_curve`.
+    :param axes_object: Will plot on these axes (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).  If `axes_object is None`,
+        will create new axes.
+    :return: pofd_by_threshold: See doc for `get_points_in_roc_curve`.
     :return: pod_by_threshold: Same.
     """
 
-    pofd_by_threshold, pod_by_threshold = _get_points_in_roc_curve(
+    pofd_by_threshold, pod_by_threshold = get_points_in_roc_curve(
         observed_labels=observed_labels,
         forecast_probabilities=forecast_probabilities)
 
-    _, axes_object = pyplot.subplots(
-        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-    )
+    if axes_object is None:
+        _, axes_object = pyplot.subplots(
+            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+        )
+
+    pofd_matrix, pod_matrix = _get_pofd_pod_grid()
+    peirce_score_matrix = pod_matrix - pofd_matrix
+
+    colour_map_object, colour_norm_object = _get_peirce_colour_scheme()
+
+    pyplot.contourf(
+        pofd_matrix, pod_matrix, peirce_score_matrix,
+        LEVELS_FOR_PEIRCE_CONTOURS, cmap=colour_map_object,
+        norm=colour_norm_object, vmin=0., vmax=1., axes=axes_object)
+
+    # TODO(thunderhoser): Calling private method is a HACK.
+    colour_bar_object = performance_diagrams._add_colour_bar(
+        axes_object=axes_object, colour_map_object=colour_map_object,
+        colour_norm_object=colour_norm_object,
+        values_to_colour=peirce_score_matrix, min_colour_value=0.,
+        max_colour_value=1., orientation_string='vertical',
+        extend_min=False, extend_max=False)
+
+    print(colour_bar_object)
+    colour_bar_object.set_label('Peirce score')
 
     random_x_coords = numpy.array([0., 1.])
     random_y_coords = numpy.array([0., 1.])
