@@ -1023,7 +1023,7 @@ def train_random_forest(
 
     random_forest_model_object = utils.setup_classification_forest(
         max_predictors_per_split=max_predictors_per_split,
-        min_examples_at_split=500, min_examples_at_leaf=200)
+        num_trees=100, min_examples_at_split=500, min_examples_at_leaf=200)
 
     _ = utils.train_classification_forest(
         model_object=random_forest_model_object,
@@ -1073,7 +1073,7 @@ def train_gradient_boosted_trees(
     # ))
 
     gbt_model_object = utils.setup_classification_forest(
-        max_predictors_per_split=num_predictors,
+        max_predictors_per_split=num_predictors, num_trees=100,
         min_examples_at_split=500, min_examples_at_leaf=200)
 
     _ = utils.train_classification_gbt(
