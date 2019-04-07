@@ -804,22 +804,28 @@ def bwo_example1(validation_image_dict, normalization_dict, cnn_model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Real example (before optimization)')
+    axes_objects_2d_list[0][0].set_title(
+        'Real example (before optimization)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Real example (before optimization)', fontsize=16)
     pyplot.show()
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Synthetic example (after optimization)')
+    axes_objects_2d_list[0][0].set_title(
+        'Synthetic example (after optimization)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Synthetic example (after optimization)', fontsize=16)
     pyplot.show()
 
 
@@ -862,22 +868,28 @@ def bwo_example2(validation_image_dict, normalization_dict, cnn_model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Real example (before optimization)')
+    axes_objects_2d_list[0][0].set_title(
+        'Real example (before optimization)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Real example (before optimization)', fontsize=16)
     pyplot.show()
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Synthetic example (after optimization)')
+    axes_objects_2d_list[0][0].set_title(
+        'Synthetic example (after optimization)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Synthetic example (after optimization)', fontsize=16)
     pyplot.show()
 
 
@@ -925,22 +937,28 @@ def bwo_example3(validation_image_dict, normalization_dict, cnn_model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Real example (before optimization)')
+    axes_objects_2d_list[0][0].set_title(
+        'Real example (before optimization)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Real example (before optimization)', fontsize=16)
     pyplot.show()
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Synthetic example (after optimization)')
+    axes_objects_2d_list[0][0].set_title(
+        'Synthetic example (after optimization)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Synthetic example (after optimization)', fontsize=16)
     pyplot.show()
 
 
@@ -988,22 +1006,28 @@ def bwo_example4(validation_image_dict, normalization_dict, cnn_model_object):
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=orig_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Real example (before optimization)')
+    axes_objects_2d_list[0][0].set_title(
+        'Real example (before optimization)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Real example (before optimization)', fontsize=16)
     pyplot.show()
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=optimized_predictor_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Synthetic example (after optimization)')
+    axes_objects_2d_list[0][0].set_title(
+        'Synthetic example (after optimization)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Synthetic example (after optimization)', fontsize=16)
     pyplot.show()
 
 
@@ -1066,22 +1090,28 @@ def apply_ucn_example1(
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=image_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Original image (CNN input)')
+    axes_objects_2d_list[0][0].set_title(
+        'Original image (CNN input)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Original image (CNN input)', fontsize=16)
     pyplot.show()
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=reconstructed_image_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Reconstructed image (upconvnet output)')
+    axes_objects_2d_list[0][0].set_title(
+        'Reconstructed image (upconvnet output)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Reconstructed image (upconvnet output)', fontsize=16)
     pyplot.show()
 
 
@@ -1137,22 +1167,28 @@ def apply_ucn_example2(
     min_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_temp_matrix_kelvins, 99)
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=image_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Original image (CNN input)')
+    axes_objects_2d_list[0][0].set_title(
+        'Original image (CNN input)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Original image (CNN input)', fontsize=16)
     pyplot.show()
 
-    figure_object, _ = utils.plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = utils.plot_many_predictors_with_barbs(
         predictor_matrix=reconstructed_image_matrix,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    figure_object.suptitle('Reconstructed image (upconvnet output)')
+    axes_objects_2d_list[0][0].set_title(
+        'Reconstructed image (upconvnet output)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        'Reconstructed image (upconvnet output)', fontsize=16)
     pyplot.show()
 
 

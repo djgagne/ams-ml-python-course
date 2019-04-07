@@ -376,7 +376,7 @@ def read_many_image_files(netcdf_file_names):
 
 
 def _init_figure_panels(num_rows, num_columns, horizontal_space_fraction=0.1,
-                        vertical_space_fraction=0.1):
+                        vertical_space_fraction=0.1, keep_aspect_ratio=True):
     """Initializes paneled figure.
 
     :param num_rows: Number of panel rows.
@@ -385,6 +385,9 @@ def _init_figure_panels(num_rows, num_columns, horizontal_space_fraction=0.1,
         fraction of panel size).
     :param vertical_space_fraction: Vertical space between panels (as fraction
         of panel size).
+    :param keep_aspect_ratio: Boolean flag.  If True, aspect ratio of each panel
+        will be forced to reflect aspect ratio of the data.  For example, if the
+        grid plotted in each panel is 32 x 32, each panel must be a square.
     :return: figure_object: Instance of `matplotlib.figure.Figure`.
     :return: axes_objects_2d_list: 2-D list, where axes_objects_2d_list[i][j] is
         the handle (instance of `matplotlib.axes._subplots.AxesSubplot`) for the
@@ -407,13 +410,21 @@ def _init_figure_panels(num_rows, num_columns, horizontal_space_fraction=0.1,
         left=0.02, bottom=0.02, right=0.98, top=0.95,
         hspace=vertical_space_fraction, wspace=horizontal_space_fraction)
 
+    if not keep_aspect_ratio:
+        return figure_object, axes_objects_2d_list
+
+    for i in range(num_rows):
+        for j in range(num_columns):
+            axes_objects_2d_list[i][j].set(
+                adjustable='box-forced', aspect='equal')
+
     return figure_object, axes_objects_2d_list
 
 
 def _add_colour_bar(
         axes_object, colour_map_object, values_to_colour, min_colour_value,
         max_colour_value, colour_norm_object=None,
-        orientation_string='vertical', extend_min=True, extend_max=True):
+        orientation_string='horizontal', extend_min=True, extend_max=True):
     """Adds colour bar to existing axes.
 
     :param axes_object: Existing axes (instance of
@@ -454,7 +465,7 @@ def _add_colour_bar(
         extend_string = 'neither'
 
     if orientation_string == 'horizontal':
-        padding = 0.075
+        padding = 0.025
     else:
         padding = 0.05
 
@@ -590,7 +601,7 @@ def plot_many_predictors_with_barbs(
     ]
 
     figure_object, axes_objects_2d_list = _init_figure_panels(
-        num_rows=len(non_wind_predictor_names), num_columns=1
+        num_columns=len(non_wind_predictor_names), num_rows=1
     )
 
     for m in range(len(non_wind_predictor_names)):
@@ -614,13 +625,13 @@ def plot_many_predictors_with_barbs(
             colour_norm_object=this_colour_norm_object,
             min_colour_value=this_min_colour_value,
             max_colour_value=this_max_colour_value,
-            axes_object=axes_objects_2d_list[m][0]
+            axes_object=axes_objects_2d_list[0][m]
         )
 
         plot_wind_2d(
             u_wind_matrix_m_s01=u_wind_matrix_m_s01,
             v_wind_matrix_m_s01=v_wind_matrix_m_s01,
-            axes_object=axes_objects_2d_list[m][0]
+            axes_object=axes_objects_2d_list[0][m]
         )
 
         this_colour_bar_object.set_label(non_wind_predictor_names[m])
@@ -3138,7 +3149,7 @@ def _plot_novelty_for_many_predictors(
     ]
 
     figure_object, axes_objects_2d_list = _init_figure_panels(
-        num_rows=len(non_wind_predictor_names), num_columns=1
+        num_columns=len(non_wind_predictor_names), num_rows=1
     )
 
     for m in range(len(non_wind_predictor_names)):
@@ -3160,13 +3171,13 @@ def _plot_novelty_for_many_predictors(
             colour_map_object=this_colour_map_object, colour_norm_object=None,
             min_colour_value=this_min_colour_value,
             max_colour_value=this_max_colour_value,
-            axes_object=axes_objects_2d_list[m][0]
+            axes_object=axes_objects_2d_list[0][m]
         )
 
         plot_wind_2d(
             u_wind_matrix_m_s01=u_wind_matrix_m_s01,
             v_wind_matrix_m_s01=v_wind_matrix_m_s01,
-            axes_object=axes_objects_2d_list[m][0]
+            axes_object=axes_objects_2d_list[0][m]
         )
 
         this_colour_bar_object.set_label(non_wind_predictor_names[m])
@@ -3203,26 +3214,25 @@ def plot_novelty_detection(image_dict, novelty_dict, test_index):
     min_colour_temp_kelvins = numpy.percentile(combined_matrix_kelvins, 1)
     max_colour_temp_kelvins = numpy.percentile(combined_matrix_kelvins, 99)
 
-    this_figure_object, _ = plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = plot_many_predictors_with_barbs(
         predictor_matrix=image_matrix_actual, predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    base_title_string = '{0:d}th-most novel example'.format(test_index + 1)
-    this_title_string = '{0:s}: actual'.format(base_title_string)
-    this_figure_object.suptitle(this_title_string)
+    axes_objects_2d_list[0][0].set_title('Actual example', fontsize=16)
+    axes_objects_2d_list[0][1].set_title('Actual example', fontsize=16)
     pyplot.show()
 
-    this_figure_object, _ = plot_many_predictors_with_barbs(
+    _, axes_objects_2d_list = plot_many_predictors_with_barbs(
         predictor_matrix=image_matrix_upconv,
         predictor_names=predictor_names,
         min_colour_temp_kelvins=min_colour_temp_kelvins,
         max_colour_temp_kelvins=max_colour_temp_kelvins)
 
-    this_title_string = r'{0:s}: upconvnet reconstruction'.format(
-        base_title_string)
-    this_title_string += r' ($\mathbf{X}_{up}$)'
-    this_figure_object.suptitle(this_title_string)
+    axes_objects_2d_list[0][0].set_title(
+        r'Upconvnet reconstruction ($\mathbf{X}_{up}$)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        r'Upconvnet reconstruction ($\mathbf{X}_{up}$)', fontsize=16)
     pyplot.show()
 
     novelty_matrix = image_matrix_upconv - image_matrix_upconv_svd
@@ -3234,13 +3244,13 @@ def plot_novelty_detection(image_dict, novelty_dict, test_index):
         numpy.absolute(novelty_matrix[..., reflectivity_index]), 99
     )
 
-    this_figure_object, _ = _plot_novelty_for_many_predictors(
+    _, axes_objects_2d_list = _plot_novelty_for_many_predictors(
         novelty_matrix=novelty_matrix, predictor_names=predictor_names,
         max_absolute_temp_kelvins=max_absolute_temp_kelvins,
         max_absolute_refl_dbz=max_absolute_refl_dbz)
 
-    this_title_string = r'{0:s}: novelty'.format(
-        base_title_string)
-    this_title_string += r' ($\mathbf{X}_{up} - \mathbf{X}_{up,svd}$)'
-    this_figure_object.suptitle(this_title_string)
+    axes_objects_2d_list[0][0].set_title(
+        r'Novelty map ($\mathbf{X}_{up} - \mathbf{X}_{up,svd}$)', fontsize=16)
+    axes_objects_2d_list[0][1].set_title(
+        r'Novelty map ($\mathbf{X}_{up} - \mathbf{X}_{up,svd}$)', fontsize=16)
     pyplot.show()
