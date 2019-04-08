@@ -109,3 +109,5 @@ slurm/
 .idea/
 data/
 *.iml
+module_4/permutation_test/
+module_4/validation/
