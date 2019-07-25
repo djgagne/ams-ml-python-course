@@ -1,5 +1,6 @@
 # ams-ml-python-course
 [![DOI](https://zenodo.org/badge/151317532.svg)](https://zenodo.org/badge/latestdoi/151317532)
+
 Machine Learning in Python for Environmental Science Problems AMS Short Course Material
 
 ## Authors
