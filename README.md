@@ -1,5 +1,12 @@
 # ams-ml-python-course
+[![DOI](https://zenodo.org/badge/151317532.svg)](https://zenodo.org/badge/latestdoi/151317532)
 Machine Learning in Python for Environmental Science Problems AMS Short Course Material
+
+## Authors
+* David John Gagne, National Center for Atmospheric Research (dgagne@ucar.edu)
+* Ryan Lagerquist, University of Oklahoma (ryan.lagerquist@ou.edu)
+* Greg Herman, Amazon
+* Sheri Mickelson, National Center for Atmospheric Research
 
 ## Requirements
 The modules for this short course require Python 3.6 and the following Python libraries:
